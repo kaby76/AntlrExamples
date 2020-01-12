@@ -3741,7 +3741,7 @@ windowName:
 // Identifiers excluding keywords (except if they are quoted). IDENT_sys in sql_yacc.yy.
 pureIdentifier:
     (IDENTIFIER | BACK_TICK_QUOTED_ID)
-    | {isSqlModeActive(AnsiQuotes)}? DOUBLE_QUOTED_TEXT
+    | {isSqlModeActive(SqlMode.AnsiQuotes)}? DOUBLE_QUOTED_TEXT
 ;
 
 // Identifiers including a certain set of keywords, which are allowed also if not quoted.
@@ -3828,7 +3828,7 @@ stringList:
 // TEXT_STRING_validated in sql_yacc.yy.
 textStringLiteral:
     value = SINGLE_QUOTED_TEXT
-    | {!isSqlModeActive(AnsiQuotes)}? value = DOUBLE_QUOTED_TEXT
+    | {!isSqlModeActive(SqlMode.AnsiQuotes)}? value = DOUBLE_QUOTED_TEXT
 ;
 
 textString:

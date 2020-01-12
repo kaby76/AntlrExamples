@@ -6,6 +6,17 @@ namespace mysql
 {
     public class MySQLBaseRecognizer : Parser
     {
+        public enum SqlMode
+        {
+            NoMode = 0,
+            AnsiQuotes = 1 << 0,
+            HighNotPrecedence = 1 << 1,
+            PipesAsConcat = 1 << 2,
+            IgnoreSpace = 1 << 3,
+            NoBackslashEscapes = 1 << 4
+        };
+        public long serverVersion;
+
         public MySQLBaseRecognizer(ITokenStream input, TextWriter output, TextWriter errorOutput)
             : base(input, output, errorOutput)
         { }
@@ -16,7 +27,7 @@ namespace mysql
 
         public override string GrammarFileName => throw new NotImplementedException();
 
-        public bool isSqlModeActive(ulong mode)
+        public bool isSqlModeActive(SqlMode mode)
         {
             throw new NotImplementedException();
         }
