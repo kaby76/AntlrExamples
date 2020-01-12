@@ -54,6 +54,8 @@ tokens {
     NOT2_SYMBOL,
     CONCAT_PIPES_SYMBOL,
 
+        INNODB_SYMBOL,
+
     // Tokens assigned in NUMBER rule.
     INT_NUMBER, // NUM in sql_yacc.yy
     LONG_NUMBER,
@@ -184,7 +186,7 @@ fragment HEXDIGIT: [0-9a-fA-F];
 HEX_NUMBER: ('0x' HEXDIGIT+) | ('x\'' HEXDIGIT+ '\'');
 BIN_NUMBER: ('0b' [01]+) | ('b\'' [01]+ '\'');
 
-INT_NUMBER: DIGITS { Type = (determineNumericType(getText())); };
+INT_NUMBER: DIGITS { Type = (determineNumericType(Text)); };
 
 // Float types must be handled first or the DOT_IDENTIIFER rule will make them to identifiers
 // (if there is no leading digit before the dot).
@@ -363,7 +365,7 @@ CURRENT_DATE_SYMBOL:
     C U R R E N T '_' D A T E                                                { Type = (determineFunction(CURDATE_SYMBOL)); }
 ;                                                                            // Synonym, MYSQL-FUNC
 CURRENT_TIME_SYMBOL:
-    C U R R E N T '_' T I M E                                                { Type = (etermineFunction(CURTIME_SYMBOL)); }
+    C U R R E N T '_' T I M E                                                { Type = (determineFunction(CURTIME_SYMBOL)); }
 ;                                                                            // Synonym, MYSQL-FUNC
 CURRENT_TIMESTAMP_SYMBOL:        C U R R E N T '_' T I M E S T A M P         -> type(NOW_SYMBOL); // Synonym
 CURRENT_USER_SYMBOL:             C U R R E N T '_' U S E R;                  // SQL-2003-R
@@ -643,7 +645,7 @@ NODEGROUP_SYMBOL:                N O D E G R O U P;
 NONE_SYMBOL:                     N O N E;                                    // SQL-2003-R
 NONBLOCKING_SYMBOL:              N O N B L O C K I N G                       {50700 < serverVersion && serverVersion < 50706}?;
 NOT_SYMBOL:
-    N O T                                                                    { Type = (isSqlModeActive(HighNotPrecedence) ? NOT2_SYMBOL: NOT_SYMBOL); }
+    N O T                                                                    { Type = (isSqlModeActive(SqlMode.HighNotPrecedence) ? NOT2_SYMBOL: NOT_SYMBOL); }
 ;                                                                            // SQL-2003-R
 NOW_SYMBOL:                      N O W                                       { Type = (determineFunction(NOW_SYMBOL)); };
 NO_SYMBOL:                       N O;                                        // SQL-2003-R
@@ -1071,7 +1073,7 @@ INVALID_INPUT:
 
 // The underscore charset token is used to defined the repertoire of a string, though it conflicts
 // with normal identifiers, which also can start with an underscore.
-UNDERSCORE_CHARSET: UNDERLINE_SYMBOL IDENTIFIER { Type = (checkCharset(getText())); };
+UNDERSCORE_CHARSET: UNDERLINE_SYMBOL IDENTIFIER { Type = (checkCharset(Text)); };
 
 // Identifiers might start with a digit, even though it is discouraged, and may not consist entirely of digits only.
 // All keywords above are automatically excluded.
@@ -1093,14 +1095,14 @@ fragment DOUBLE_QUOTE: '"';
 
 BACK_TICK_QUOTED_ID:
     BACK_TICK (
-        {!isSqlModeActive(NoBackslashEscapes)}? '\\' BACK_TICK
+        {!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' BACK_TICK
         | .
     )*? BACK_TICK
 ;
 
 DOUBLE_QUOTED_TEXT: (
         DOUBLE_QUOTE (
-            {!isSqlModeActive(NoBackslashEscapes)}? '\\' DOUBLE_QUOTE
+            {!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' DOUBLE_QUOTE
             | .
         )*? DOUBLE_QUOTE
     )+
@@ -1108,7 +1110,7 @@ DOUBLE_QUOTED_TEXT: (
 
 SINGLE_QUOTED_TEXT: (
         SINGLE_QUOTE (
-            {!isSqlModeActive(NoBackslashEscapes)}? '\\' SINGLE_QUOTE
+            {!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' SINGLE_QUOTE
             | .
         )*? SINGLE_QUOTE
     )+
@@ -1120,7 +1122,7 @@ SINGLE_QUOTED_TEXT: (
 // /*!12345 ... */ - Same as the previous one except code is only used when the given number is lower
 //                   than the current server version (specifying so the minimum server version the code can run with).
 VERSION_COMMENT_START: ('/*!' DIGITS) (
-        {checkVersion(getText())}? // Will set inVersionComment if the number matches.
+        {checkVersion(Text)}? // Will set inVersionComment if the number matches.
         | .*? '*/'
     ) -> channel(HIDDEN)
 ;
