@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Antlr4.Runtime.Atn;
 
 namespace mysql
 {
@@ -86,16 +88,16 @@ namespace mysql
                 return INVALID_INDEX - 1; // INVALID_INDEX alone can be interpreted as EOF.
 
             // Generate string -> enum value map, if not yet done.
-            if (_symbols.empty())
+            if (! _symbols.Any())
             {
-                auto & vocabulary = getVocabulary();
-                size_t max = vocabulary.getMaxTokenType();
-                for (size_t i = 0; i <= max; ++i)
+                var vocabulary = this.Vocabulary;
+                uint max = vocabulary.getMaxTokenType();
+                for (uint i = 0; i <= max; ++i)
                     _symbols[vocabulary.getSymbolicName(i)] = i;
             }
 
             // Here we know for sure we got a keyword.
-            auto symbol = _symbols.find(transformed);
+            var symbol = _symbols.find(transformed);
             if (symbol == _symbols.end())
                 return INVALID_INDEX - 1;
             return symbol->second;
@@ -138,7 +140,7 @@ namespace mysql
                 if (token.Type != MySQLLexer.CLOSE_PAR_SYMBOL)
                     return false;
                 token = nextDefaultChannelToken();
-                if (token.Type == Token::EOF)
+                if (token.Type == TokenConstants.EOF)
                     return false;
             }
             return true;
@@ -158,7 +160,7 @@ namespace mysql
                     if (!isIdentifier(token.Type) && token.Type != MySQLLexer.SINGLE_QUOTED_TEXT)
                         return false;
                     token = nextDefaultChannelToken();
-                    if (token.Type == Token::EOF)
+                    if (token.Type == TokenConstants.EOF)
                         return false;
                 }
             }
@@ -172,14 +174,14 @@ namespace mysql
         MySQLQueryType determineQueryType()
         {
             IToken token = nextDefaultChannelToken();
-            if (token.Type == Token::EOF)
+            if (token.Type == TokenConstants.EOF)
                 return MySQLQueryType.QtUnknown;
 
             switch (token.Type)
             {
                 case MySQLLexer.ALTER_SYMBOL:
                     token = nextDefaultChannelToken();
-                    if (token.Type == Token::EOF)
+                    if (token.Type == TokenConstants.EOF)
                         return MySQLQueryType.QtAmbiguous;
 
                     switch (token.Type)
@@ -240,7 +242,7 @@ namespace mysql
                 case MySQLLexer.CREATE_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         switch (token.Type)
@@ -283,7 +285,7 @@ namespace mysql
                                         case MySQLLexer.FUNCTION_SYMBOL:
                                             {
                                                 token = nextDefaultChannelToken();
-                                                if (token.Type == Token::EOF)
+                                                if (token.Type == TokenConstants.EOF)
                                                     return MySQLQueryType.QtAmbiguous;
 
                                                 if (!isIdentifier(token.Type))
@@ -339,7 +341,7 @@ namespace mysql
                 case MySQLLexer.DROP_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         switch (token.Type)
@@ -410,7 +412,7 @@ namespace mysql
                 case MySQLLexer.LOAD_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         switch (token.Type)
@@ -418,7 +420,7 @@ namespace mysql
                             case MySQLLexer.DATA_SYMBOL:
                                 {
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtAmbiguous;
 
                                     if (token.Type == MySQLLexer.FROM_SYMBOL)
@@ -450,7 +452,7 @@ namespace mysql
                         while (token.Type == MySQLLexer.OPEN_PAR_SYMBOL)
                         {
                             token = nextDefaultChannelToken();
-                            if (token.Type == Token::EOF)
+                            if (token.Type == TokenConstants.EOF)
                                 return MySQLQueryType.QtAmbiguous;
                         }
                         if (token.Type == MySQLLexer.SELECT_SYMBOL)
@@ -465,7 +467,7 @@ namespace mysql
                 case MySQLLexer.START_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         if (token.Type == MySQLLexer.TRANSACTION_SYMBOL)
@@ -483,12 +485,12 @@ namespace mysql
                     {
                         // We assume a transaction statement here unless we exactly know it's about a savepoint.
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtRollbackWork;
                         if (token.Type == MySQLLexer.WORK_SYMBOL)
                         {
                             token = nextDefaultChannelToken();
-                            if (token.Type == Token::EOF)
+                            if (token.Type == TokenConstants.EOF)
                                 return MySQLQueryType.QtRollbackWork;
                         }
 
@@ -500,7 +502,7 @@ namespace mysql
                 case MySQLLexer.SET_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtSet;
 
                         switch (token.Type)
@@ -512,14 +514,14 @@ namespace mysql
                             case MySQLLexer.LOCAL_SYMBOL:
                             case MySQLLexer.SESSION_SYMBOL:
                                 token = nextDefaultChannelToken();
-                                if (token.Type == Token::EOF)
+                                if (token.Type == TokenConstants.EOF)
                                     return MySQLQueryType.QtSet;
                                 break;
 
                             case MySQLLexer.IDENTIFIER:
                                 {
-                                    string text = token->getText();
-                                    std::transform(text.begin(), text.end(), text.begin(), ::tolower);
+                                    string text = token.Text;
+                                    text = text.ToLower();
                                     if (text == "autocommit")
                                         return MySQLQueryType.QtSetAutoCommit;
                                     break;
@@ -555,7 +557,7 @@ namespace mysql
                 case MySQLLexer.RESET_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtReset;
 
                         switch (token.Type)
@@ -584,7 +586,7 @@ namespace mysql
                 case MySQLLexer.GRANT_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         if (token.Type == MySQLLexer.PROXY_SYMBOL)
@@ -595,7 +597,7 @@ namespace mysql
                 case MySQLLexer.RENAME_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         if (token.Type == MySQLLexer.USER_SYMBOL)
@@ -606,7 +608,7 @@ namespace mysql
                 case MySQLLexer.REVOKE_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         if (token.Type == MySQLLexer.PROXY_SYMBOL)
@@ -644,7 +646,7 @@ namespace mysql
                 case MySQLLexer.SHOW_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtShow;
 
                         if (token.Type == MySQLLexer.FULL_SYMBOL)
@@ -652,7 +654,7 @@ namespace mysql
                             // Not all SHOW cases allow an optional FULL keyword, but this is not about checking for
                             // a valid query but to find the most likely type.
                             token = nextDefaultChannelToken();
-                            if (token.Type == Token::EOF)
+                            if (token.Type == TokenConstants.EOF)
                                 return MySQLQueryType.QtShow;
                         }
 
@@ -663,7 +665,7 @@ namespace mysql
                             case MySQLLexer.SESSION_SYMBOL:
                                 {
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtShow;
 
                                     if (token.Type == MySQLLexer.STATUS_SYMBOL)
@@ -708,7 +710,7 @@ namespace mysql
                                         return MySQLQueryType.QtShow;
 
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtShow;
 
                                     switch (token.Type)
@@ -726,7 +728,7 @@ namespace mysql
                             case MySQLLexer.CREATE_SYMBOL:
                                 {
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtShow;
 
                                     switch (token.Type)
@@ -775,7 +777,7 @@ namespace mysql
                             case MySQLLexer.FUNCTION_SYMBOL:
                                 {
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtAmbiguous;
 
                                     if (token.Type == MySQLLexer.CODE_SYMBOL)
@@ -807,7 +809,7 @@ namespace mysql
                             case MySQLLexer.PROCEDURE_SYMBOL:
                                 {
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtShow;
 
                                     if (token.Type == MySQLLexer.STATUS_SYMBOL)
@@ -830,7 +832,7 @@ namespace mysql
                             case MySQLLexer.SLAVE_SYMBOL:
                                 {
                                     token = nextDefaultChannelToken();
-                                    if (token.Type == Token::EOF)
+                                    if (token.Type == TokenConstants.EOF)
                                         return MySQLQueryType.QtAmbiguous;
 
                                     if (token.Type == MySQLLexer.HOSTS_SYMBOL)
@@ -873,7 +875,7 @@ namespace mysql
                 case MySQLLexer.DESC_SYMBOL:
                     {
                         token = nextDefaultChannelToken();
-                        if (token.Type == Token::EOF)
+                        if (token.Type == TokenConstants.EOF)
                             return MySQLQueryType.QtAmbiguous;
 
                         if (isIdentifier(token.Type) || token.Type == MySQLLexer.DOT_SYMBOL)
@@ -883,7 +885,7 @@ namespace mysql
                         if (token.Type == MySQLLexer.EXTENDED_SYMBOL)
                         {
                             token = nextDefaultChannelToken();
-                            if (token.Type == Token::EOF)
+                            if (token.Type == TokenConstants.EOF)
                                 return MySQLQueryType.QtExplainTable;
 
                             switch (token.Type)
@@ -1024,21 +1026,21 @@ namespace mysql
         public override IToken NextToken()
         {
             // First respond with pending tokens to the next token request, if there are any.
-            if (!_pendingTokens.empty())
+            if (_pendingTokens.Any())
             {
-                auto pending = std::move(_pendingTokens.front());
-                _pendingTokens.pop_front();
+                var pending = _pendingTokens.First();
+                _pendingTokens.RemoveAt(0);
                 return pending;
             }
 
             // Let the main lexer class run the next token recognition.
             // This might create additional tokens again.
-            var next = Lexer.nextToken();
-            if (!_pendingTokens.empty())
+            var next = base.NextToken();
+            if (_pendingTokens.Any())
             {
-                auto pending = std::move(_pendingTokens.front());
-                _pendingTokens.pop_front();
-                _pendingTokens.push_back(std::move(next));
+                var pending = _pendingTokens.First();
+                _pendingTokens.RemoveAt(0);
+                _pendingTokens.Add(next);
                 return pending;
             }
             return next;
@@ -1046,11 +1048,11 @@ namespace mysql
 
         bool checkVersion(string text)
         {
-            if (text.size() < 8) // Minimum is: /*!12345
+            if (text.Length < 8) // Minimum is: /*!12345
                 return false;
 
             // Skip version comment introducer.
-            long version = std::stoul(text.c_str() + 3, NULL, 10);
+            long version = Int64.Parse(text.Substring(3));
             if (version <= serverVersion)
             {
                 inVersionComment = true;
@@ -1064,19 +1066,19 @@ namespace mysql
         {
             // Skip any whitespace character if the sql mode says they should be ignored,
             // before actually trying to match the open parenthesis.
-            if (isSqlModeActive(IgnoreSpace))
+            if (isSqlModeActive(SqlMode.IgnoreSpace))
             {
-                size_t input = _input->LA(1);
+                var input = this.InputStream.LA(1);
                 while (input == ' ' || input == '\t' || input == '\r' || input == '\n')
                 {
-                    getInterpreter<atn::LexerATNSimulator>()->consume(_input);
-                    channel = HIDDEN;
-                    type = MySQLLexer.WHITESPACE;
-                    input = _input->LA(1);
+                    this.Interpreter.Consume((ICharStream)this.InputStream);
+                    this.Channel = HIDDEN;
+                    this.Type = MySQLLexer.WHITESPACE;
+                    input = this.InputStream.LA(1);
                 }
             }
 
-            return _input->LA(1) == '(' ? proposed : MySQLLexer.IDENTIFIER;
+            return this.InputStream.LA(1) == '(' ? proposed : MySQLLexer.IDENTIFIER;
         }
 
         int determineNumericType(string text)
@@ -1099,31 +1101,31 @@ namespace mysql
             if (length < long_len) // quick normal case
                 return MySQLLexer.INT_NUMBER;
             uint negative = 0;
-
-            if (*str == '+') // Remove sign and pre-zeros
+            int ptr = 0;
+            if (str[ptr] == '+') // Remove sign and pre-zeros
             {
-                str++;
+                ptr++;
                 length--;
             }
-            else if (*str == '-')
+            else if (str[ptr] == '-')
             {
-                str++;
+                ptr++;
                 length--;
                 negative = 1;
             }
 
-            while (*str == '0' && length)
+            while (str[ptr] == '0' && length != 0)
             {
-                str++;
+                ptr++;
                 length--;
             }
 
             if (length < long_len)
                 return MySQLLexer.INT_NUMBER;
 
-            unsigned smaller, bigger;
+            uint smaller, bigger;
             const char* cmp;
-            if (negative)
+            if (negative != 0)
             {
                 if (length == long_len)
                 {
