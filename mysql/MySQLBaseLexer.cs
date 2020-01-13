@@ -1099,98 +1099,103 @@ namespace mysql
 
         public int determineNumericType(string text)
         {
-            //const string long_str = "2147483647";
-            //const uint long_len = 10;
-            //const string signed_long_str = "-2147483648";
-            //const string longlong_str = "9223372036854775807";
-            //const uint longlong_len = 19;
-            //const string signed_longlong_str = "-9223372036854775808";
-            //const uint signed_longlong_len = 19;
-            //const string unsigned_longlong_str = "18446744073709551615";
-            //const uint unsigned_longlong_len = 20;
+            const string long_str = "2147483647";
+            const uint long_len = 10;
+            const string signed_long_str = "-2147483648";
+            const string longlong_str = "9223372036854775807";
+            const uint longlong_len = 19;
+            const string signed_longlong_str = "-9223372036854775808";
+            const uint signed_longlong_len = 19;
+            const string unsigned_longlong_str = "18446744073709551615";
+            const uint unsigned_longlong_len = 20;
 
-            //// The original code checks for leading +/- but actually that can never happen, neither in the
-            //// server parser (as a digit is used to trigger processing in the lexer) nor in our parser
-            //// as our rules are defined without signs. But we do it anyway for maximum compatibility.
-            //uint length = (uint)text.Length - 1;
-            //string str = text;
-            //if (length < long_len) // quick normal case
-            //    return MySQLLexer.INT_NUMBER;
-            //uint negative = 0;
-            //int ptr = 0;
-            //if (str[ptr] == '+') // Remove sign and pre-zeros
-            //{
-            //    ptr++;
-            //    length--;
-            //}
-            //else if (str[ptr] == '-')
-            //{
-            //    ptr++;
-            //    length--;
-            //    negative = 1;
-            //}
+            // The original code checks for leading +/- but actually that can never happen, neither in the
+            // server parser (as a digit is used to trigger processing in the lexer) nor in our parser
+            // as our rules are defined without signs. But we do it anyway for maximum compatibility.
+            uint length = (uint)text.Length - 1;
+            string str = text;
+            int ptr_str = 0;
+            if (length < long_len) // quick normal case
+                return MySQLLexer.INT_NUMBER;
+            uint negative = 0;
+            if (str[ptr_str] == '+') // Remove sign and pre-zeros
+            {
+                ptr_str++;
+                length--;
+            }
+            else if (str[ptr_str] == '-')
+            {
+                ptr_str++;
+                length--;
+                negative = 1;
+            }
 
-            //while (str[ptr] == '0' && length != 0)
-            //{
-            //    ptr++;
-            //    length--;
-            //}
+            while (str[ptr_str] == '0' && length != 0)
+            {
+                ptr_str++;
+                length--;
+            }
 
-            //if (length < long_len)
-            //    return MySQLLexer.INT_NUMBER;
+            if (length < long_len)
+                return MySQLLexer.INT_NUMBER;
 
-            //uint smaller, bigger;
-            //string cmp;
-            //if (negative != 0)
-            //{
-            //    if (length == long_len)
-            //    {
-            //        cmp = signed_long_str + 1;
-            //        smaller = MySQLLexer.INT_NUMBER; // If <= signed_long_str
-            //        bigger = MySQLLexer.LONG_NUMBER; // If >= signed_long_str
-            //    }
-            //    else if (length < signed_longlong_len)
-            //        return MySQLLexer.LONG_NUMBER;
-            //    else if (length > signed_longlong_len)
-            //        return MySQLLexer.DECIMAL_NUMBER;
-            //    else
-            //    {
-            //        cmp = signed_longlong_str + 1;
-            //        smaller = MySQLLexer.LONG_NUMBER; // If <= signed_longlong_str
-            //        bigger = MySQLLexer.DECIMAL_NUMBER;
-            //    }
-            //}
-            //else
-            //{
-            //    if (length == long_len)
-            //    {
-            //        cmp = long_str;
-            //        smaller = MySQLLexer.INT_NUMBER;
-            //        bigger = MySQLLexer.LONG_NUMBER;
-            //    }
-            //    else if (length < longlong_len)
-            //        return MySQLLexer.LONG_NUMBER;
-            //    else if (length > longlong_len)
-            //    {
-            //        if (length > unsigned_longlong_len)
-            //            return MySQLLexer.DECIMAL_NUMBER;
-            //        cmp = unsigned_longlong_str;
-            //        smaller = MySQLLexer.ULONGLONG_NUMBER;
-            //        bigger = MySQLLexer.DECIMAL_NUMBER;
-            //    }
-            //    else
-            //    {
-            //        cmp = longlong_str;
-            //        smaller = MySQLLexer.LONG_NUMBER;
-            //        bigger = MySQLLexer.ULONGLONG_NUMBER;
-            //    }
-            //}
+            int smaller, bigger;
+            string cmp;
+            int ptr_cmp = 0;
+            if (negative != 0)
+            {
+                if (length == long_len)
+                {
+                    cmp = signed_long_str;
+                    ptr_cmp = 1;
+                    smaller = MySQLLexer.INT_NUMBER; // If <= signed_long_str
+                    bigger = MySQLLexer.LONG_NUMBER; // If >= signed_long_str
+                }
+                else if (length < signed_longlong_len)
+                    return MySQLLexer.LONG_NUMBER;
+                else if (length > signed_longlong_len)
+                    return MySQLLexer.DECIMAL_NUMBER;
+                else
+                {
+                    cmp = signed_longlong_str;
+                    ptr_cmp = 1;
+                    smaller = MySQLLexer.LONG_NUMBER; // If <= signed_longlong_str
+                    bigger = MySQLLexer.DECIMAL_NUMBER;
+                }
+            }
+            else
+            {
+                if (length == long_len)
+                {
+                    cmp = long_str;
+                    ptr_cmp = 0;
+                    smaller = MySQLLexer.INT_NUMBER;
+                    bigger = MySQLLexer.LONG_NUMBER;
+                }
+                else if (length < longlong_len)
+                    return MySQLLexer.LONG_NUMBER;
+                else if (length > longlong_len)
+                {
+                    if (length > unsigned_longlong_len)
+                        return MySQLLexer.DECIMAL_NUMBER;
+                    cmp = unsigned_longlong_str;
+                    ptr_cmp = 0;
+                    smaller = MySQLLexer.ULONGLONG_NUMBER;
+                    bigger = MySQLLexer.DECIMAL_NUMBER;
+                }
+                else
+                {
+                    cmp = longlong_str;
+                    ptr_cmp = 0;
+                    smaller = MySQLLexer.LONG_NUMBER;
+                    bigger = MySQLLexer.ULONGLONG_NUMBER;
+                }
+            }
 
-            //while (*cmp && *cmp++ == *str++)
-            //    ;
+            while (ptr_cmp < cmp.Length && cmp[ptr_cmp++] == str[ptr_str++])
+                ;
 
-            //return ((char)str[-1] <= (char)cmp[-1]) ? smaller: bigger;
-            throw new Exception();
+            return ((char)str[ptr_str-1] <= (char)cmp[ptr_cmp-1]) ? smaller : bigger;
         }
 
         public int checkCharset(string text)
@@ -1203,13 +1208,11 @@ namespace mysql
          */
         public void emitDot()
         {
-            //this.TokenFactory.Create(new Tuple<ITokenSource, ICharStream>(null, null), MySQLLexer.DOT_SYMBOL,
-            //    _text, channel, )
-            //_pendingTokens.Add();
-            //_pendingTokens.emplace_back(_factory->create({ this, _input}, MySQLLexer.DOT_SYMBOL, _text, channel,
-            //                                       tokenStartCharIndex, tokenStartCharIndex, tokenStartLine,
-            //                                       tokenStartCharPositionInLine));
-            //++tokenStartCharIndex;
+            var token = this.TokenFactory.Create(new Tuple<ITokenSource, ICharStream>(null, null), MySQLLexer.DOT_SYMBOL,
+                this.Text, Channel, this.TokenStartCharIndex, this.TokenStartCharIndex, this.TokenStartLine,
+                this.TokenStartColumn);
+            _pendingTokens.Add(token);
+            //this.TokenStartCharIndex = this.TokenStartCharIndex + 1;
         }
 
     }
