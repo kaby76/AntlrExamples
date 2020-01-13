@@ -89,6 +89,21 @@ END");
             Try(@"SELECT a FROM tick t WHERE timestamp > (((((((SELECT 1)  + 1))))))");
             Try(@"select * from (select 1 from dual)");
             Try(@"ALTER USER u@localhost IDENTIFIED WITH sha256_password BY 'test';");
+
+
+            Try(@"`test` select 1;"); //Syntax error: `test` (back thick quoted id) is not valid input at this position
+            Try(@"'test' select 1;"); // Syntax error: 'test' (single quoted text) is not valid input at this position
+            Try("\"test\" select 1;"); // Syntax error: "test" (double quoted text) is not valid input at this position
+            Try("select 1 from ;"); // Syntax error: unexpected end of statement
+            Try("select 1 from '';"); // Syntax error: unexpected '' (single quoted text)
+            Try(@"
+select a, b,
+    (case y
+        -- missing when clause here
+        then c # Syntax error: missing subclause or elements before 'then' (then)
+        else 0 # Syntax error: missing closing parenthesis
+    end)
+;");
         }
     }
 }
