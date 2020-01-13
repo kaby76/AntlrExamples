@@ -6,6 +6,7 @@ namespace mysql
     {
         static void Try(string input)
         {
+            //var str = new AntlrInputStream(input);
             var str = new AntlrInputStream(input);
             var lexer = new MySQLLexer(str);
             var tokens = new CommonTokenStream(lexer);
@@ -27,8 +28,7 @@ namespace mysql
 
         static void Main(string[] args)
         {
-            Try("1 + 2 * 3");
-            Try("1 + 2 3 * ");
+            Try("select * from foobar;");
         }
     }
 }

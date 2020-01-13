@@ -24,7 +24,7 @@ namespace mysql
         public SqlMode sqlMode; // A collection of flags indicating which of relevant SQL modes are active.
         public HashSet<string> charsets; // Used to check repertoires.
         public bool inVersionComment;
-        public List<IToken> _pendingTokens;
+        public List<IToken> _pendingTokens = new List<IToken>();
         public Dictionary<string, int> _symbols; // A list of all defined symbols for lookup.
 
         public bool isSqlModeActive(SqlMode mode)
