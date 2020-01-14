@@ -3323,7 +3323,7 @@ defaultCollation:
 ;
 
 defaultEncryption:
-	DEFAULT_SYMBOL? ENCRYPTION_SYMBOL EQUAL_OPERATOR? textStringLiteral
+    DEFAULT_SYMBOL? ENCRYPTION_SYMBOL EQUAL_OPERATOR? textStringLiteral
 ;
 
 defaultCharset:

@@ -29,7 +29,6 @@ namespace mysql
         static void Main(string[] args)
         {
             Try(@"select 2 as expected, /*!01000/**/*/ 2 as result");
-            return;
             Try("select * from foobar;");
             Try("select col1 from foobar where col1 > 1 and col1 < 10;");
             Try(@"select (select t1.id as a, sakila.actor.actor_id b, t2.id c, (select  1 * 0.123, a from t3) from  `ÄÖÜ丈` t1, sakila.actor as t2
