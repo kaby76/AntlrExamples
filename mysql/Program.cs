@@ -21,16 +21,17 @@ namespace mysql
             else
             {
                 System.Console.WriteLine("parse completed.");
-                System.Console.WriteLine(tokens.OutputTokens());
-                System.Console.WriteLine(tree.OutputTree(tokens));
             }
+            System.Console.WriteLine(tokens.OutputTokens());
+            System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static void Main(string[] args)
         {
+            Try(@"select 2 as expected, /*!01000/**/*/ 2 as result");
+            return;
             Try("select * from foobar;");
             Try("select col1 from foobar where col1 > 1 and col1 < 10;");
-            Try(@"select 2 as expected, /*!01000/**/*/ 2 as result");
             Try(@"select (select t1.id as a, sakila.actor.actor_id b, t2.id c, (select  1 * 0.123, a from t3) from  `ÄÖÜ丈` t1, sakila.actor as t2
 where ((t1.id = t2.id)) and (t1.id = sakila.actor.actor_id)) as r1, 2");
             Try(@"select 1 from
