@@ -1,3 +1,6 @@
 mysql/.vs/
 mysql/obj/
 mysql/bin/
+.vs/
+mysql-c/x64/
+mysql-c/packages/

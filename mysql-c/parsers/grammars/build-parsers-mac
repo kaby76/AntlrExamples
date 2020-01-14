@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]
+then
+  echo "Usage: $0 [mysql]"
+  exit
+fi 
+
+LOCATION=../../../3rd-party-ce/bin/antlr-4.7.1-complete.jar
+case "$1" in
+  "mysql") echo "Building MySQL parser"
+    java -jar $LOCATION -Dlanguage=Cpp -listener -visitor -o ../mysql -package parsers MySQLLexer.g4 MySQLParser.g4
+  ;;
+ *) echo "Unknown parser type $1"
+ exit 1
+ ;;
+esac
+

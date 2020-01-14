@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Code Completion">
+      <UniqueIdentifier>{d098f596-01c2-4609-b55b-751a3cb276fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Grammars">
+      <UniqueIdentifier>{7ab96768-096f-49a7-8f95-459af7633692}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MySQL">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="code-completion\mysql-code-completion.cpp">
+      <Filter>Code Completion</Filter>
+    </ClCompile>
+    <ClCompile Include="parsers-common.cpp" />
+    <ClCompile Include="code-completion\CodeCompletionCore.cpp">
+      <Filter>Code Completion</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLBaseLexer.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLBaseRecognizer.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLLexer.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLParser.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLParserBaseListener.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLParserBaseVisitor.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLParserListener.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLParserVisitor.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql\MySQLRecognizerCommon.cpp">
+      <Filter>MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="SymbolTable.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="code-completion\mysql-code-completion.h">
+      <Filter>Code Completion</Filter>
+    </ClInclude>
+    <ClInclude Include="parsers-common.h" />
+    <ClInclude Include="code-completion\CodeCompletionCore.h">
+      <Filter>Code Completion</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLBaseLexer.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLBaseRecognizer.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLLexer.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLParser.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLParserBaseListener.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLParserBaseVisitor.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLParserListener.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLParserVisitor.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\mysql-recognition-types.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql\MySQLRecognizerCommon.h">
+      <Filter>MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="SymbolTable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="grammars\MySQLParser.g4">
+      <Filter>Grammars</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="grammars\MySQLLexer.g4">
+      <Filter>Grammars</Filter>
+    </None>
+  </ItemGroup>
+</Project>
