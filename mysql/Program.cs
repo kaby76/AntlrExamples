@@ -30,6 +30,8 @@ namespace mysql
 
         static void Main(string[] args)
         {
+            Try(@"create table `test` (field timestamp(6));", 80000);
+
             // -----------------------------
             // Positive (parses) tests.
             // -----------------------------

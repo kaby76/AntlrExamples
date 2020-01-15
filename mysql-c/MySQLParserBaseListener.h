@@ -41,6 +41,12 @@ namespace parsers {
 class PARSERS_PUBLIC_TYPE MySQLParserBaseListener : public MySQLParserListener {
 public:
 
+  virtual void enterQueries(MySQLParser::QueriesContext * /*ctx*/) override { }
+  virtual void exitQueries(MySQLParser::QueriesContext * /*ctx*/) override { }
+
+  virtual void enterAux_query(MySQLParser::Aux_queryContext * /*ctx*/) override { }
+  virtual void exitAux_query(MySQLParser::Aux_queryContext * /*ctx*/) override { }
+
   virtual void enterQuery(MySQLParser::QueryContext * /*ctx*/) override { }
   virtual void exitQuery(MySQLParser::QueryContext * /*ctx*/) override { }
 

@@ -46,7 +46,7 @@ lexer grammar MySQLLexer;
 
 options {
     superClass = MySQLBaseLexer;
-//    tokenVocab = predefined; // Certain tokens in a predefined order for simpler checks.
+  //  tokenVocab = predefined; // Certain tokens in a predefined order for simpler checks.
     exportMacro = PARSERS_PUBLIC_TYPE;
 }
 
@@ -54,7 +54,7 @@ tokens {
     NOT2_SYMBOL,
     CONCAT_PIPES_SYMBOL,
 
-    INNODB_SYMBOL,
+        INNODB_SYMBOL,
 
     // Tokens assigned in NUMBER rule.
     INT_NUMBER, // NUM in sql_yacc.yy

@@ -82,6 +82,9 @@ options {
 
 //-------------------------------------------------------------------------------------------------
 
+queries : aux_query;
+aux_query : ((simpleStatement | beginWork)? SEMICOLON_SYMBOL)* EOF;
+
 query:
     EOF
     | (simpleStatement | beginWork) (SEMICOLON_SYMBOL EOF? | EOF)
@@ -3323,7 +3326,7 @@ defaultCollation:
 ;
 
 defaultEncryption:
-	DEFAULT_SYMBOL? ENCRYPTION_SYMBOL EQUAL_OPERATOR? textStringLiteral
+    DEFAULT_SYMBOL? ENCRYPTION_SYMBOL EQUAL_OPERATOR? textStringLiteral
 ;
 
 defaultCharset:

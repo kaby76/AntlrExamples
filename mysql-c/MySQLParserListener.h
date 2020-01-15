@@ -39,6 +39,12 @@ namespace parsers {
 class PARSERS_PUBLIC_TYPE MySQLParserListener : public antlr4::tree::ParseTreeListener {
 public:
 
+  virtual void enterQueries(MySQLParser::QueriesContext *ctx) = 0;
+  virtual void exitQueries(MySQLParser::QueriesContext *ctx) = 0;
+
+  virtual void enterAux_query(MySQLParser::Aux_queryContext *ctx) = 0;
+  virtual void exitAux_query(MySQLParser::Aux_queryContext *ctx) = 0;
+
   virtual void enterQuery(MySQLParser::QueryContext *ctx) = 0;
   virtual void exitQuery(MySQLParser::QueryContext *ctx) = 0;
 

@@ -17,14 +17,21 @@ public:
 	};
 };
 
-int main()
+void Try(std::string str, int server_version = 0)
 {
-	antlr4::ANTLRInputStream input("select 2 as expected, /*!01000/**/*/ 2 as result");
+	antlr4::ANTLRInputStream input(str);
 	parsers::MySQLLexer lexer(&input);
+	lexer.serverVersion = server_version;
 	antlr4::CommonTokenStream tokens(&lexer);
 	parsers::MySQLParser parser(&tokens);
+	parser.serverVersion = server_version;
 	ErrorListener listener;
 	parser.addErrorListener(&listener);
-	parser.query();
+	parser.queries();
+}
+
+int main()
+{
+	Try("create table `test` (field timestamp(6));", 80000);
 }
 
