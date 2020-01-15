@@ -6,20 +6,21 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "mysql", "mysql.csproj", "{7B7BCA8B-4459-4C1C-8010-630681B700E7}"
 EndProject
 Global
-        GlobalSection(SolutionConfigurationPlatforms) = preSolution
-                Debug|Any CPU = Debug|Any CPU
-                Release|Any CPU = Release|Any CPU
-        EndGlobalSection
-        GlobalSection(ProjectConfigurationPlatforms) = postSolution
-                {7B7BCA8B-4459-4C1C-8010-630681B700E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-                {7B7BCA8B-4459-4C1C-8010-630681B700E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-                {7B7BCA8B-4459-4C1C-8010-630681B700E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-                {7B7BCA8B-4459-4C1C-8010-630681B700E7}.Release|Any CPU.Build.0 = Release|Any CPU
-        EndGlobalSection
-        GlobalSection(SolutionProperties) = preSolution
-                HideSolutionNode = FALSE
-        EndGlobalSection
-        GlobalSection(ExtensibilityGlobals) = postSolution
-                SolutionGuid = {B076FEEB-04F8-4457-B6D4-339701D6A9AD}
-        EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7B7BCA8B-4459-4C1C-8010-630681B700E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B7BCA8B-4459-4C1C-8010-630681B700E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B7BCA8B-4459-4C1C-8010-630681B700E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B7BCA8B-4459-4C1C-8010-630681B700E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		                SolutionGuid = {B076FEEB-04F8-4457-B6D4-339701D6A9AD}
+		SolutionGuid = {1154948B-4BC8-4D50-BA29-627E614CB8CA}
+	EndGlobalSection
 EndGlobal

@@ -4,16 +4,18 @@ namespace mysql
 {
     public class Program
     {
-        static void Try(string input)
+        static void Try(string input, int server_version = 0)
         {
             //var str = new AntlrInputStream(input);
             var str = new AntlrInputStream(input);
             var lexer = new MySQLLexer(str);
+            lexer.serverVersion = server_version;
             var tokens = new CommonTokenStream(lexer);
             var parser = new MySQLParser(tokens);
+            parser.serverVersion = server_version;
             var listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
-            var tree = parser.query();
+            var tree = parser.queries();
             if (listener.had_error)
             {
                 System.Console.WriteLine("error in parse.");
@@ -28,8 +30,142 @@ namespace mysql
 
         static void Main(string[] args)
         {
-            Try(@"select 2 as expected, /*!01000/**/*/ 2 as result");
+            // -----------------------------
+            // Positive (parses) tests.
+            // -----------------------------
             Try("select * from foobar;");
+
+            // (From https://www.mysqltutorial.org/mysql-comment/)
+            Try(@"SELECT 1 /*! +1 */;");
+            Try(@"CREATE TABLE t1 (
+    k INT AUTO_INCREMENT,
+    KEY (k)
+)  /*!50110 KEY_BLOCK_SIZE=1024; */;");
+
+            // (From https://www.mysqltutorial.org/mysql-adjacency-list-tree/)
+            Try(@"CREATE TABLE category (
+  id int(10) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(255) NOT NULL,
+  parent_id int(10) unsigned DEFAULT NULL,
+  PRIMARY KEY (id),
+  FOREIGN KEY (parent_id) REFERENCES category (id) 
+    ON DELETE CASCADE ON UPDATE CASCADE
+);");
+
+            Try(@"INSERT INTO category(title,parent_id) 
+VALUES('Electronics',NULL);");
+            Try(@"INSERT INTO category(title,parent_id) 
+VALUES('Laptops & PC',1);
+ 
+INSERT INTO category(title,parent_id) 
+VALUES('Laptops',2);
+INSERT INTO category(title,parent_id) 
+VALUES('PC',2);
+ 
+INSERT INTO category(title,parent_id) 
+VALUES('Cameras & photo',1);
+INSERT INTO category(title,parent_id) 
+VALUES('Camera',5);
+ 
+INSERT INTO category(title,parent_id) 
+VALUES('Phones & Accessories',1);
+INSERT INTO category(title,parent_id) 
+VALUES('Smartphones',7);
+ 
+INSERT INTO category(title,parent_id) 
+VALUES('Android',8);
+INSERT INTO category(title,parent_id) 
+VALUES('iOS',8);
+INSERT INTO category(title,parent_id) 
+VALUES('Other Smartphones',8);
+ 
+INSERT INTO category(title,parent_id) 
+VALUES('Batteries',7);
+INSERT INTO category(title,parent_id) 
+VALUES('Headsets',7);
+INSERT INTO category(title,parent_id) 
+VALUES('Screen Protectors',7);");
+            Try(@"SELECT
+    id, title
+FROM
+    category
+WHERE
+    parent_id IS NULL;");
+            Try(@"SELECT
+    id, title
+FROM
+    category
+WHERE
+    parent_id = 1;");
+            Try(@"SELECT
+    c1.id, c1.title
+FROM
+    category c1
+        LEFT JOIN
+    category c2 ON c2.parent_id = c1.id
+WHERE
+    c2.id IS NULL;");
+            Try(@"WITH RECURSIVE category_path (id, title, path) AS
+(
+  SELECT id, title, title as path
+    FROM category
+    WHERE parent_id IS NULL
+  UNION ALL
+  SELECT c.id, c.title, CONCAT(cp.path, ' > ', c.title)
+    FROM category_path AS cp JOIN category AS c
+      ON cp.id = c.parent_id
+)
+SELECT * FROM category_path
+ORDER BY path;", 80000);
+            Try(@"WITH RECURSIVE category_path (id, title, path) AS
+(
+  SELECT id, title, title as path
+    FROM category
+    WHERE parent_id = 7
+  UNION ALL
+  SELECT c.id, c.title, CONCAT(cp.path, ' > ', c.title)
+    FROM category_path AS cp JOIN category AS c
+      ON cp.id = c.parent_id
+)
+SELECT * FROM category_path
+ORDER BY path;", 80000);
+            Try(@"WITH RECURSIVE category_path (id, title, parent_id) AS
+(
+  SELECT id, title, parent_id
+    FROM category
+    WHERE id = 10 -- child node
+  UNION ALL
+  SELECT c.id, c.title, c.parent_id
+    FROM category_path AS cp JOIN category AS c
+      ON cp.parent_id = c.id
+)
+SELECT * FROM category_path;", 80000);
+            Try(@"WITH RECURSIVE category_path (id, title, lvl) AS
+(
+  SELECT id, title, 0 lvl
+    FROM category
+    WHERE parent_id IS NULL
+  UNION ALL
+  SELECT c.id, c.title,cp.lvl + 1
+    FROM category_path AS cp JOIN category AS c
+      ON cp.id = c.parent_id
+)
+SELECT * FROM category_path
+ORDER BY lvl;", 80000);
+            Try(@"DELETE FROM category 
+WHERE
+    id = 2;");
+            Try(@"UPDATE category 
+SET 
+    parent_id = 7 -- Phones & Accessories
+WHERE
+    parent_id = 5; -- Smartphones");
+            Try(@"DELETE FROM category 
+WHERE
+    id = 8;");
+
+            // Negative (does not parse) tests.
+            Try(@"select 2 as expected, /*!01000/**/*/ 2 as result");
             Try("select col1 from foobar where col1 > 1 and col1 < 10;");
             Try(@"select (select t1.id as a, sakila.actor.actor_id b, t2.id c, (select  1 * 0.123, a from t3) from  `ÄÖÜ丈` t1, sakila.actor as t2
 where ((t1.id = t2.id)) and (t1.id = sakila.actor.actor_id)) as r1, 2");

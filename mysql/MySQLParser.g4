@@ -82,6 +82,9 @@ options {
 
 //-------------------------------------------------------------------------------------------------
 
+queries : aux_query;
+aux_query : ((simpleStatement | beginWork)? SEMICOLON_SYMBOL)* EOF;
+
 query:
     EOF
     | (simpleStatement | beginWork) (SEMICOLON_SYMBOL EOF? | EOF)
