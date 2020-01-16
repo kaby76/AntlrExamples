@@ -71,6 +71,7 @@ namespace mysql
                     break;
                 }
             }
+            _token_stream.Seek(currentIndex);
 
             var all_parses = EnterState(null);
             var result = new IntervalSet();

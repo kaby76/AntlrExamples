@@ -106,10 +106,11 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ANTLR4CPP_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\Users\kenne\Documents\AntlrExamples\mysql-c\parsers;C:\Users\kenne\Documents\AntlrExamples\mysql-c\base;C:\Users\kenne\Downloads\antlr4-cpp-runtime-4.7.2-vs2015\antlr4-runtime</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -168,6 +169,7 @@
     <ClCompile Include="MySQLParserBaseListener.cpp" />
     <ClCompile Include="MySQLParserListener.cpp" />
     <ClCompile Include="MySQLRecognizerCommon.cpp" />
+    <ClCompile Include="Output.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="MySQLLexer.g4" />
@@ -183,6 +185,7 @@
     <ClInclude Include="MySQLParserBaseListener.h" />
     <ClInclude Include="MySQLParserListener.h" />
     <ClInclude Include="MySQLRecognizerCommon.h" />
+    <ClInclude Include="Output.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

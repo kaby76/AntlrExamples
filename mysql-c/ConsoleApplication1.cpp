@@ -5,6 +5,7 @@
 #include <ANTLRInputStream.h>
 #include "MySQLLexer.h"
 #include "MySQLParser.h"
+#include "Output.h"
 
 class ErrorListener : public antlr4::ConsoleErrorListener
 {
@@ -27,11 +28,13 @@ void Try(std::string str, int server_version = 0)
 	parser.serverVersion = server_version;
 	ErrorListener listener;
 	parser.addErrorListener(&listener);
-	parser.queries();
+	parsers::MySQLParser::QueriesContext* tree = parser.queries();
+	std::cout << mysql::Output::OutputTokens(tokens);
+	std::cout << mysql::Output::OutputTree(*tree, tokens);
 }
 
 int main()
 {
-	Try("create table `test` (field timestamp(6));", 80000);
+	Try("create table `test` (field timestamp(6));");// , 80000);
 }
 
