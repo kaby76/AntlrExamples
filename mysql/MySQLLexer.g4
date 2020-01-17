@@ -331,9 +331,7 @@ COLLATION_SYMBOL:                C O L L A T I O N;                          // 
 COLUMNS_SYMBOL:                  C O L U M N S;
 COLUMN_SYMBOL:                   C O L U M N;                                // SQL-2003-R
 COLUMN_NAME_SYMBOL:              C O L U M N '_' N A M E;                    // SQL-2003-N
-COLUMN_FORMAT_SYMBOL:
-    C O L U M N '_' F O R M A T                                              {serverVersion >= 50600}?
-;                                                                            // Said to be available only in MySQL cluster, but nonetheless handled in the standard server parserserver well.
+COLUMN_FORMAT_SYMBOL:            C O L U M N '_' F O R M A T;
 COMMENT_SYMBOL:                  C O M M E N T;
 COMMITTED_SYMBOL:                C O M M I T T E D;                          // SQL-2003-N
 COMMIT_SYMBOL:                   C O M M I T;                                // SQL-2003-R
@@ -401,7 +399,7 @@ DESC_SYMBOL:                     D E S C;                                    // 
 DESCRIBE_SYMBOL:                 D E S C R I B E;                            // SQL-2003-R
 DES_KEY_FILE_SYMBOL:             D E S '_' K E Y '_' F I L E                 {serverVersion < 80000}?;
 DETERMINISTIC_SYMBOL:            D E T E R M I N I S T I C;                  // SQL-2003-R
-DIAGNOSTICS_SYMBOL:              D I A G N O S T I C S                       {serverVersion >= 50600}?;
+DIAGNOSTICS_SYMBOL:              D I A G N O S T I C S;
 DIRECTORY_SYMBOL:                D I R E C T O R Y;
 DISABLE_SYMBOL:                  D I S A B L E;
 DISCARD_SYMBOL:                  D I S C A R D;
@@ -435,13 +433,13 @@ ESCAPE_SYMBOL:                   E S C A P E;                                // 
 EVENTS_SYMBOL:                   E V E N T S;
 EVENT_SYMBOL:                    E V E N T;
 EVERY_SYMBOL:                    E V E R Y;                                  // SQL-2003-N
-EXCHANGE_SYMBOL:                 E X C H A N G E                             {serverVersion >= 50600}?;
+EXCHANGE_SYMBOL:                 E X C H A N G E;
 EXECUTE_SYMBOL:                  E X E C U T E;                              // SQL-2003-R
 EXISTS_SYMBOL:                   E X I S T S;                                // SQL-2003-R
 EXIT_SYMBOL:                     E X I T;
 EXPANSION_SYMBOL:                E X P A N S I O N;
 EXPIRE_SYMBOL:                   E X P I R E                                 {serverVersion >= 50606}?;
-EXPLAIN_SYMBOL:                  E X P L A I N                               -> type(DESCRIBE_SYMBOL); // SQL-2003-R
+EXPLAIN_SYMBOL:                  E X P L A I N;                              // SQL-2003-R
 EXPORT_SYMBOL:                   E X P O R T                                 {serverVersion >= 50606}?;
 EXTENDED_SYMBOL:                 E X T E N D E D;
 EXTENT_SIZE_SYMBOL:              E X T E N T '_' S I Z E;
@@ -464,7 +462,7 @@ FOLLOWS_SYMBOL:                  F O L L O W S                               {se
 FORCE_SYMBOL:                    F O R C E;
 FOREIGN_SYMBOL:                  F O R E I G N;                              // SQL-2003-R
 FOR_SYMBOL:                      F O R;                                      // SQL-2003-R
-FORMAT_SYMBOL:                   F O R M A T                                 {serverVersion >= 50600}?;
+FORMAT_SYMBOL:                   F O R M A T;
 FOUND_SYMBOL:                    F O U N D;                                  // SQL-2003-R
 FROM_SYMBOL:                     F R O M;
 FULL_SYMBOL:                     F U L L;                                    // SQL-2003-R
@@ -517,12 +515,8 @@ INTO_SYMBOL:                     I N T O;                                    // 
 INT_SYMBOL:                      I N T;                                      // SQL-2003-R
 INVOKER_SYMBOL:                  I N V O K E R;
 IN_SYMBOL:                       I N;                                        // SQL-2003-R
-IO_AFTER_GTIDS_SYMBOL:
-    I O '_' A F T E R '_' G T I D S                                          {serverVersion >= 50600}?
-;                                                                            // MYSQL, FUTURE-USE
-IO_BEFORE_GTIDS_SYMBOL:
-    I O '_' B E F O R E '_' G T I D S                                        {serverVersion >= 50600}?
-;                                                                            // MYSQL, FUTURE-USE
+IO_AFTER_GTIDS_SYMBOL:           I O '_' A F T E R '_' G T I D S;            // MYSQL, FUTURE-USE
+IO_BEFORE_GTIDS_SYMBOL:          I O '_' B E F O R E '_' G T I D S;          // MYSQL, FUTURE-USE
 IO_THREAD_SYMBOL:                I O '_' T H R E A D                         -> type(RELAY_THREAD_SYMBOL); // Synonym
 IO_SYMBOL:                       I O;
 IPC_SYMBOL:                      I P C;
@@ -568,7 +562,7 @@ LOW_PRIORITY_SYMBOL:             L O W '_' P R I O R I T Y;
 MASTER_AUTO_POSITION_SYMBOL:     M A S T E R '_' A U T O '_' P O S I T I O N {serverVersion >= 50605}?;
 MASTER_BIND_SYMBOL:              M A S T E R '_' B I N D                     {serverVersion >= 50602}?;
 MASTER_CONNECT_RETRY_SYMBOL:     M A S T E R '_' C O N N E C T '_' R E T R Y;
-MASTER_DELAY_SYMBOL:             M A S T E R '_' D E L A Y                   {serverVersion >= 50600}?;
+MASTER_DELAY_SYMBOL:             M A S T E R '_' D E L A Y;
 MASTER_HOST_SYMBOL:              M A S T E R '_' H O S T;
 MASTER_LOG_FILE_SYMBOL:          M A S T E R '_' L O G '_' F I L E;
 MASTER_LOG_POS_SYMBOL:           M A S T E R '_' L O G '_' P O S;
@@ -659,7 +653,6 @@ OFFLINE_SYMBOL:                  O F F L I N E;
 OFFSET_SYMBOL:                   O F F S E T;
 OLD_PASSWORD_SYMBOL:             O L D '_' P A S S W O R D                   {serverVersion < 50706}?;
 ON_SYMBOL:                       O N;                                        // SQL-2003-R
-ONE_SHOT_SYMBOL:                 O N E '_' S H O T                           {serverVersion < 50600}?; // Deprecated in 5.0, removed in 5.6.
 ONE_SYMBOL:                      O N E;
 ONLINE_SYMBOL:                   O N L I N E;
 ONLY_SYMBOL:                     O N L Y                                     {serverVersion >= 50605}?;
@@ -755,10 +748,10 @@ RESIGNAL_SYMBOL:                 R E S I G N A L;                            // 
 RESTORE_SYMBOL:                  R E S T O R E;
 RESTRICT_SYMBOL:                 R E S T R I C T;
 RESUME_SYMBOL:                   R E S U M E;
-RETURNED_SQLSTATE_SYMBOL:        R E T U R N E D '_' S Q L S T A T E         {serverVersion >= 50600}?;
+RETURNED_SQLSTATE_SYMBOL:        R E T U R N E D '_' S Q L S T A T E;
 RETURNS_SYMBOL:                  R E T U R N S;                              // SQL-2003-R
 RETURN_SYMBOL:                   R E T U R N?;                               // SQL-2003-R
-REVERSE_SYMBOL:                  R E V E R S E                               {serverVersion >= 50600}?;
+REVERSE_SYMBOL:                  R E V E R S E;
 REVOKE_SYMBOL:                   R E V O K E;                                // SQL-2003-R
 RIGHT_SYMBOL:                    R I G H T;                                  // SQL-2003-R
 RLIKE_SYMBOL:                    R L I K E                                   -> type(REGEXP_SYMBOL); // Synonym (like in mSQL2)
@@ -812,11 +805,11 @@ SPECIFIC_SYMBOL:                 S P E C I F I C;                            // 
 SQLEXCEPTION_SYMBOL:             S Q L E X C E P T I O N;                    // SQL-2003-R
 SQLSTATE_SYMBOL:                 S Q L S T A T E;                            // SQL-2003-R
 SQLWARNING_SYMBOL:               S Q L W A R N I N G;                        // SQL-2003-R
-SQL_AFTER_GTIDS_SYMBOL:          S Q L '_' A F T E R '_' G T I D S           {serverVersion >= 50600}?; // MYSQL
+SQL_AFTER_GTIDS_SYMBOL:          S Q L '_' A F T E R '_' G T I D S;          // MYSQL
 SQL_AFTER_MTS_GAPS_SYMBOL:
     S Q L '_' A F T E R '_' M T S '_' G A P S                                {serverVersion >= 50606}?
 ;                                                                            // MYSQL
-SQL_BEFORE_GTIDS_SYMBOL:         S Q L '_' B E F O R E '_' G T I D S         {serverVersion >= 50600}?; // MYSQL
+SQL_BEFORE_GTIDS_SYMBOL:         S Q L '_' B E F O R E '_' G T I D S;        // MYSQL
 SQL_BIG_RESULT_SYMBOL:           S Q L '_' B I G '_' R E S U L T;
 SQL_BUFFER_RESULT_SYMBOL:        S Q L '_' B U F F E R '_' R E S U L T;
 SQL_CACHE_SYMBOL:                S Q L '_' C A C H E                         {serverVersion < 80000}?;
@@ -830,9 +823,9 @@ STACKED_SYMBOL:                  S T A C K E D                               {se
 STARTING_SYMBOL:                 S T A R T I N G;
 STARTS_SYMBOL:                   S T A R T S;
 START_SYMBOL:                    S T A R T;                                  // SQL-2003-R
-STATS_AUTO_RECALC_SYMBOL:        S T A T S '_' A U T O '_' R E C A L C       {serverVersion >= 50600}?;
-STATS_PERSISTENT_SYMBOL:         S T A T S '_' P E R S I S T E N T           {serverVersion >= 50600}?;
-STATS_SAMPLE_PAGES_SYMBOL:       S T A T S '_' S A M P L E '_' P A G E S     {serverVersion >= 50600}?;
+STATS_AUTO_RECALC_SYMBOL:        S T A T S '_' A U T O '_' R E C A L C;
+STATS_PERSISTENT_SYMBOL:         S T A T S '_' P E R S I S T E N T;
+STATS_SAMPLE_PAGES_SYMBOL:       S T A T S '_' S A M P L E '_' P A G E S;
 STATUS_SYMBOL:                   S T A T U S;
 STDDEV_SAMP_SYMBOL:
     S T D D E V '_' S A M P                                                  { Type = (determineFunction(STDDEV_SAMP_SYMBOL)); }
@@ -903,7 +896,7 @@ UNLOCK_SYMBOL:                   U N L O C K;
 UNSIGNED_SYMBOL:                 U N S I G N E D;                            // MYSQL
 UNTIL_SYMBOL:                    U N T I L;
 UPDATE_SYMBOL:                   U P D A T E;                                // SQL-2003-R
-UPGRADE_SYMBOL:                  U P G R A D E?;
+UPGRADE_SYMBOL:                  U P G R A D E;
 USAGE_SYMBOL:                    U S A G E;                                  // SQL-2003-N
 USER_RESOURCES_SYMBOL:
     U S E R '_' R E S O U R C E S
@@ -931,13 +924,11 @@ VIRTUAL_SYMBOL:                  V I R T U A L                               {se
 WAIT_SYMBOL:                     W A I T;
 WARNINGS_SYMBOL:                 W A R N I N G S;
 WEEK_SYMBOL:                     W E E K;
-WEIGHT_STRING_SYMBOL:            W E I G H T '_' S T R I N G                 {serverVersion >= 50600}?;
+WEIGHT_STRING_SYMBOL:            W E I G H T '_' S T R I N G;
 WHEN_SYMBOL:                     W H E N;                                    // SQL-2003-R
 WHERE_SYMBOL:                    W H E R E;                                  // SQL-2003-R
 WHILE_SYMBOL:                    W H I L E;
 WITH_SYMBOL:                     W I T H;                                    // SQL-2003-R
-WITH_CUBE_SYMBOL:                W I T H '_' C U B E                         {serverVersion < 80000}?; // INTERNAL
-WITH_ROLLUP_SYMBOL:              W I T H '_' R O L L U P;                    // INTERNAL
 WITHOUT_SYMBOL:                  W I T H O U T;                              // SQL-2003-R
 WORK_SYMBOL:                     W O R K;                                    // SQL-2003-N
 WRAPPER_SYMBOL:                  W R A P P E R;
@@ -1014,29 +1005,43 @@ MASTER_PUBLIC_KEY_PATH_SYMBOL:
 GET_MASTER_PUBLIC_KEY_SYMBOL:
     G E T '_' M A S T E R '_' P U B L I C '_' K E Y '_' S Y M                {serverVersion >= 80000}?
 ;                                                                            // MYSQL
-RESTART_SYMBOL:                  R E S T A R T                               {serverVersion >= 80011}?;
-DEFINITION_SYMBOL:               D E F I N I T I O N                         {serverVersion >= 80011}?;
-DESCRIPTION_SYMBOL:              D E S C R I P T I O N                       {serverVersion >= 80011}?;
-ORGANIZATION_SYMBOL:             O R G A N I Z A T I O N                     {serverVersion >= 80011}?;
-REFERENCE_SYMBOL:                R E F E R E N C E                           {serverVersion >= 80011}?;
+RESTART_SYMBOL:                  R E S T A R T                               {serverVersion >= 80011}?; // SQL-2003-N
+DEFINITION_SYMBOL:               D E F I N I T I O N                         {serverVersion >= 80011}?; // MYSQL
+DESCRIPTION_SYMBOL:              D E S C R I P T I O N                       {serverVersion >= 80011}?; // MYSQL
+ORGANIZATION_SYMBOL:             O R G A N I Z A T I O N                     {serverVersion >= 80011}?; // MYSQL
+REFERENCE_SYMBOL:                R E F E R E N C E                           {serverVersion >= 80011}?; // MYSQL
 
-OPTIONAL_SYMBOL:                O P T I O N A L                              {serverVersion >= 80013}?;
-SECONDARY_SYMBOL:               S E C O N D A R Y                            {serverVersion >= 80013}?;
-SECONDARY_ENGINE_SYMBOL:        S E C O N D A R Y '_' E N G I N E            {serverVersion >= 80013}?;
-SECONDARY_LOAD_SYMBOL:          S E C O N D A R Y '_' L O A D                {serverVersion >= 80013}?;
-SECONDARY_UNLOAD_SYMBOL:        S E C O N D A R Y '_' U N L O A D            {serverVersion >= 80013}?;
+OPTIONAL_SYMBOL:                 O P T I O N A L                             {serverVersion >= 80013}?; // MYSQL
+SECONDARY_SYMBOL:                S E C O N D A R Y                           {serverVersion >= 80013}?; // MYSQL
+SECONDARY_ENGINE_SYMBOL:         S E C O N D A R Y '_' E N G I N E           {serverVersion >= 80013}?; // MYSQL
+SECONDARY_LOAD_SYMBOL:           S E C O N D A R Y '_' L O A D               {serverVersion >= 80013}?; // MYSQL
+SECONDARY_UNLOAD_SYMBOL:         S E C O N D A R Y '_' U N L O A D           {serverVersion >= 80013}?; // MYSQL
 
-ACTIVE_SYMBOL:                  A C T I V E                                  {serverVersion >= 80014}?;
-INACTIVE_SYMBOL:                I N A C T I V E                              {serverVersion >= 80014}?;
-LATERAL_SYMBOL:                 L A T E R A L                                {serverVersion >= 80014}?;
-RETAIN_SYMBOL:                  R E T A I N                                  {serverVersion >= 80014}?;
-OLD_SYMBOL:                     O L D                                        {serverVersion >= 80014}?;
+ACTIVE_SYMBOL:                   A C T I V E                                 {serverVersion >= 80014}?; // MYSQL
+INACTIVE_SYMBOL:                 I N A C T I V E                             {serverVersion >= 80014}?; // MYSQL
+LATERAL_SYMBOL:                  L A T E R A L                               {serverVersion >= 80014}?; // SQL-2003-R
+RETAIN_SYMBOL:                   R E T A I N                                 {serverVersion >= 80014}?; // MYSQL
+OLD_SYMBOL:                      O L D                                       {serverVersion >= 80014}?; // SQL-2003-R
 
-NETWORK_NAMESPACE_SYMBOL:       N E T W O R K '_' N A M E S P A C E          {serverVersion >= 80017}?;
-ENFORCED_SYMBOL:                E N F O R C E D                              {serverVersion >= 80017}?;
-ARRAY_SYMBOL:                   A R R A Y                                    {serverVersion >= 80017}?;
-OJ_SYMBOL:                      O J                                          {serverVersion >= 80017}?;
-MEMBER_SYMBOL:                  M E M B E R                                  {serverVersion >= 80017}?;
+NETWORK_NAMESPACE_SYMBOL:        N E T W O R K '_' N A M E S P A C E         {serverVersion >= 80017}?; // MYSQL
+ENFORCED_SYMBOL:                 E N F O R C E D                             {serverVersion >= 80017}?; // SQL-2003-N
+ARRAY_SYMBOL:                    A R R A Y                                   {serverVersion >= 80017}?; // SQL-2003-R
+OJ_SYMBOL:                       O J                                         {serverVersion >= 80017}?; // ODBC
+MEMBER_SYMBOL:                   M E M B E R                                 {serverVersion >= 80017}?; // SQL-2003-R
+
+RANDOM_SYMBOL:                   R A N D O M                                 {serverVersion >= 80018}?; // MYSQL
+MASTER_COMPRESSION_ALGORITHM_SYMBOL:
+    M A S T E R '_' C O M P R E S S I O N '_' A L G O R I T H M              {serverVersion >= 80018}?
+;                                                                            // MYSQL
+MASTER_ZSTD_COMPRESSION_LEVEL_SYMBOL:
+    M A S T E R '_' Z S T D '_' C O M P R E S S I O N '_' L E V E L          {serverVersion >= 80018}?
+;                                                                            // MYSQL
+PRIVILEGE_CHECKS_USER_SYMBOL:
+    P R I V I L E G E '_' C H E C K S '_' U S E R                            {serverVersion >= 80018}?
+;                                                                            // MYSQL
+MASTER_TLS_CIPHERSUITES_SYMBOL:
+    M A S T E R '_' T L S '_' C I P H E R S U I T E S                        {serverVersion >= 80018}?
+;                                                                            // MYSQL
 
 // $antlr-format groupedAlignments on, alignTrailers off, alignLexerCommands on
 
@@ -1073,7 +1078,7 @@ INVALID_INPUT:
 
 // The underscore charset token is used to defined the repertoire of a string, though it conflicts
 // with normal identifiers, which also can start with an underscore.
-UNDERSCORE_CHARSET: UNDERLINE_SYMBOL IDENTIFIER { Type = (checkCharset(Text)); };
+UNDERSCORE_CHARSET: UNDERLINE_SYMBOL [a-z0-9]+ { Type = (checkCharset(Text)); };
 
 // Identifiers might start with a digit, even though it is discouraged, and may not consist entirely of digits only.
 // All keywords above are automatically excluded.
@@ -1093,26 +1098,15 @@ fragment BACK_TICK:    '`';
 fragment SINGLE_QUOTE: '\'';
 fragment DOUBLE_QUOTE: '"';
 
-BACK_TICK_QUOTED_ID:
-    BACK_TICK (
-        {!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' BACK_TICK
-        | .
-    )*? BACK_TICK
-;
+BACK_TICK_QUOTED_ID: BACK_TICK (({!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\')? .)*? BACK_TICK;
 
 DOUBLE_QUOTED_TEXT: (
-        DOUBLE_QUOTE (
-            {!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' DOUBLE_QUOTE
-            | .
-        )*? DOUBLE_QUOTE
+        DOUBLE_QUOTE (({!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' .)? .)*? DOUBLE_QUOTE
     )+
 ;
 
 SINGLE_QUOTED_TEXT: (
-        SINGLE_QUOTE (
-            {!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\' SINGLE_QUOTE
-            | .
-        )*? SINGLE_QUOTE
+        SINGLE_QUOTE (({!isSqlModeActive(SqlMode.NoBackslashEscapes)}? '\\')? .)*? SINGLE_QUOTE
     )+
 ;
 
