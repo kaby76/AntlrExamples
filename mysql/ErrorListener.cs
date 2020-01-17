@@ -1,11 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
-
+﻿// Template generated code from Antlr4BuildTasks.Template v 1.5
 namespace mysql
 {
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using Antlr4.Runtime;
+    using Antlr4.Runtime.Misc;
+
     public class ErrorListener<S> : ConsoleErrorListener<S>
     {
         public bool had_error;

@@ -1,16 +1,15 @@
-﻿using System;
-using System.Text;
-using System.CodeDom;
-using System.CodeDom.Compiler;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.RegularExpressions;
-using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
-using Antlr4.Runtime.Tree;
-
+﻿// Template generated code from Antlr4BuildTasks.Template v 1.5
 namespace mysql
 {
+    using System;
+    using System.Text;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Text.RegularExpressions;
+    using Antlr4.Runtime;
+    using Antlr4.Runtime.Misc;
+    using Antlr4.Runtime.Tree;
+
     static class Output
     {
         private static int changed = 0;
@@ -105,7 +104,7 @@ namespace mysql
             {
                 var literal = input;
                 literal = literal.Replace("\\", "\\\\");
-                literal = input.Replace("\b", "\\b");
+                literal = literal.Replace("\b", "\\b");
                 literal = literal.Replace("\n", "\\n");
                 literal = literal.Replace("\t", "\\t");
                 literal = literal.Replace("\r", "\\r");
