@@ -420,6 +420,9 @@ public:
   virtual void enterValues(MySQLParser::ValuesContext *ctx) = 0;
   virtual void exitValues(MySQLParser::ValuesContext *ctx) = 0;
 
+  virtual void enterValuesReference(MySQLParser::ValuesReferenceContext *ctx) = 0;
+  virtual void exitValuesReference(MySQLParser::ValuesReferenceContext *ctx) = 0;
+
   virtual void enterInsertUpdateList(MySQLParser::InsertUpdateListContext *ctx) = 0;
   virtual void exitInsertUpdateList(MySQLParser::InsertUpdateListContext *ctx) = 0;
 
@@ -669,12 +672,6 @@ public:
   virtual void enterTransactionCharacteristic(MySQLParser::TransactionCharacteristicContext *ctx) = 0;
   virtual void exitTransactionCharacteristic(MySQLParser::TransactionCharacteristicContext *ctx) = 0;
 
-  virtual void enterSetTransactionCharacteristic(MySQLParser::SetTransactionCharacteristicContext *ctx) = 0;
-  virtual void exitSetTransactionCharacteristic(MySQLParser::SetTransactionCharacteristicContext *ctx) = 0;
-
-  virtual void enterIsolationLevel(MySQLParser::IsolationLevelContext *ctx) = 0;
-  virtual void exitIsolationLevel(MySQLParser::IsolationLevelContext *ctx) = 0;
-
   virtual void enterSavepointStatement(MySQLParser::SavepointStatementContext *ctx) = 0;
   virtual void exitSavepointStatement(MySQLParser::SavepointStatementContext *ctx) = 0;
 
@@ -716,6 +713,12 @@ public:
 
   virtual void enterMasterOption(MySQLParser::MasterOptionContext *ctx) = 0;
   virtual void exitMasterOption(MySQLParser::MasterOptionContext *ctx) = 0;
+
+  virtual void enterPrivilegeCheckDef(MySQLParser::PrivilegeCheckDefContext *ctx) = 0;
+  virtual void exitPrivilegeCheckDef(MySQLParser::PrivilegeCheckDefContext *ctx) = 0;
+
+  virtual void enterMasterTlsCiphersuitesDef(MySQLParser::MasterTlsCiphersuitesDefContext *ctx) = 0;
+  virtual void exitMasterTlsCiphersuitesDef(MySQLParser::MasterTlsCiphersuitesDefContext *ctx) = 0;
 
   virtual void enterMasterFileDef(MySQLParser::MasterFileDefContext *ctx) = 0;
   virtual void exitMasterFileDef(MySQLParser::MasterFileDefContext *ctx) = 0;
@@ -789,6 +792,9 @@ public:
   virtual void enterAlterUserTail(MySQLParser::AlterUserTailContext *ctx) = 0;
   virtual void exitAlterUserTail(MySQLParser::AlterUserTailContext *ctx) = 0;
 
+  virtual void enterUserFunction(MySQLParser::UserFunctionContext *ctx) = 0;
+  virtual void exitUserFunction(MySQLParser::UserFunctionContext *ctx) = 0;
+
   virtual void enterCreateUser(MySQLParser::CreateUserContext *ctx) = 0;
   virtual void exitCreateUser(MySQLParser::CreateUserContext *ctx) = 0;
 
@@ -843,9 +849,6 @@ public:
   virtual void enterAclType(MySQLParser::AclTypeContext *ctx) = 0;
   virtual void exitAclType(MySQLParser::AclTypeContext *ctx) = 0;
 
-  virtual void enterSetPassword(MySQLParser::SetPasswordContext *ctx) = 0;
-  virtual void exitSetPassword(MySQLParser::SetPasswordContext *ctx) = 0;
-
   virtual void enterRoleOrPrivilegesList(MySQLParser::RoleOrPrivilegesListContext *ctx) = 0;
   virtual void exitRoleOrPrivilegesList(MySQLParser::RoleOrPrivilegesListContext *ctx) = 0;
 
@@ -891,23 +894,38 @@ public:
   virtual void enterSetStatement(MySQLParser::SetStatementContext *ctx) = 0;
   virtual void exitSetStatement(MySQLParser::SetStatementContext *ctx) = 0;
 
+  virtual void enterStartOptionValueList(MySQLParser::StartOptionValueListContext *ctx) = 0;
+  virtual void exitStartOptionValueList(MySQLParser::StartOptionValueListContext *ctx) = 0;
+
+  virtual void enterTransactionCharacteristics(MySQLParser::TransactionCharacteristicsContext *ctx) = 0;
+  virtual void exitTransactionCharacteristics(MySQLParser::TransactionCharacteristicsContext *ctx) = 0;
+
+  virtual void enterTransactionAccessMode(MySQLParser::TransactionAccessModeContext *ctx) = 0;
+  virtual void exitTransactionAccessMode(MySQLParser::TransactionAccessModeContext *ctx) = 0;
+
+  virtual void enterIsolationLevel(MySQLParser::IsolationLevelContext *ctx) = 0;
+  virtual void exitIsolationLevel(MySQLParser::IsolationLevelContext *ctx) = 0;
+
+  virtual void enterOptionValueListContinued(MySQLParser::OptionValueListContinuedContext *ctx) = 0;
+  virtual void exitOptionValueListContinued(MySQLParser::OptionValueListContinuedContext *ctx) = 0;
+
   virtual void enterOptionValueNoOptionType(MySQLParser::OptionValueNoOptionTypeContext *ctx) = 0;
   virtual void exitOptionValueNoOptionType(MySQLParser::OptionValueNoOptionTypeContext *ctx) = 0;
 
+  virtual void enterOptionValue(MySQLParser::OptionValueContext *ctx) = 0;
+  virtual void exitOptionValue(MySQLParser::OptionValueContext *ctx) = 0;
+
   virtual void enterSetSystemVariable(MySQLParser::SetSystemVariableContext *ctx) = 0;
   virtual void exitSetSystemVariable(MySQLParser::SetSystemVariableContext *ctx) = 0;
+
+  virtual void enterStartOptionValueListFollowingOptionType(MySQLParser::StartOptionValueListFollowingOptionTypeContext *ctx) = 0;
+  virtual void exitStartOptionValueListFollowingOptionType(MySQLParser::StartOptionValueListFollowingOptionTypeContext *ctx) = 0;
 
   virtual void enterOptionValueFollowingOptionType(MySQLParser::OptionValueFollowingOptionTypeContext *ctx) = 0;
   virtual void exitOptionValueFollowingOptionType(MySQLParser::OptionValueFollowingOptionTypeContext *ctx) = 0;
 
   virtual void enterSetExprOrDefault(MySQLParser::SetExprOrDefaultContext *ctx) = 0;
   virtual void exitSetExprOrDefault(MySQLParser::SetExprOrDefaultContext *ctx) = 0;
-
-  virtual void enterOptionValueList(MySQLParser::OptionValueListContext *ctx) = 0;
-  virtual void exitOptionValueList(MySQLParser::OptionValueListContext *ctx) = 0;
-
-  virtual void enterOptionValue(MySQLParser::OptionValueContext *ctx) = 0;
-  virtual void exitOptionValue(MySQLParser::OptionValueContext *ctx) = 0;
 
   virtual void enterShowStatement(MySQLParser::ShowStatementContext *ctx) = 0;
   virtual void exitShowStatement(MySQLParser::ShowStatementContext *ctx) = 0;
@@ -1494,12 +1512,6 @@ public:
   virtual void enterNchar(MySQLParser::NcharContext *ctx) = 0;
   virtual void exitNchar(MySQLParser::NcharContext *ctx) = 0;
 
-  virtual void enterVarchar(MySQLParser::VarcharContext *ctx) = 0;
-  virtual void exitVarchar(MySQLParser::VarcharContext *ctx) = 0;
-
-  virtual void enterNvarchar(MySQLParser::NvarcharContext *ctx) = 0;
-  virtual void exitNvarchar(MySQLParser::NvarcharContext *ctx) = 0;
-
   virtual void enterRealType(MySQLParser::RealTypeContext *ctx) = 0;
   virtual void exitRealType(MySQLParser::RealTypeContext *ctx) = 0;
 
@@ -1661,6 +1673,9 @@ public:
 
   virtual void enterReplacePassword(MySQLParser::ReplacePasswordContext *ctx) = 0;
   virtual void exitReplacePassword(MySQLParser::ReplacePasswordContext *ctx) = 0;
+
+  virtual void enterUserIdentifierOrText(MySQLParser::UserIdentifierOrTextContext *ctx) = 0;
+  virtual void exitUserIdentifierOrText(MySQLParser::UserIdentifierOrTextContext *ctx) = 0;
 
   virtual void enterUser(MySQLParser::UserContext *ctx) = 0;
   virtual void exitUser(MySQLParser::UserContext *ctx) = 0;

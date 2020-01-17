@@ -422,6 +422,9 @@ public:
   virtual void enterValues(MySQLParser::ValuesContext * /*ctx*/) override { }
   virtual void exitValues(MySQLParser::ValuesContext * /*ctx*/) override { }
 
+  virtual void enterValuesReference(MySQLParser::ValuesReferenceContext * /*ctx*/) override { }
+  virtual void exitValuesReference(MySQLParser::ValuesReferenceContext * /*ctx*/) override { }
+
   virtual void enterInsertUpdateList(MySQLParser::InsertUpdateListContext * /*ctx*/) override { }
   virtual void exitInsertUpdateList(MySQLParser::InsertUpdateListContext * /*ctx*/) override { }
 
@@ -671,12 +674,6 @@ public:
   virtual void enterTransactionCharacteristic(MySQLParser::TransactionCharacteristicContext * /*ctx*/) override { }
   virtual void exitTransactionCharacteristic(MySQLParser::TransactionCharacteristicContext * /*ctx*/) override { }
 
-  virtual void enterSetTransactionCharacteristic(MySQLParser::SetTransactionCharacteristicContext * /*ctx*/) override { }
-  virtual void exitSetTransactionCharacteristic(MySQLParser::SetTransactionCharacteristicContext * /*ctx*/) override { }
-
-  virtual void enterIsolationLevel(MySQLParser::IsolationLevelContext * /*ctx*/) override { }
-  virtual void exitIsolationLevel(MySQLParser::IsolationLevelContext * /*ctx*/) override { }
-
   virtual void enterSavepointStatement(MySQLParser::SavepointStatementContext * /*ctx*/) override { }
   virtual void exitSavepointStatement(MySQLParser::SavepointStatementContext * /*ctx*/) override { }
 
@@ -718,6 +715,12 @@ public:
 
   virtual void enterMasterOption(MySQLParser::MasterOptionContext * /*ctx*/) override { }
   virtual void exitMasterOption(MySQLParser::MasterOptionContext * /*ctx*/) override { }
+
+  virtual void enterPrivilegeCheckDef(MySQLParser::PrivilegeCheckDefContext * /*ctx*/) override { }
+  virtual void exitPrivilegeCheckDef(MySQLParser::PrivilegeCheckDefContext * /*ctx*/) override { }
+
+  virtual void enterMasterTlsCiphersuitesDef(MySQLParser::MasterTlsCiphersuitesDefContext * /*ctx*/) override { }
+  virtual void exitMasterTlsCiphersuitesDef(MySQLParser::MasterTlsCiphersuitesDefContext * /*ctx*/) override { }
 
   virtual void enterMasterFileDef(MySQLParser::MasterFileDefContext * /*ctx*/) override { }
   virtual void exitMasterFileDef(MySQLParser::MasterFileDefContext * /*ctx*/) override { }
@@ -791,6 +794,9 @@ public:
   virtual void enterAlterUserTail(MySQLParser::AlterUserTailContext * /*ctx*/) override { }
   virtual void exitAlterUserTail(MySQLParser::AlterUserTailContext * /*ctx*/) override { }
 
+  virtual void enterUserFunction(MySQLParser::UserFunctionContext * /*ctx*/) override { }
+  virtual void exitUserFunction(MySQLParser::UserFunctionContext * /*ctx*/) override { }
+
   virtual void enterCreateUser(MySQLParser::CreateUserContext * /*ctx*/) override { }
   virtual void exitCreateUser(MySQLParser::CreateUserContext * /*ctx*/) override { }
 
@@ -845,9 +851,6 @@ public:
   virtual void enterAclType(MySQLParser::AclTypeContext * /*ctx*/) override { }
   virtual void exitAclType(MySQLParser::AclTypeContext * /*ctx*/) override { }
 
-  virtual void enterSetPassword(MySQLParser::SetPasswordContext * /*ctx*/) override { }
-  virtual void exitSetPassword(MySQLParser::SetPasswordContext * /*ctx*/) override { }
-
   virtual void enterRoleOrPrivilegesList(MySQLParser::RoleOrPrivilegesListContext * /*ctx*/) override { }
   virtual void exitRoleOrPrivilegesList(MySQLParser::RoleOrPrivilegesListContext * /*ctx*/) override { }
 
@@ -893,23 +896,38 @@ public:
   virtual void enterSetStatement(MySQLParser::SetStatementContext * /*ctx*/) override { }
   virtual void exitSetStatement(MySQLParser::SetStatementContext * /*ctx*/) override { }
 
+  virtual void enterStartOptionValueList(MySQLParser::StartOptionValueListContext * /*ctx*/) override { }
+  virtual void exitStartOptionValueList(MySQLParser::StartOptionValueListContext * /*ctx*/) override { }
+
+  virtual void enterTransactionCharacteristics(MySQLParser::TransactionCharacteristicsContext * /*ctx*/) override { }
+  virtual void exitTransactionCharacteristics(MySQLParser::TransactionCharacteristicsContext * /*ctx*/) override { }
+
+  virtual void enterTransactionAccessMode(MySQLParser::TransactionAccessModeContext * /*ctx*/) override { }
+  virtual void exitTransactionAccessMode(MySQLParser::TransactionAccessModeContext * /*ctx*/) override { }
+
+  virtual void enterIsolationLevel(MySQLParser::IsolationLevelContext * /*ctx*/) override { }
+  virtual void exitIsolationLevel(MySQLParser::IsolationLevelContext * /*ctx*/) override { }
+
+  virtual void enterOptionValueListContinued(MySQLParser::OptionValueListContinuedContext * /*ctx*/) override { }
+  virtual void exitOptionValueListContinued(MySQLParser::OptionValueListContinuedContext * /*ctx*/) override { }
+
   virtual void enterOptionValueNoOptionType(MySQLParser::OptionValueNoOptionTypeContext * /*ctx*/) override { }
   virtual void exitOptionValueNoOptionType(MySQLParser::OptionValueNoOptionTypeContext * /*ctx*/) override { }
 
+  virtual void enterOptionValue(MySQLParser::OptionValueContext * /*ctx*/) override { }
+  virtual void exitOptionValue(MySQLParser::OptionValueContext * /*ctx*/) override { }
+
   virtual void enterSetSystemVariable(MySQLParser::SetSystemVariableContext * /*ctx*/) override { }
   virtual void exitSetSystemVariable(MySQLParser::SetSystemVariableContext * /*ctx*/) override { }
+
+  virtual void enterStartOptionValueListFollowingOptionType(MySQLParser::StartOptionValueListFollowingOptionTypeContext * /*ctx*/) override { }
+  virtual void exitStartOptionValueListFollowingOptionType(MySQLParser::StartOptionValueListFollowingOptionTypeContext * /*ctx*/) override { }
 
   virtual void enterOptionValueFollowingOptionType(MySQLParser::OptionValueFollowingOptionTypeContext * /*ctx*/) override { }
   virtual void exitOptionValueFollowingOptionType(MySQLParser::OptionValueFollowingOptionTypeContext * /*ctx*/) override { }
 
   virtual void enterSetExprOrDefault(MySQLParser::SetExprOrDefaultContext * /*ctx*/) override { }
   virtual void exitSetExprOrDefault(MySQLParser::SetExprOrDefaultContext * /*ctx*/) override { }
-
-  virtual void enterOptionValueList(MySQLParser::OptionValueListContext * /*ctx*/) override { }
-  virtual void exitOptionValueList(MySQLParser::OptionValueListContext * /*ctx*/) override { }
-
-  virtual void enterOptionValue(MySQLParser::OptionValueContext * /*ctx*/) override { }
-  virtual void exitOptionValue(MySQLParser::OptionValueContext * /*ctx*/) override { }
 
   virtual void enterShowStatement(MySQLParser::ShowStatementContext * /*ctx*/) override { }
   virtual void exitShowStatement(MySQLParser::ShowStatementContext * /*ctx*/) override { }
@@ -1496,12 +1514,6 @@ public:
   virtual void enterNchar(MySQLParser::NcharContext * /*ctx*/) override { }
   virtual void exitNchar(MySQLParser::NcharContext * /*ctx*/) override { }
 
-  virtual void enterVarchar(MySQLParser::VarcharContext * /*ctx*/) override { }
-  virtual void exitVarchar(MySQLParser::VarcharContext * /*ctx*/) override { }
-
-  virtual void enterNvarchar(MySQLParser::NvarcharContext * /*ctx*/) override { }
-  virtual void exitNvarchar(MySQLParser::NvarcharContext * /*ctx*/) override { }
-
   virtual void enterRealType(MySQLParser::RealTypeContext * /*ctx*/) override { }
   virtual void exitRealType(MySQLParser::RealTypeContext * /*ctx*/) override { }
 
@@ -1663,6 +1675,9 @@ public:
 
   virtual void enterReplacePassword(MySQLParser::ReplacePasswordContext * /*ctx*/) override { }
   virtual void exitReplacePassword(MySQLParser::ReplacePasswordContext * /*ctx*/) override { }
+
+  virtual void enterUserIdentifierOrText(MySQLParser::UserIdentifierOrTextContext * /*ctx*/) override { }
+  virtual void exitUserIdentifierOrText(MySQLParser::UserIdentifierOrTextContext * /*ctx*/) override { }
 
   virtual void enterUser(MySQLParser::UserContext * /*ctx*/) override { }
   virtual void exitUser(MySQLParser::UserContext * /*ctx*/) override { }
