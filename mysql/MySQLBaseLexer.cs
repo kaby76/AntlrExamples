@@ -20,8 +20,8 @@ namespace mysql
         };
 
         // For parameterizing the parsing process.
-        public long serverVersion;
-        public SqlMode sqlMode; // A collection of flags indicating which of relevant SQL modes are active.
+        public long serverVersion { get; set; }
+        public SqlMode sqlMode { get; set; } // A collection of flags indicating which of relevant SQL modes are active.
         public HashSet<string> charsets; // Used to check repertoires.
         public bool inVersionComment;
         public List<IToken> _pendingTokens = new List<IToken>();

@@ -16,8 +16,8 @@ namespace mysql
             NoBackslashEscapes = 1 << 4
         };
 
-        public long serverVersion;
-        public SqlMode sqlMode; // A collection of flags indicating which of relevant SQL modes are active.
+        public long serverVersion { get; set; }
+        public SqlMode sqlMode { get; set; } // A collection of flags indicating which of relevant SQL modes are active.
 
         public MySQLBaseRecognizer(ITokenStream input, TextWriter output, TextWriter errorOutput)
             : base(input, output, errorOutput)
