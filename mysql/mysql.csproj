@@ -8,9 +8,13 @@
   <ItemGroup>
     <Antlr4 Include="MySQLLexer.g4">
       <CustomToolNamespace>mysql</CustomToolNamespace>
+      <Listener>false</Listener>
+      <Visitor>false</Visitor>
     </Antlr4>
     <Antlr4 Include="MySQLParser.g4">
       <CustomToolNamespace>mysql</CustomToolNamespace>
+      <Listener>false</Listener>
+      <Visitor>false</Visitor>
     </Antlr4>
   </ItemGroup>
 

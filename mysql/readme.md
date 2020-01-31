@@ -13,8 +13,9 @@ for a few unused methods in MySQLSymbolInfo.cs, which seem somewhat useful.
 * The Antlr grammars are processed automatically using Antlr4BuildTasks.
 
 * The error reporting using the "Code Completion" routines were completely replaced with my
-own lookahead predictor because Mike's code does not work correctly. The
-LASets.cs code contains a complete ATN parser. The tree walkers,
-used in code completion, were removed.
+own lookahead predictor because Mike's code does not work correctly.
+For further information, see my blog entry describing the new algorithm.
+As far as I could tell, the only tree walkers used were for code completion, which was used
+for error reporting. They were removed, and the generation of them turned off.
 
 --Ken Domino
