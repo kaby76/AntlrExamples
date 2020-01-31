@@ -1,62 +1,13 @@
-﻿using Antlr4.Runtime;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using Antlr4.Runtime.Atn;
-
-namespace mysql
+﻿namespace mysql
 {
-    public abstract class MySQLBaseLexer : Lexer
+    using Antlr4.Runtime;
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Linq;
+
+    public abstract class MySQLBaseLexer : Lexer, IMySQLRecognizerCommon
     {
-        public enum SqlMode
-        {
-            NoMode = 0,
-            AnsiQuotes = 1 << 0,
-            HighNotPrecedence = 1 << 1,
-            PipesAsConcat = 1 << 2,
-            IgnoreSpace = 1 << 3,
-            NoBackslashEscapes = 1 << 4
-        };
-
-        // For parameterizing the parsing process.
-        public long serverVersion { get; set; }
-        public SqlMode sqlMode { get; set; } // A collection of flags indicating which of relevant SQL modes are active.
-        public HashSet<string> charsets; // Used to check repertoires.
-        public bool inVersionComment;
-        public List<IToken> _pendingTokens = new List<IToken>();
-        public Dictionary<string, int> _symbols; // A list of all defined symbols for lookup.
-
-        public bool isSqlModeActive(SqlMode mode)
-        {
-            return (sqlMode & mode) != 0;
-        }
-
-        public void sqlModeFromString(string modes)
-        {
-            sqlMode = SqlMode.NoMode;
-            modes = modes.ToUpper();
-            string mode;
-            var split = modes.Split(',');
-            foreach (var s in split)
-            {
-                mode = s.Trim();
-                if (mode == "ANSI" || mode == "DB2" || mode == "MAXDB" || mode == "MSSQL" || mode == "ORACLE" ||
-                    mode == "POSTGRESQL")
-                    sqlMode = (sqlMode | SqlMode.AnsiQuotes | SqlMode.PipesAsConcat | SqlMode.IgnoreSpace);
-                else if (mode == "ANSI_QUOTES")
-                    sqlMode = (sqlMode | SqlMode.AnsiQuotes);
-                else if (mode == "PIPES_AS_CONCAT")
-                    sqlMode = (sqlMode | SqlMode.PipesAsConcat);
-                else if (mode == "NO_BACKSLASH_ESCAPES")
-                    sqlMode = (sqlMode | SqlMode.NoBackslashEscapes);
-                else if (mode == "IGNORE_SPACE")
-                    sqlMode = (sqlMode | SqlMode.IgnoreSpace);
-                else if (mode == "HIGH_NOT_PRECEDENCE" || mode == "MYSQL323" || mode == "MYSQL40")
-                    sqlMode = (sqlMode | SqlMode.HighNotPrecedence);
-            }
-        }
-
         public MySQLBaseLexer(ICharStream input, TextWriter output, TextWriter errorOutput)
             : base(input, output, errorOutput)
         {
@@ -65,124 +16,151 @@ namespace mysql
             inVersionComment = false;
         }
 
+        public List<IToken> _pendingTokens { get; set; } = new List<IToken>();
+        public Dictionary<string, int> _symbols { get; set; } = new Dictionary<string, int>();
+        public HashSet<string> charsets { get; set; }
+        public bool inVersionComment { get; set; }
+        public long serverVersion { get; set; }
+        public SqlMode sqlMode { get; set; }
 
-        public override void Reset()
+        public int checkCharset(string text)
         {
-            inVersionComment = false;
-            base.Reset();
+            return charsets.Contains(text) ? MySQLLexer.UNDERSCORE_CHARSET : MySQLLexer.IDENTIFIER;
         }
 
-        /**
-         * Returns true if the given token is an identifier. This includes all those keywords that are
-         * allowed as identifiers when unquoted (non-reserved keywords).
-         */
-        public bool isIdentifier(int type)
+        public bool checkVersion(string text)
         {
-            if ((type == MySQLLexer.IDENTIFIER) || (type == MySQLLexer.BACK_TICK_QUOTED_ID))
-                return true;
-
-            // Double quoted text represents identifiers only if the ANSI QUOTES sql mode is active.
-            if (((sqlMode & SqlMode.AnsiQuotes) != 0) && (type == MySQLLexer.DOUBLE_QUOTED_TEXT))
-                return true;
-
-            string symbol = Vocabulary.GetSymbolicName(type);
-            if (!string.IsNullOrEmpty(symbol) && !MySQLSymbolInfo.isReservedKeyword(symbol, MySQLSymbolInfo.numberToVersion(serverVersion)))
-                return true;
-
-            return false;
-        }
-
-        public int keywordFromText(string name)
-        {
-            // (My)SQL only uses ASCII chars for keywords so we can do a simple downcase here for comparison.
-            string transformed;
-            transformed = name.ToLower();
-
-            if (!MySQLSymbolInfo.isKeyword(transformed, MySQLSymbolInfo.numberToVersion(serverVersion)))
-                return int.MaxValue - 1; // INVALID_INDEX alone can be interpreted as EOF.
-
-            // Generate string -> enum value map, if not yet done.
-            if (! _symbols.Any())
-            {
-                Vocabulary vocabulary = this.Vocabulary as Vocabulary;
-                var max = vocabulary.getMaxTokenType();
-                for (var i = 0; i <= max; ++i)
-                    _symbols[vocabulary.GetSymbolicName(i)] = i;
-            }
-
-            // Here we know for sure we got a keyword.
-            bool found = _symbols.TryGetValue(transformed, out int symbol);
-            if (! found)
-                return int.MaxValue - 1;
-            return symbol;
-        }
-
-
-        /**
-         *  Helper for the query type determination.
-         */
-        public IToken nextDefaultChannelToken()
-        {
-            do
-            {
-                IToken token = NextToken();
-                if (token.Channel == TokenConstants.DefaultChannel)
-                    return token;
-            } while (true);
-        }
-
-
-        /**
-         *  Skips over a definer clause if possible. Returns true if it was successful and points to the
-         *  token after the last definer part.
-         *  On entry the DEFINER symbol has been already consumed.
-         *  If the syntax is wrong false is returned and the token source state is undetermined.
-         */
-        public bool skipDefiner(ref IToken token)
-        {
-            token = nextDefaultChannelToken();
-            if (token.Type != MySQLLexer.EQUAL_OPERATOR)
+            if (text.Length < 8) // Minimum is: /*!12345
                 return false;
 
-            token = nextDefaultChannelToken();
-            if (token.Type == MySQLLexer.CURRENT_USER_SYMBOL)
+            // Skip version comment introducer.
+            long version = Int64.Parse(text.Substring(3));
+            if (version <= serverVersion)
             {
-                token = nextDefaultChannelToken();
-                if (token.Type == MySQLLexer.OPEN_PAR_SYMBOL)
-                {
-                    token = nextDefaultChannelToken();
-                    if (token.Type != MySQLLexer.CLOSE_PAR_SYMBOL)
-                        return false;
-                    token = nextDefaultChannelToken();
-                    if (token.Type == TokenConstants.EOF)
-                        return false;
-                }
+                inVersionComment = true;
                 return true;
             }
-
-            if (token.Type == MySQLLexer.SINGLE_QUOTED_TEXT || isIdentifier(token.Type))
-            {
-                // First part of the user definition (mandatory).
-                token = nextDefaultChannelToken();
-                if (token.Type == MySQLLexer.AT_SIGN_SYMBOL || token.Type == MySQLLexer.AT_TEXT_SUFFIX)
-                {
-                    // Second part of the user definition (optional).
-                    bool needIdentifier = token.Type == MySQLLexer.AT_SIGN_SYMBOL;
-                    token = nextDefaultChannelToken();
-                    if (needIdentifier)
-                    {
-                        if (!isIdentifier(token.Type) && token.Type != MySQLLexer.SINGLE_QUOTED_TEXT)
-                            return false;
-                        token = nextDefaultChannelToken();
-                        if (token.Type == TokenConstants.EOF)
-                            return false;
-                    }
-                }
-
-                return true;
-            }
-
             return false;
+        }
+
+        public int determineFunction(int proposed)
+        {
+            // Skip any whitespace character if the sql mode says they should be ignored,
+            // before actually trying to match the open parenthesis.
+            if (isSqlModeActive(SqlMode.IgnoreSpace))
+            {
+                var input = this.InputStream.LA(1);
+                while (input == ' ' || input == '\t' || input == '\r' || input == '\n')
+                {
+                    this.Interpreter.Consume((ICharStream)this.InputStream);
+                    this.Channel = TokenConstants.HiddenChannel;
+                    this.Type = MySQLLexer.WHITESPACE;
+                    input = this.InputStream.LA(1);
+                }
+            }
+
+            return this.InputStream.LA(1) == '(' ? proposed : MySQLLexer.IDENTIFIER;
+        }
+
+        public int determineNumericType(string text)
+        {
+            const string long_str = "2147483647";
+            const uint long_len = 10;
+            const string signed_long_str = "-2147483648";
+            const string longlong_str = "9223372036854775807";
+            const uint longlong_len = 19;
+            const string signed_longlong_str = "-9223372036854775808";
+            const uint signed_longlong_len = 19;
+            const string unsigned_longlong_str = "18446744073709551615";
+            const uint unsigned_longlong_len = 20;
+
+            // The original code checks for leading +/- but actually that can never happen, neither in the
+            // server parser (as a digit is used to trigger processing in the lexer) nor in our parser
+            // as our rules are defined without signs. But we do it anyway for maximum compatibility.
+            uint length = (uint)text.Length - 1;
+            string str = text;
+            int ptr_str = 0;
+            if (length < long_len) // quick normal case
+                return MySQLLexer.INT_NUMBER;
+            uint negative = 0;
+            if (str[ptr_str] == '+') // Remove sign and pre-zeros
+            {
+                ptr_str++;
+                length--;
+            }
+            else if (str[ptr_str] == '-')
+            {
+                ptr_str++;
+                length--;
+                negative = 1;
+            }
+
+            while (str[ptr_str] == '0' && length != 0)
+            {
+                ptr_str++;
+                length--;
+            }
+
+            if (length < long_len)
+                return MySQLLexer.INT_NUMBER;
+
+            int smaller, bigger;
+            string cmp;
+            int ptr_cmp = 0;
+            if (negative != 0)
+            {
+                if (length == long_len)
+                {
+                    cmp = signed_long_str;
+                    ptr_cmp = 1;
+                    smaller = MySQLLexer.INT_NUMBER; // If <= signed_long_str
+                    bigger = MySQLLexer.LONG_NUMBER; // If >= signed_long_str
+                }
+                else if (length < signed_longlong_len)
+                    return MySQLLexer.LONG_NUMBER;
+                else if (length > signed_longlong_len)
+                    return MySQLLexer.DECIMAL_NUMBER;
+                else
+                {
+                    cmp = signed_longlong_str;
+                    ptr_cmp = 1;
+                    smaller = MySQLLexer.LONG_NUMBER; // If <= signed_longlong_str
+                    bigger = MySQLLexer.DECIMAL_NUMBER;
+                }
+            }
+            else
+            {
+                if (length == long_len)
+                {
+                    cmp = long_str;
+                    ptr_cmp = 0;
+                    smaller = MySQLLexer.INT_NUMBER;
+                    bigger = MySQLLexer.LONG_NUMBER;
+                }
+                else if (length < longlong_len)
+                    return MySQLLexer.LONG_NUMBER;
+                else if (length > longlong_len)
+                {
+                    if (length > unsigned_longlong_len)
+                        return MySQLLexer.DECIMAL_NUMBER;
+                    cmp = unsigned_longlong_str;
+                    ptr_cmp = 0;
+                    smaller = MySQLLexer.ULONGLONG_NUMBER;
+                    bigger = MySQLLexer.DECIMAL_NUMBER;
+                }
+                else
+                {
+                    cmp = longlong_str;
+                    ptr_cmp = 0;
+                    smaller = MySQLLexer.LONG_NUMBER;
+                    bigger = MySQLLexer.ULONGLONG_NUMBER;
+                }
+            }
+
+            while (ptr_cmp < cmp.Length && cmp[ptr_cmp++] == str[ptr_str++])
+                ;
+
+            return ((char)str[ptr_str - 1] <= (char)cmp[ptr_cmp - 1]) ? smaller : bigger;
         }
 
         public MySQLQueryType determineQueryType()
@@ -929,49 +907,29 @@ namespace mysql
             return MySQLQueryType.QtUnknown;
         }
 
-        public bool isRelation(uint type)
+        public void emitDot()
         {
-            switch (type)
-            {
-                case MySQLLexer.EQUAL_OPERATOR:
-                case MySQLLexer.ASSIGN_OPERATOR:
-                case MySQLLexer.NULL_SAFE_EQUAL_OPERATOR:
-                case MySQLLexer.GREATER_OR_EQUAL_OPERATOR:
-                case MySQLLexer.GREATER_THAN_OPERATOR:
-                case MySQLLexer.LESS_OR_EQUAL_OPERATOR:
-                case MySQLLexer.LESS_THAN_OPERATOR:
-                case MySQLLexer.NOT_EQUAL_OPERATOR:
-                case MySQLLexer.NOT_EQUAL2_OPERATOR:
-                case MySQLLexer.PLUS_OPERATOR:
-                case MySQLLexer.MINUS_OPERATOR:
-                case MySQLLexer.MULT_OPERATOR:
-                case MySQLLexer.DIV_OPERATOR:
-                case MySQLLexer.MOD_OPERATOR:
-                case MySQLLexer.LOGICAL_NOT_OPERATOR:
-                case MySQLLexer.BITWISE_NOT_OPERATOR:
-                case MySQLLexer.SHIFT_LEFT_OPERATOR:
-                case MySQLLexer.SHIFT_RIGHT_OPERATOR:
-                case MySQLLexer.LOGICAL_AND_OPERATOR:
-                case MySQLLexer.BITWISE_AND_OPERATOR:
-                case MySQLLexer.BITWISE_XOR_OPERATOR:
-                case MySQLLexer.LOGICAL_OR_OPERATOR:
-                case MySQLLexer.BITWISE_OR_OPERATOR:
+            var token = this.TokenFactory.Create(new Tuple<ITokenSource, ICharStream>(null, null), MySQLLexer.DOT_SYMBOL,
+                this.Text, Channel, this.TokenStartCharIndex, this.TokenStartCharIndex, this.TokenStartLine,
+                this.TokenStartColumn);
+            _pendingTokens.Add(token);
+            //this.TokenStartCharIndex = this.TokenStartCharIndex + 1;
+        }
 
-                case MySQLLexer.OR_SYMBOL:
-                case MySQLLexer.XOR_SYMBOL:
-                case MySQLLexer.AND_SYMBOL:
-                case MySQLLexer.IS_SYMBOL:
-                case MySQLLexer.BETWEEN_SYMBOL:
-                case MySQLLexer.LIKE_SYMBOL:
-                case MySQLLexer.REGEXP_SYMBOL:
-                case MySQLLexer.IN_SYMBOL:
-                case MySQLLexer.SOUNDS_SYMBOL:
-                case MySQLLexer.NOT_SYMBOL:
-                    return true;
+        public bool isIdentifier(int type)
+        {
+            if ((type == MySQLLexer.IDENTIFIER) || (type == MySQLLexer.BACK_TICK_QUOTED_ID))
+                return true;
 
-                default:
-                    return false;
-            }
+            // Double quoted text represents identifiers only if the ANSI QUOTES sql mode is active.
+            if (((sqlMode & SqlMode.AnsiQuotes) != 0) && (type == MySQLLexer.DOUBLE_QUOTED_TEXT))
+                return true;
+
+            string symbol = Vocabulary.GetSymbolicName(type);
+            if (!string.IsNullOrEmpty(symbol) && !MySQLSymbolInfo.isReservedKeyword(symbol, MySQLSymbolInfo.numberToVersion(serverVersion)))
+                return true;
+
+            return false;
         }
 
         public bool isNumber(uint type)
@@ -1036,9 +994,91 @@ namespace mysql
             }
         }
 
-        /**
-         * Allow a grammar rule to emit as many tokens as it needs.
-         */
+        public bool isRelation(uint type)
+        {
+            switch (type)
+            {
+                case MySQLLexer.EQUAL_OPERATOR:
+                case MySQLLexer.ASSIGN_OPERATOR:
+                case MySQLLexer.NULL_SAFE_EQUAL_OPERATOR:
+                case MySQLLexer.GREATER_OR_EQUAL_OPERATOR:
+                case MySQLLexer.GREATER_THAN_OPERATOR:
+                case MySQLLexer.LESS_OR_EQUAL_OPERATOR:
+                case MySQLLexer.LESS_THAN_OPERATOR:
+                case MySQLLexer.NOT_EQUAL_OPERATOR:
+                case MySQLLexer.NOT_EQUAL2_OPERATOR:
+                case MySQLLexer.PLUS_OPERATOR:
+                case MySQLLexer.MINUS_OPERATOR:
+                case MySQLLexer.MULT_OPERATOR:
+                case MySQLLexer.DIV_OPERATOR:
+                case MySQLLexer.MOD_OPERATOR:
+                case MySQLLexer.LOGICAL_NOT_OPERATOR:
+                case MySQLLexer.BITWISE_NOT_OPERATOR:
+                case MySQLLexer.SHIFT_LEFT_OPERATOR:
+                case MySQLLexer.SHIFT_RIGHT_OPERATOR:
+                case MySQLLexer.LOGICAL_AND_OPERATOR:
+                case MySQLLexer.BITWISE_AND_OPERATOR:
+                case MySQLLexer.BITWISE_XOR_OPERATOR:
+                case MySQLLexer.LOGICAL_OR_OPERATOR:
+                case MySQLLexer.BITWISE_OR_OPERATOR:
+
+                case MySQLLexer.OR_SYMBOL:
+                case MySQLLexer.XOR_SYMBOL:
+                case MySQLLexer.AND_SYMBOL:
+                case MySQLLexer.IS_SYMBOL:
+                case MySQLLexer.BETWEEN_SYMBOL:
+                case MySQLLexer.LIKE_SYMBOL:
+                case MySQLLexer.REGEXP_SYMBOL:
+                case MySQLLexer.IN_SYMBOL:
+                case MySQLLexer.SOUNDS_SYMBOL:
+                case MySQLLexer.NOT_SYMBOL:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        public bool isSqlModeActive(SqlMode mode)
+        {
+            return (sqlMode & mode) != 0;
+        }
+
+        public int keywordFromText(string name)
+        {
+            // (My)SQL only uses ASCII chars for keywords so we can do a simple downcase here for comparison.
+            string transformed;
+            transformed = name.ToLower();
+
+            if (!MySQLSymbolInfo.isKeyword(transformed, MySQLSymbolInfo.numberToVersion(serverVersion)))
+                return int.MaxValue - 1; // INVALID_INDEX alone can be interpreted as EOF.
+
+            // Generate string -> enum value map, if not yet done.
+            if (!_symbols.Any())
+            {
+                Vocabulary vocabulary = this.Vocabulary as Vocabulary;
+                var max = vocabulary.getMaxTokenType();
+                for (var i = 0; i <= max; ++i)
+                    _symbols[vocabulary.GetSymbolicName(i)] = i;
+            }
+
+            // Here we know for sure we got a keyword.
+            bool found = _symbols.TryGetValue(transformed, out int symbol);
+            if (!found)
+                return int.MaxValue - 1;
+            return symbol;
+        }
+
+        public IToken nextDefaultChannelToken()
+        {
+            do
+            {
+                IToken token = NextToken();
+                if (token.Channel == TokenConstants.DefaultChannel)
+                    return token;
+            } while (true);
+        }
+
         public override IToken NextToken()
         {
             // First respond with pending tokens to the next token request, if there are any.
@@ -1062,158 +1102,82 @@ namespace mysql
             return next;
         }
 
-        public bool checkVersion(string text)
+        public override void Reset()
         {
-            if (text.Length < 8) // Minimum is: /*!12345
+            inVersionComment = false;
+            base.Reset();
+        }
+
+        public bool skipDefiner(ref IToken token)
+        {
+            token = nextDefaultChannelToken();
+            if (token.Type != MySQLLexer.EQUAL_OPERATOR)
                 return false;
 
-            // Skip version comment introducer.
-            long version = Int64.Parse(text.Substring(3));
-            if (version <= serverVersion)
+            token = nextDefaultChannelToken();
+            if (token.Type == MySQLLexer.CURRENT_USER_SYMBOL)
             {
-                inVersionComment = true;
+                token = nextDefaultChannelToken();
+                if (token.Type == MySQLLexer.OPEN_PAR_SYMBOL)
+                {
+                    token = nextDefaultChannelToken();
+                    if (token.Type != MySQLLexer.CLOSE_PAR_SYMBOL)
+                        return false;
+                    token = nextDefaultChannelToken();
+                    if (token.Type == TokenConstants.EOF)
+                        return false;
+                }
                 return true;
             }
+
+            if (token.Type == MySQLLexer.SINGLE_QUOTED_TEXT || isIdentifier(token.Type))
+            {
+                // First part of the user definition (mandatory).
+                token = nextDefaultChannelToken();
+                if (token.Type == MySQLLexer.AT_SIGN_SYMBOL || token.Type == MySQLLexer.AT_TEXT_SUFFIX)
+                {
+                    // Second part of the user definition (optional).
+                    bool needIdentifier = token.Type == MySQLLexer.AT_SIGN_SYMBOL;
+                    token = nextDefaultChannelToken();
+                    if (needIdentifier)
+                    {
+                        if (!isIdentifier(token.Type) && token.Type != MySQLLexer.SINGLE_QUOTED_TEXT)
+                            return false;
+                        token = nextDefaultChannelToken();
+                        if (token.Type == TokenConstants.EOF)
+                            return false;
+                    }
+                }
+
+                return true;
+            }
+
             return false;
         }
 
-
-        public int determineFunction(int proposed)
+        public void sqlModeFromString(string modes)
         {
-            // Skip any whitespace character if the sql mode says they should be ignored,
-            // before actually trying to match the open parenthesis.
-            if (isSqlModeActive(SqlMode.IgnoreSpace))
+            sqlMode = SqlMode.NoMode;
+            modes = modes.ToUpper();
+            string mode;
+            var split = modes.Split(',');
+            foreach (var s in split)
             {
-                var input = this.InputStream.LA(1);
-                while (input == ' ' || input == '\t' || input == '\r' || input == '\n')
-                {
-                    this.Interpreter.Consume((ICharStream)this.InputStream);
-                    this.Channel = TokenConstants.HiddenChannel;
-                    this.Type = MySQLLexer.WHITESPACE;
-                    input = this.InputStream.LA(1);
-                }
+                mode = s.Trim();
+                if (mode == "ANSI" || mode == "DB2" || mode == "MAXDB" || mode == "MSSQL" || mode == "ORACLE" ||
+                    mode == "POSTGRESQL")
+                    sqlMode = (sqlMode | SqlMode.AnsiQuotes | SqlMode.PipesAsConcat | SqlMode.IgnoreSpace);
+                else if (mode == "ANSI_QUOTES")
+                    sqlMode = (sqlMode | SqlMode.AnsiQuotes);
+                else if (mode == "PIPES_AS_CONCAT")
+                    sqlMode = (sqlMode | SqlMode.PipesAsConcat);
+                else if (mode == "NO_BACKSLASH_ESCAPES")
+                    sqlMode = (sqlMode | SqlMode.NoBackslashEscapes);
+                else if (mode == "IGNORE_SPACE")
+                    sqlMode = (sqlMode | SqlMode.IgnoreSpace);
+                else if (mode == "HIGH_NOT_PRECEDENCE" || mode == "MYSQL323" || mode == "MYSQL40")
+                    sqlMode = (sqlMode | SqlMode.HighNotPrecedence);
             }
-
-            return this.InputStream.LA(1) == '(' ? proposed : MySQLLexer.IDENTIFIER;
         }
-
-        public int determineNumericType(string text)
-        {
-            const string long_str = "2147483647";
-            const uint long_len = 10;
-            const string signed_long_str = "-2147483648";
-            const string longlong_str = "9223372036854775807";
-            const uint longlong_len = 19;
-            const string signed_longlong_str = "-9223372036854775808";
-            const uint signed_longlong_len = 19;
-            const string unsigned_longlong_str = "18446744073709551615";
-            const uint unsigned_longlong_len = 20;
-
-            // The original code checks for leading +/- but actually that can never happen, neither in the
-            // server parser (as a digit is used to trigger processing in the lexer) nor in our parser
-            // as our rules are defined without signs. But we do it anyway for maximum compatibility.
-            uint length = (uint)text.Length - 1;
-            string str = text;
-            int ptr_str = 0;
-            if (length < long_len) // quick normal case
-                return MySQLLexer.INT_NUMBER;
-            uint negative = 0;
-            if (str[ptr_str] == '+') // Remove sign and pre-zeros
-            {
-                ptr_str++;
-                length--;
-            }
-            else if (str[ptr_str] == '-')
-            {
-                ptr_str++;
-                length--;
-                negative = 1;
-            }
-
-            while (str[ptr_str] == '0' && length != 0)
-            {
-                ptr_str++;
-                length--;
-            }
-
-            if (length < long_len)
-                return MySQLLexer.INT_NUMBER;
-
-            int smaller, bigger;
-            string cmp;
-            int ptr_cmp = 0;
-            if (negative != 0)
-            {
-                if (length == long_len)
-                {
-                    cmp = signed_long_str;
-                    ptr_cmp = 1;
-                    smaller = MySQLLexer.INT_NUMBER; // If <= signed_long_str
-                    bigger = MySQLLexer.LONG_NUMBER; // If >= signed_long_str
-                }
-                else if (length < signed_longlong_len)
-                    return MySQLLexer.LONG_NUMBER;
-                else if (length > signed_longlong_len)
-                    return MySQLLexer.DECIMAL_NUMBER;
-                else
-                {
-                    cmp = signed_longlong_str;
-                    ptr_cmp = 1;
-                    smaller = MySQLLexer.LONG_NUMBER; // If <= signed_longlong_str
-                    bigger = MySQLLexer.DECIMAL_NUMBER;
-                }
-            }
-            else
-            {
-                if (length == long_len)
-                {
-                    cmp = long_str;
-                    ptr_cmp = 0;
-                    smaller = MySQLLexer.INT_NUMBER;
-                    bigger = MySQLLexer.LONG_NUMBER;
-                }
-                else if (length < longlong_len)
-                    return MySQLLexer.LONG_NUMBER;
-                else if (length > longlong_len)
-                {
-                    if (length > unsigned_longlong_len)
-                        return MySQLLexer.DECIMAL_NUMBER;
-                    cmp = unsigned_longlong_str;
-                    ptr_cmp = 0;
-                    smaller = MySQLLexer.ULONGLONG_NUMBER;
-                    bigger = MySQLLexer.DECIMAL_NUMBER;
-                }
-                else
-                {
-                    cmp = longlong_str;
-                    ptr_cmp = 0;
-                    smaller = MySQLLexer.LONG_NUMBER;
-                    bigger = MySQLLexer.ULONGLONG_NUMBER;
-                }
-            }
-
-            while (ptr_cmp < cmp.Length && cmp[ptr_cmp++] == str[ptr_str++])
-                ;
-
-            return ((char)str[ptr_str-1] <= (char)cmp[ptr_cmp-1]) ? smaller : bigger;
-        }
-
-        public int checkCharset(string text)
-        {
-            return charsets.Contains(text) ? MySQLLexer.UNDERSCORE_CHARSET : MySQLLexer.IDENTIFIER;
-        }
-
-        /**
-         * Puts a DOT token onto the pending token list.
-         */
-        public void emitDot()
-        {
-            var token = this.TokenFactory.Create(new Tuple<ITokenSource, ICharStream>(null, null), MySQLLexer.DOT_SYMBOL,
-                this.Text, Channel, this.TokenStartCharIndex, this.TokenStartCharIndex, this.TokenStartLine,
-                this.TokenStartColumn);
-            _pendingTokens.Add(token);
-            //this.TokenStartCharIndex = this.TokenStartCharIndex + 1;
-        }
-
     }
 }

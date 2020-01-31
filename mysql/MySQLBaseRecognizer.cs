@@ -1,29 +1,17 @@
 ﻿using Antlr4.Runtime;
 using System;
-using System.IO;
-
 namespace mysql
 {
-    public abstract class MySQLBaseRecognizer : Parser
+    using System.IO;
+
+    public abstract class MySQLBaseRecognizer : Parser, IMySQLRecognizerCommon
     {
-        public enum SqlMode
-        {
-            NoMode = 0,
-            AnsiQuotes = 1 << 0,
-            HighNotPrecedence = 1 << 1,
-            PipesAsConcat = 1 << 2,
-            IgnoreSpace = 1 << 3,
-            NoBackslashEscapes = 1 << 4
-        };
-
-        public long serverVersion { get; set; }
-        public SqlMode sqlMode { get; set; } // A collection of flags indicating which of relevant SQL modes are active.
-
         public MySQLBaseRecognizer(ITokenStream input, TextWriter output, TextWriter errorOutput)
             : base(input, output, errorOutput)
         { }
 
-
+        public long serverVersion { get; set; }
+        public SqlMode sqlMode { get; set; } // A collection of flags indicating which of relevant SQL modes are active.
         public bool isSqlModeActive(SqlMode mode)
         {
             return (sqlMode & mode) != 0;

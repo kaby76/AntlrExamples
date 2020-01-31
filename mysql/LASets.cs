@@ -1,10 +1,10 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 1.5
 namespace mysql
 {
-    using System;
     using Antlr4.Runtime;
     using Antlr4.Runtime.Atn;
     using Antlr4.Runtime.Misc;
+    using System;
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
@@ -13,7 +13,6 @@ namespace mysql
     class LASets
     {
         private Parser _parser;
-        private AntlrInputStream _input_stream;
         private CommonTokenStream _token_stream;
         private List<IToken> _input;
         private int _cursor;
@@ -22,7 +21,6 @@ namespace mysql
         private HashSet<ATNState> _start_states;
         private bool _log_parse = false;
         private bool _log_closure = false;
-        private bool _log_first = false;
 
         class Edge
         {
@@ -386,7 +384,6 @@ namespace mysql
                 visited.Add(state);
                 foreach (var transition in state.TransitionsArray)
                 {
-                    List<List<Edge>> matches = null;
                     switch (transition.TransitionType)
                     {
                         case TransitionType.RULE:
@@ -489,7 +486,6 @@ namespace mysql
 
         bool Validate(List<Edge> parse, List<IToken> i)
         {
-            bool result = false;
             var q = parse.ToList();
             q.Reverse();
             var ei = _input.GetEnumerator();

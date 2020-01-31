@@ -1,36 +1,12 @@
-﻿using Antlr4.Runtime;
-
-namespace mysql
+﻿namespace mysql
 {
+    using Antlr4.Runtime;
+
     public class Program
     {
-        static void Try(string input, int server_version = 0)
-        {
-            //var str = new AntlrInputStream(input);
-            var str = new AntlrInputStream(input);
-            var lexer = new MySQLLexer(str);
-            lexer.serverVersion = server_version;
-            var tokens = new CommonTokenStream(lexer);
-            var parser = new MySQLParser(tokens);
-            parser.serverVersion = server_version;
-            var listener = new ErrorListener<IToken>(parser, lexer, tokens);
-            parser.AddErrorListener(listener);
-            var tree = parser.queries();
-            if (listener.had_error)
-            {
-                System.Console.WriteLine("error in parse.");
-            }
-            else
-            {
-                System.Console.WriteLine("parse completed.");
-            }
-            System.Console.WriteLine(tokens.OutputTokens());
-            System.Console.WriteLine(tree.OutputTree(tokens));
-        }
-
         static void Main(string[] args)
         {
-            Try(@"create table `test` (field timestamp(6));");//, 80000);
+            Try(@"create table `test` (field timestamp(6));", 80000);
 
             // -----------------------------
             // Positive (parses) tests.
@@ -244,6 +220,30 @@ select a, b,
         else 0 # Syntax error: missing closing parenthesis
     end)
 ;");
+        }
+
+        static void Try(string input, int server_version = 0)
+        {
+            //var str = new AntlrInputStream(input);
+            var str = new AntlrInputStream(input);
+            var lexer = new MySQLLexer(str);
+            lexer.serverVersion = server_version;
+            var tokens = new CommonTokenStream(lexer);
+            var parser = new MySQLParser(tokens);
+            parser.serverVersion = server_version;
+            var listener = new ErrorListener<IToken>(parser, lexer, tokens);
+            parser.AddErrorListener(listener);
+            var tree = parser.queries();
+            if (listener.had_error)
+            {
+                System.Console.WriteLine("error in parse.");
+            }
+            else
+            {
+                System.Console.WriteLine("parse completed.");
+            }
+            System.Console.WriteLine(tokens.OutputTokens());
+            System.Console.WriteLine(tree.OutputTree(tokens));
         }
     }
 }
