@@ -17,8 +17,10 @@ and Resharper.
 * The error reporting using the "Code Completion" routines were completely replaced with my
 own lookahead predictor because Mike's code does not work correctly in some situations.
 For further information, see my [blog entry](http://codinggorilla.com/?p=2449) describing the new algorithm.
-As far as I could tell, the only tree walkers used were for code completion
-for error reporting. Since that was replaced, the tree walkers and the generation
+
+* As far as I could tell, the only tree walkers used were for code completion
+for error reporting, and certainly not for static semantic analysis.
+Since the error message handler code was replaced, the tree walkers and the generation
 of the base classes were removed.
 
 --Ken Domino
