@@ -1,6 +1,7 @@
 ﻿# MySQL Workbench Parser
 
-This code is my translation of the Oracle Workbench library
+This code is my translation of the Antlr parser from
+the Oracle Workbench library
 at https://github.com/mysql/mysql-workbench/tree/8.0/library/parsers/grammars (written by
 Mike Lischke).
 
