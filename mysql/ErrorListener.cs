@@ -6,6 +6,7 @@ namespace mysql
     using System.IO;
     using Antlr4.Runtime;
     using Antlr4.Runtime.Misc;
+    using System.Linq;
 
     public class ErrorListener<S> : ConsoleErrorListener<S>
     {
@@ -38,9 +39,12 @@ namespace mysql
                     string rule_name = _parser.Vocabulary.GetSymbolicName(r);
                     result.Add(rule_name);
                 }
-                System.Console.Error.WriteLine("Parse error line/col " + line + "/" + col
-                                               + ", expecting "
-                                               + String.Join(", ", result));
+                if (result.Any())
+                    System.Console.Error.WriteLine("Parse error line/col " + line + "/" + col
+                                                       + ", expecting "
+                        + String.Join(", ", result));
+                else
+                    base.SyntaxError(output, recognizer, offendingSymbol, line, col, msg, e);
             }
             else
             {
