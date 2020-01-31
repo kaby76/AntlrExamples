@@ -10,7 +10,7 @@ they might be useful in some applications.
 The code was cleaned and reorganized using CodeMaid
 and Resharper.
 
-* The code source tree was flatten into one directory.
+* The code source tree was flatten into one directory to make it simplier to navigate.
 
 * The Antlr grammars are processed automatically using Antlr4BuildTasks.
 
