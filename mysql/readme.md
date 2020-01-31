@@ -15,7 +15,6 @@ for a few unused methods in MySQLSymbolInfo.cs, which seem somewhat useful.
 * The error reporting using the "Code Completion" routines were completely replaced with my
 own lookahead predictor because Mike's code does not work correctly. The
 LASets.cs code contains a complete ATN parser. The tree walkers,
-used in the error reporting code,
-were removed in favor of the simplier error reporting method I wrote.
+used in code completion, were removed.
 
 --Ken Domino
