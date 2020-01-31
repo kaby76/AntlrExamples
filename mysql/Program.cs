@@ -208,7 +208,7 @@ END;");
   SELECT result;
 END;");
             Try(@"grant alter (a, b) on table * to 'mike'@'%';");
-            Try(@"ALTER USER u@localhost IDENTIFIED WITH sha256_password BY 'test';");
+            Try(@"ALTER USER u@localhost IDENTIFIED WITH sha256_password BY 'test';", 50706);
 
 
             Try(@"`test` select 1;"); //Syntax error: `test` (back thick quoted id) is not valid input at this position
