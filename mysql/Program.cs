@@ -13,8 +13,12 @@
             // -----------------------------
             Try("select * from foobar;");
 
+            Try("select 2;");
+            Try("select 1 + 1;");
+            Try("select 1 + 1;", 80017);
+
             // (From https://www.mysqltutorial.org/mysql-comment/)
-            Try(@"SELECT 1 /*! +1 */;");
+            Try(@"SELECT 1 /*! +1 */;", 80017);
             Try(@"CREATE TABLE t1 (
     k INT AUTO_INCREMENT,
     KEY (k)

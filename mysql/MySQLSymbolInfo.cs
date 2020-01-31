@@ -5,7 +5,6 @@
 
     public class MySQLSymbolInfo
     {
-
         public enum MySQLVersion
         {
             Unknown,
