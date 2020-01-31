@@ -1,7 +1,6 @@
-﻿using Antlr4.Runtime;
-using System;
-namespace mysql
+﻿namespace mysql
 {
+    using Antlr4.Runtime;
     using System.IO;
 
     public abstract class MySQLBaseRecognizer : Parser, IMySQLRecognizerCommon
