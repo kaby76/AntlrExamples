@@ -4,4 +4,4 @@
 at https://github.com/mysql/mysql-workbench/tree/8.0/library/parsers/grammars, and written by
 Mike Lischke.
 
-* [Why you should not use a LHS predicate in Antlr Lexers]().
+* [Why you should not use a LHS predicate in Antlr Lexers](https://github.com/kaby76/AntlrExamples/tree/master/perf).
