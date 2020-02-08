@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>a</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="aLexer.g4" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Antlr4 Include="aLexer.g4">
+      <CustomToolNamespace>a</CustomToolNamespace>
+    </Antlr4>
+    <Antlr4 Include="aParser.g4">
+      <CustomToolNamespace>a</CustomToolNamespace>
+    </Antlr4>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.8.0" />
+    <PackageReference Include="Antlr4BuildTasks" Version="2.1" />
+    <PackageReference Include="System.CodeDom" Version="4.7.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <NoWarn>3021;1701;1702</NoWarn>
+  </PropertyGroup>
+
+</Project>

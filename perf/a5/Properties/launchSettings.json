@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "a": {
+      "commandName": "Project",
+      "commandLineArgs": "cinput",
+      "workingDirectory": "C:\\Users\\kenne\\perf\\a4"
+    }
+  }
+}
