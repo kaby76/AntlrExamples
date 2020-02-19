@@ -4,3 +4,5 @@ mysql/bin/
 .vs/
 mysql-c/x64/
 mysql-c/packages/
+AntlrParserTool/bin/
+AntlrParserTool/obj/
