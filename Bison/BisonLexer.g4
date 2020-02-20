@@ -1,7 +1,15 @@
 lexer grammar BisonLexer;
 
+options {
+	superClass = LexerAdaptor ;
+}
+
 channels {
 	OFF_CHANNEL		// non-default channel for whitespace and comments
+}
+
+tokens {
+    SC_EPILOGUE
 }
 
 PERCENT_TOKEN:       '%token';
@@ -54,11 +62,19 @@ EPILOGUE:          'epilogue';
 EQUAL:             '=';
 //ID_COLON:          Id ':';
 ID:                Id;
-PERCENT_PERCENT:   '%%';
+PERCENT_PERCENT:   '%%'
+		{
+			if (++percent_percent_count < 2)
+			{
+				this.Type = BisonLexer.PERCENT_PERCENT;
+				return;
+			}
+			this.PushMode(BisonLexer.PercentAction);
+		};
 PIPE:              '|';
 PROLOGUE:          '%{' .* '%}';
 SEMICOLON:         ';';
-TAG:               '<tag>';
+TAG:               '<' Id '>';
 TAG_ANY:           '<*>';
 TAG_NONE:          '<>';
 
@@ -87,7 +103,34 @@ fragment EscAny
 	:	Esc .
 	;
 
-fragment Id : [a-zA-Z]+;
+fragment Id	: NameStartChar NameChar*	;
+fragment NameChar
+	:	NameStartChar
+	|	'0'..'9'
+	|	Underscore
+	|	'\u00B7'
+	|	'\u0300'..'\u036F'
+	|	'\u203F'..'\u2040'
+	;
+
+fragment Underscore		: '_'	;
+
+fragment NameStartChar
+	:	'A'..'Z'
+	|	'a'..'z'
+	|	'\u00C0'..'\u00D6'
+	|	'\u00D8'..'\u00F6'
+	|	'\u00F8'..'\u02FF'
+	|	'\u0370'..'\u037D'
+	|	'\u037F'..'\u1FFF'
+	|	'\u200C'..'\u200D'
+	|	'\u2070'..'\u218F'
+	|	'\u2C00'..'\u2FEF'
+	|	'\u3001'..'\uD7FF'
+	|	'\uF900'..'\uFDCF'
+	|	'\uFDF0'..'\uFFFD'
+	;	// ignores | ['\u10000-'\uEFFFF] ;
+
 
 
 BLOCK_COMMENT
@@ -134,19 +177,15 @@ fragment RBrace			: '}'	;
 // in their own alts so as not to inadvertantly match {}.
 
 mode MAction;
-
 	NESTED_ACTION			: LBrace			-> type(ACTION_CONTENT), pushMode(MAction)	;
-
 	ACTION_ESCAPE			: EscAny			-> type(ACTION_CONTENT)		;
-
 	ACTION_STRING_LITERAL	: DQuoteLiteral		-> type(ACTION_CONTENT)		;
 	ACTION_CHAR_LITERAL		: SQuoteLiteral		-> type(ACTION_CONTENT)		;
-
 	ACTION_BLOCK_COMMENT	: BlockComment 		-> type(ACTION_CONTENT)		;
 	ACTION_LINE_COMMENT		: LineComment 		-> type(ACTION_CONTENT)		;
-
-	END_ACTION				: RBrace		-> popMode		;
-
+	END_ACTION				: RBrace		{ handleEndAction(); }		;
 	UNTERMINATED_ACTION		: EOF		-> type(ACTION_CONTENT), popMode		;
-
 	ACTION_CONTENT			: .							;
+
+mode PercentAction;
+	SC_EPILOGUE : .*? -> type(SC_EPILOGUE), popMode ;
