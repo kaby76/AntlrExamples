@@ -43,7 +43,7 @@ prologue_declarations:
 
 prologue_declaration:
   grammar_declaration
-| '%{...%}'
+| PROLOGUE
 | '%<flag>'
 | '%define' variable value
 | '%defines'
@@ -53,7 +53,7 @@ prologue_declaration:
 | '%expect-rr' INT
 | '%file-prefix' STRING
 | '%glr-parser'
-| '%initial-action' '{...}'
+| '%initial-action' actionBlock
 | '%language' STRING
 | '%name-prefix' STRING
 | '%no-lines'
@@ -69,8 +69,8 @@ prologue_declaration:
 ;
 
 params:
-   params '{...}'
-| '{...}'
+   params actionBlock
+| actionBlock
 ;
 
 
@@ -81,12 +81,12 @@ params:
 grammar_declaration:
   symbol_declaration
 | '%start' symbol
-| code_props_type '{...}' generic_symlist
+| code_props_type actionBlock generic_symlist
 | '%default-prec'
 | '%no-default-prec'
-| '%code' '{...}'
-| '%code' ID '{...}'
-| '%union' union_name '{...}'
+| '%code' actionBlock
+| '%code' ID actionBlock
+| '%union' union_name actionBlock
 ;
 
 code_props_type:
@@ -244,7 +244,7 @@ rules_or_grammar_declaration:
 ;
 
 rules:
-  id_colon named_ref_opt ':' rhses_1
+  id named_ref_opt ':' rhses_1
 ;
 
 rhses_1:
@@ -255,7 +255,7 @@ rhses_1:
 
 rhs:
 | rhs symbol named_ref_opt
-| rhs tag_opt '{...}' named_ref_opt
+| rhs tag_opt actionBlock named_ref_opt
 | rhs '%?{...}'
 | rhs '%empty'
 | rhs '%prec' symbol
@@ -282,7 +282,7 @@ variable:
 value:
 | ID
 | STRING
-| '{...}'
+| actionBlock
 ;
 
 
@@ -314,7 +314,14 @@ string_as_id:
 ;
 
 epilogue_opt:
-| '%%' EPILOGUE
+| '%%' epilogue
 ;
 
+epilogue: actionBlock
+|
+;
+
+actionBlock
+	:	BEGIN_ACTION ACTION_CONTENT* END_ACTION
+	;
 

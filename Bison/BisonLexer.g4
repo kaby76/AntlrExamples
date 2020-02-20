@@ -1,5 +1,9 @@
 lexer grammar BisonLexer;
 
+channels {
+	OFF_CHANNEL		// non-default channel for whitespace and comments
+}
+
 PERCENT_TOKEN:       '%token';
 PERCENT_NTERM:       '%nterm';
 
@@ -44,15 +48,15 @@ PERCENT_YACC:            '%yacc';
 BRACED_CODE:       '{...}';
 BRACED_PREDICATE:  '%?{...}';
 BRACKETED_ID:      '[' Id ']';
-CHAR:              ['] . ['];
+CHAR:              CharLiteral;
 COLON:             ':';
 EPILOGUE:          'epilogue';
 EQUAL:             '=';
+//ID_COLON:          Id ':';
 ID:                Id;
-ID_COLON:          Id ':';
 PERCENT_PERCENT:   '%%';
 PIPE:              '|';
-PROLOGUE:          '%{...%}';
+PROLOGUE:          '%{' .* '%}';
 SEMICOLON:         ';';
 TAG:               '<tag>';
 TAG_ANY:           '<*>';
@@ -69,10 +73,80 @@ INT: [0-9]+;
 
 fragment DQuoteLiteral	: DQuote ( EscSeq | ~["\r\n\\] )* DQuote	;
 fragment DQuote			: '"'	;
+fragment SQuote			: '\''	;
+fragment CharLiteral	: SQuote ( EscSeq | ~['\r\n\\] )  SQuote	;
+fragment SQuoteLiteral	: SQuote ( EscSeq | ~['\r\n\\] )* SQuote	;
+fragment USQuoteLiteral	: SQuote ( EscSeq | ~['\r\n\\] )* 			;
+
 fragment Esc			: '\\'	;
 fragment EscSeq
 	:	Esc
 		[btnfr"'\\]	// The standard escaped character set such as tab, newline, etc.
 	;
+fragment EscAny
+	:	Esc .
+	;
 
 fragment Id : [a-zA-Z]+;
+
+
+BLOCK_COMMENT
+	:	BlockComment	-> channel(OFF_CHANNEL)
+	;
+
+LINE_COMMENT
+	:	LineComment		-> channel(OFF_CHANNEL)
+	;
+
+fragment BlockComment	: '/*'  .*? ('*/' | EOF)	;
+fragment LineComment	: '//' ~[\r\n]* 							;
+fragment LineCommentExt	: '//' ~'\n'* ( '\n' Hws* '//' ~'\n'* )*	;
+fragment Ws				: Hws | Vws	;
+fragment Hws			: [ \t]		;
+fragment Vws			: [\r\n\f]	;
+WS	:	( Hws | Vws )+		-> channel(OFF_CHANNEL)	;
+
+ /* Four types of user code:
+    - prologue (code between '%{' '%}' in the first section, before %%);
+    - actions, printers, union, etc, (between braced in the middle section);
+    - epilogue (everything after the second %%).
+    - predicate (code between '%?{' and '{' in middle section); */
+
+// -------------------------
+// Actions
+
+BEGIN_ACTION
+	:	LBrace		-> pushMode(MAction)
+	;
+
+LBRACE		: LBrace		;
+RBRACE		: RBrace		;
+fragment LBrace			: '{'	;
+fragment RBrace			: '}'	;
+// -------------------------
+// Actions
+//
+// Many language targets use {} as block delimiters and so we
+// must recursively match {} delimited blocks to balance the
+// braces. Additionally, we must make some assumptions about
+// literal string representation in the target language. We assume
+// that they are delimited by ' or " and so consume these
+// in their own alts so as not to inadvertantly match {}.
+
+mode MAction;
+
+	NESTED_ACTION			: LBrace			-> type(ACTION_CONTENT), pushMode(MAction)	;
+
+	ACTION_ESCAPE			: EscAny			-> type(ACTION_CONTENT)		;
+
+	ACTION_STRING_LITERAL	: DQuoteLiteral		-> type(ACTION_CONTENT)		;
+	ACTION_CHAR_LITERAL		: SQuoteLiteral		-> type(ACTION_CONTENT)		;
+
+	ACTION_BLOCK_COMMENT	: BlockComment 		-> type(ACTION_CONTENT)		;
+	ACTION_LINE_COMMENT		: LineComment 		-> type(ACTION_CONTENT)		;
+
+	END_ACTION				: RBrace		-> popMode		;
+
+	UNTERMINATED_ACTION		: EOF		-> type(ACTION_CONTENT), popMode		;
+
+	ACTION_CONTENT			: .							;

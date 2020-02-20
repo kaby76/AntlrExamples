@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Bison": {
+      "commandName": "Project",
+      "commandLineArgs": "../../../examples/calc.y"
+    }
+  }
+}

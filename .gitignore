@@ -6,3 +6,5 @@ mysql-c/x64/
 mysql-c/packages/
 AntlrParserTool/bin/
 AntlrParserTool/obj/
+Bison/bin/
+Bison/obj/
