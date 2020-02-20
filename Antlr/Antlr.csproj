@@ -2,15 +2,15 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net472</TargetFramework>
-    <RootNamespace>AntlrParserTool</RootNamespace>
+    <RootNamespace>Antlr</RootNamespace>
   </PropertyGroup>
   
   <ItemGroup>
     <Antlr4 Include="ANTLRv4Parser.g4">
-      <CustomToolNamespace>AntlrParserTool</CustomToolNamespace>
+      <CustomToolNamespace>Antlr</CustomToolNamespace>
     </Antlr4>
     <Antlr4 Include="ANTLRv4Lexer.g4">
-      <CustomToolNamespace>AntlrParserTool</CustomToolNamespace>
+      <CustomToolNamespace>Antlr</CustomToolNamespace>
     </Antlr4>
   </ItemGroup>
 

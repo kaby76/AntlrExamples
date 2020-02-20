@@ -1,5 +1,5 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 2.1
-namespace AntlrParserTool
+namespace Antlr
 {
     using System;
     using System.Collections.Generic;

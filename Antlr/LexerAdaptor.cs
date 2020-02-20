@@ -1,4 +1,4 @@
-﻿namespace AntlrParserTool
+﻿namespace Antlr
 {
     using Antlr4.Runtime;
     using Antlr4.Runtime.Misc;
