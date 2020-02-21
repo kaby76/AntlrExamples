@@ -1,5 +1,5 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 2.1
-namespace Bison
+namespace lexer_as_parser
 {
     using Antlr4.Runtime;
 
@@ -7,13 +7,13 @@ namespace Bison
     {
         static void Try(string input)
         {
-            var str = new AntlrFileStream(input);
-            var lexer = new BisonLexer(str);
+            var str = new AntlrInputStream(input);
+            var lexer = new arithmeticLexer(str);
             var tokens = new CommonTokenStream(lexer);
-            var parser = new BisonParser(tokens);
+            var parser = new arithmeticParser(tokens);
             var listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
-            var tree = parser.input();
+            var tree = parser.file();
             if (listener.had_error)
             {
                 System.Console.WriteLine("error in parse.");
@@ -22,13 +22,13 @@ namespace Bison
             {
                 System.Console.WriteLine("parse completed.");
             }
-//	    System.Console.WriteLine(tokens.OutputTokens());
-//	    System.Console.WriteLine(tree.OutputTree(tokens));
+            System.Console.WriteLine(tokens.OutputTokens());
+            System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static void Main(string[] args)
         {
-            Try(args[0]);
+            Try(" 1 + 2 * 3 ; 1; hi");
         }
     }
 }
