@@ -24,6 +24,7 @@ fragment Underscore
 fragment NameStartChar
 	:	'A'..'Z'
 	|	'a'..'z'
+        | '_'
 	|	'\u00C0'..'\u00D6'
 	|	'\u00D8'..'\u00F6'
 	|	'\u00F8'..'\u02FF'
@@ -76,6 +77,10 @@ fragment EscAny
 
 fragment Id
 	: NameStartChar NameChar*
+	;
+
+fragment Type
+	: ([\t\r\n\f a-zA-Z0-9] | '[' | ']' | '{' | '}' | '.' | '_' | '(' | ')' | ',')+
 	;
 
 fragment NameChar
@@ -434,7 +439,7 @@ PERCENT_PERCENT
 	;
 PIPE:              '|';
 SEMICOLON:         ';';
-TAG:               '<' Id '>';
+TAG:               '<' Type '>';
 TAG_ANY:           '<*>';
 TAG_NONE:          '<>';
 STRING: DQuoteLiteral;

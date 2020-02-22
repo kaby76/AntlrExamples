@@ -60,7 +60,11 @@ prologue_declaration:
 | '%nondeterministic-parser'
 | '%output' STRING
 | '%param' params
-//| '%pure-parser'
+| PERCENT_PURE_PARSER
+| PARSE actionBlock
+| LEX actionBlock
+| PERCENT_NAME_PREFIX STRING
+| LOCATIONS
 | '%require' STRING
 | '%skeleton' STRING
 | '%token-table'
