@@ -252,16 +252,16 @@ rules:
 ;
 
 rhses_1:
-  rhs
-| rhses_1 '|' rhs
-| rhses_1 ';'
+  rhs                   # rhs1
+| rhses_1 '|' rhs       # rhs2
+| rhses_1 ';'           # rhs3
 ;
 
 rhs:
 | rhs symbol named_ref_opt
 | rhs tag_opt actionBlock named_ref_opt
 | rhs BRACED_PREDICATE
-| rhs '%empty'
+| rhs '%empty'                          
 | rhs '%prec' symbol
 | rhs '%dprec' INT
 | rhs '%merge' TAG

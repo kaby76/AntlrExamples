@@ -1,4 +1,9 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 2.1
+
+using System;
+using System.Collections.Generic;
+using Antlr4.Runtime.Tree;
+
 namespace Bison
 {
     using Antlr4.Runtime;
@@ -21,9 +26,27 @@ namespace Bison
             else
             {
                 System.Console.WriteLine("parse completed.");
-            }
-	    System.Console.WriteLine(tokens.OutputTokens());
-	    System.Console.WriteLine(tree.OutputTree(tokens));
+                var visitor = new GrammarListener();
+                ParseTreeWalker.Default.Walk(visitor, tree);
+                foreach (Tuple<string, List<List<string>>> r in visitor.rules)
+                {
+                    string lhs = r.Item1;
+                    System.Console.WriteLine(lhs);
+                    List<List<string>> rhs = r.Item2;
+                    bool first = true;
+                    foreach (List<string> s in rhs)
+                    {
+                        System.Console.Write(first ? "  :" : "  |");
+                        first = false;
+                        foreach (var c in s)
+                            System.Console.Write(" " + c);
+                        System.Console.WriteLine();
+                    }
+                    System.Console.WriteLine("  ;");
+                }
+            } 
+            System.Console.WriteLine(tokens.OutputTokens());
+            System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static void Main(string[] args)
