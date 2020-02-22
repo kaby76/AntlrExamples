@@ -1,3 +1,6 @@
+// Author -- Ken Domino
+// MIT License
+
 lexer grammar BisonLexer;
 
 options {
@@ -12,108 +15,11 @@ tokens {
     SC_EPILOGUE
 }
 
-PERCENT_TOKEN:       '%token';
-PERCENT_NTERM:       '%nterm';
+// ======================= Common fragments =========================
 
-PERCENT_TYPE:        '%type';
-PERCENT_DESTRUCTOR:  '%destructor';
-PERCENT_PRINTER:     '%printer';
-
-PERCENT_LEFT:        '%left';
-PERCENT_RIGHT:       '%right';
-PERCENT_NONASSOC:    '%nonassoc';
-PERCENT_PRECEDENCE:  '%precedence';
-
-PERCENT_PREC:        '%prec';
-PERCENT_DPREC:       '%dprec';
-PERCENT_MERGE:       '%merge';
-
-PERCENT_CODE:            '%code';
-PERCENT_DEFAULT_PREC:    '%default-prec';
-PERCENT_DEFINE:          '%define';
-PERCENT_DEFINES:         '%defines';
-PERCENT_ERROR_VERBOSE:   '%error-verbose';
-PERCENT_EXPECT:          '%expect';
-PERCENT_EXPECT_RR:       '%expect-rr';
-PERCENT_FLAG:            '%<flag>';
-PERCENT_FILE_PREFIX:     '%file-prefix';
-PERCENT_GLR_PARSER:      '%glr-parser';
-PERCENT_INITIAL_ACTION:  '%initial-action';
-PERCENT_LANGUAGE:        '%language';
-PERCENT_NAME_PREFIX:     '%name-prefix';
-PERCENT_NO_DEFAULT_PREC: '%no-default-prec';
-PERCENT_NO_LINES:        '%no-lines';
-PERCENT_NONDETERMINISTIC_PARSER:  '%nondeterministic-parser';
-PERCENT_OUTPUT:          '%output';
-PERCENT_PURE_PARSER:     '%pure-parser';
-PERCENT_REQUIRE:         '%require';
-PERCENT_SKELETON:        '%skeleton';
-PERCENT_START:           '%start';
-PERCENT_TOKEN_TABLE:     '%token-table';
-PERCENT_VERBOSE:         '%verbose';
-PERCENT_YACC:            '%yacc';
-
-BRACED_CODE:       '{...}';
-BRACED_PREDICATE:  '%?{...}';
-BRACKETED_ID:      '[' Id ']';
-CHAR:              CharLiteral;
-COLON:             ':';
-EPILOGUE:          'epilogue';
-EQUAL:             '=';
-//ID_COLON:          Id ':';
-ID:                Id;
-PERCENT_PERCENT:   '%%'
-		{
-			if (++percent_percent_count < 2)
-			{
-				this.Type = BisonLexer.PERCENT_PERCENT;
-				return;
-			}
-			this.PushMode(BisonLexer.PercentAction);
-		};
-PIPE:              '|';
-PROLOGUE:          '%{' .* '%}';
-SEMICOLON:         ';';
-TAG:               '<' Id '>';
-TAG_ANY:           '<*>';
-TAG_NONE:          '<>';
-
-PARAM: '%param';
-UNION: '%union';
-EMPTY: '%empty';
-
-
-STRING: DQuoteLiteral;
-INT: [0-9]+;
-//TSTRING: ;
-
-fragment DQuoteLiteral	: DQuote ( EscSeq | ~["\r\n\\] )* DQuote	;
-fragment DQuote			: '"'	;
-fragment SQuote			: '\''	;
-fragment CharLiteral	: SQuote ( EscSeq | ~['\r\n\\] )  SQuote	;
-fragment SQuoteLiteral	: SQuote ( EscSeq | ~['\r\n\\] )* SQuote	;
-fragment USQuoteLiteral	: SQuote ( EscSeq | ~['\r\n\\] )* 			;
-
-fragment Esc			: '\\'	;
-fragment EscSeq
-	:	Esc
-		[btnfr"'\\]	// The standard escaped character set such as tab, newline, etc.
+fragment Underscore
+	: '_'
 	;
-fragment EscAny
-	:	Esc .
-	;
-
-fragment Id	: NameStartChar NameChar*	;
-fragment NameChar
-	:	NameStartChar
-	|	'0'..'9'
-	|	Underscore
-	|	'\u00B7'
-	|	'\u0300'..'\u036F'
-	|	'\u203F'..'\u2040'
-	;
-
-fragment Underscore		: '_'	;
 
 fragment NameStartChar
 	:	'A'..'Z'
@@ -131,7 +37,408 @@ fragment NameStartChar
 	|	'\uFDF0'..'\uFFFD'
 	;	// ignores | ['\u10000-'\uEFFFF] ;
 
+fragment DQuoteLiteral
+	: DQuote ( EscSeq | ~["\r\n\\] )* DQuote
+	;
 
+fragment DQuote
+	: '"'
+	;
+
+fragment SQuote
+	: '\''
+	;
+
+fragment CharLiteral
+	: SQuote ( EscSeq | ~['\r\n\\] )  SQuote
+	;
+
+fragment SQuoteLiteral
+	: SQuote ( EscSeq | ~['\r\n\\] )* SQuote
+	;
+
+fragment USQuoteLiteral
+	: SQuote ( EscSeq | ~['\r\n\\] )*
+	;
+
+fragment Esc
+	: '\\'
+	;
+
+fragment EscSeq
+	:	Esc
+		[btnfr"'\\]	// The standard escaped character set such as tab, newline, etc.
+	;
+
+fragment EscAny
+	:	Esc .
+	;
+
+fragment Id
+	: NameStartChar NameChar*
+	;
+
+fragment NameChar
+	:	NameStartChar
+	|	'0'..'9'
+	|	Underscore
+	|	'\u00B7'
+	|	'\u0300'..'\u036F'
+	|	'\u203F'..'\u2040'
+	| '.'
+	;
+
+fragment BlockComment
+	: '/*'  .*? ('*/' | EOF)
+	;
+
+fragment LineComment
+	: '//' ~[\r\n]*
+	;
+
+fragment LineCommentExt
+	: '//' ~'\n'* ( '\n' Hws* '//' ~'\n'* )*
+	;
+
+fragment Ws
+	: Hws
+	| Vws
+	;
+
+fragment Hws
+	: [ \t]
+	;
+
+fragment Vws
+	: [\r\n\f]
+	;
+
+/* Four types of user code:
+    - prologue (code between '%{' '%}' in the first section, before %%);
+    - actions, printers, union, etc, (between braced in the middle section);
+    - epilogue (everything after the second %%).
+    - predicate (code between '%?{' and '{' in middle section); */
+
+// -------------------------
+// Actions
+
+fragment LBrace
+	: '{'
+	;
+
+fragment RBrace
+	: '}'
+	;
+
+fragment PercentLBrace
+	: '%{'
+	;
+
+fragment PercentRBrace
+	: '%}'
+	;
+
+fragment PercentQuestion
+	: '%?{'
+	;
+
+fragment ActionCode
+	: NestedAction
+	| EscAny
+	| DQuoteLiteral
+	| SQuoteLiteral
+	| BlockComment
+	| LineComment
+	| Ws
+	| ~('{' | '}')
+	;
+
+fragment NestedPrologue
+	: PercentLBrace ActionCode* PercentRBrace
+	;
+
+fragment NestedAction
+	: LBrace ActionCode* RBrace
+	;
+
+fragment NestedPredicate
+	: PercentQuestion ActionCode* RBrace
+	;
+
+fragment Sp
+	: Ws*
+	;
+
+fragment Eqopt
+	: (Sp [=])?
+	;
+
+PercentPercent:   '%%'
+		{
+			++percent_percent_count;
+			if (percent_percent_count == 1)
+			{
+				//this.PushMode(BisonLexer.RuleMode);
+				return;
+			} else if (percent_percent_count == 2)
+			{
+				this.PushMode(BisonLexer.EpilogueMode);
+				return;
+			} else
+			{
+				this.Type = BisonLexer.PERCENT_PERCENT;
+				return;
+			}
+		}
+		;
+
+  /*----------------------------.
+  | Scanning Bison directives.  |
+  `----------------------------*/
+
+  /* For directives that are also command line options, the regex must be
+        "%..."
+     after "[-_]"s are removed, and the directive must match the --long
+     option name, with a single string argument.  Otherwise, add exceptions
+     to ../build-aux/cross-options.pl.  */
+
+NONASSOC
+	: '%binary'
+	;
+
+CODE
+	: '%code'
+	;
+
+PERCENT_FLAG
+	: '%debug'
+	;
+
+DEFAULT_PREC
+	: '%default-prec'
+	;
+
+DEFINE
+	: '%define'
+	;
+
+DEFINES
+	: '%defines'
+	;
+
+DESTRUCTOR
+	: '%destructor'
+	;
+
+DPREC
+	: '%dprec'
+	;
+
+EMPTY
+	: '%empty'
+	;
+
+EXPECT
+	: '%expect'
+	;
+
+EXPECT_RR
+	: '%expect-rr'
+	;
+
+PERCENT_FILE_PREFIX
+	: '%file-prefix'
+	;
+
+INITIAL_ACTION
+	: '%initial-action'
+	;
+
+GLR_PARSER
+	: '%glr-parser'
+	;
+
+LANGUAGE
+	: '%language'
+	;
+
+PERCENT_LEFT
+	: '%left'
+	;
+
+LEX
+	: '%lex-param'
+	;
+
+LOCATIONS
+	: '%locations'
+	;
+
+MERGE
+	: '%merge'
+	;
+
+NO_DEFAULT_PREC
+	: '%no-default-prec'
+	;
+
+NO_LINES
+	: '%no-lines'
+	;
+
+PERCENT_NONASSOC
+	: '%nonassoc'
+	;
+
+NONDETERMINISTIC_PARSER
+	: '%nondeterministic-parser'
+	;
+
+NTERM
+	: '%nterm'
+	;
+
+OUTPUT
+	: '%output'
+	;
+
+PARAM
+	: '%param'
+	;
+
+PARSE
+	: '%parse-param'
+	;
+
+PERCENT_PREC
+	: '%prec'
+	;
+
+PRECEDENCE
+	: '%precedence'
+	;
+
+PRINTER
+	: '%printer'
+	;
+
+REQUIRE
+	: '%require'
+	;
+
+PERCENT_RIGHT
+	: '%right'
+	;
+
+SKELETON
+	: '%skeleton'
+	;
+
+PERCENT_START
+	: '%start'
+	;
+
+TOKEN
+	: '%term'
+	;
+
+PERCENT_TOKEN
+	: '%token'
+	;
+
+TOKEN_TABLE
+	: '%token-table'
+	;
+
+PERCENT_TYPE
+	: '%type'
+	;
+
+PERCENT_UNION
+	: '%union'
+	;
+
+VERBOSE
+	: '%verbose'
+	;
+
+PERCENT_YACC
+	: '%yacc'
+	;
+
+  /* Deprecated since Bison 2.3b (2008-05-27), but the warning is
+     issued only since Bison 3.4. */
+PERCENT_PURE_PARSER
+	: '%pure'[-_]'parser'
+	;
+
+  /* Deprecated since Bison 3.0 (2013-07-25), but the warning is
+     issued only since Bison 3.3. */
+PERCENT_ERROR_VERBOSE
+	: '%error-verbose'
+	;
+
+  /* Deprecated since Bison 2.6 (2012-07-19), but the warning is
+     issued only since Bison 3.3. */
+PERCENT_NAME_PREFIX
+	: '%name'[-_]'prefix'(Eqopt)?(Sp)
+	;
+
+  /* Deprecated since Bison 2.7.90, 2012. */
+OBS_DEFAULT_PREC
+	: '%default'[-_]'prec'
+	;
+
+OBS_PERCENT_ERROR_VERBOSE
+	: '%error'[-_]'verbose'
+	;
+
+OBS_EXPECT_RR
+	: '%expect'[-_]'rr'
+	;
+
+OBS_PERCENT_FILE_PREFIX
+	: '%file-prefix'(Eqopt)
+	;
+
+OBS_FIXED_OUTPUT
+	: '%fixed'[-_]'output'[-_]'files'
+	;
+
+OBS_NO_DEFAULT_PREC
+	: '%no'[-_]'default'[-_]'prec'
+	;
+OBS_NO_LINES
+	: '%no'[-_]'lines'
+	;
+
+OBS_OUTPUT
+	: '%output'(Eqopt)
+	;
+OBS_TOKEN_TABLE
+	: '%token'[-_]'table'
+	;
+
+
+BRACED_CODE:       NestedAction;
+BRACED_PREDICATE:  NestedPredicate;
+BRACKETED_ID:      '[' Id ']';
+CHAR:              CharLiteral;
+COLON:             ':';
+//EPILOGUE:          'epilogue';
+EQUAL:             '=';
+//ID_COLON:          Id ':';
+ID:                Id;
+PERCENT_PERCENT
+	: PercentPercent
+	;
+PIPE:              '|';
+SEMICOLON:         ';';
+TAG:               '<' Id '>';
+TAG_ANY:           '<*>';
+TAG_NONE:          '<>';
+STRING: DQuoteLiteral;
+INT: [0-9]+;
 
 BLOCK_COMMENT
 	:	BlockComment	-> channel(OFF_CHANNEL)
@@ -141,51 +448,18 @@ LINE_COMMENT
 	:	LineComment		-> channel(OFF_CHANNEL)
 	;
 
-fragment BlockComment	: '/*'  .*? ('*/' | EOF)	;
-fragment LineComment	: '//' ~[\r\n]* 							;
-fragment LineCommentExt	: '//' ~'\n'* ( '\n' Hws* '//' ~'\n'* )*	;
-fragment Ws				: Hws | Vws	;
-fragment Hws			: [ \t]		;
-fragment Vws			: [\r\n\f]	;
 WS	:	( Hws | Vws )+		-> channel(OFF_CHANNEL)	;
 
- /* Four types of user code:
-    - prologue (code between '%{' '%}' in the first section, before %%);
-    - actions, printers, union, etc, (between braced in the middle section);
-    - epilogue (everything after the second %%).
-    - predicate (code between '%?{' and '{' in middle section); */
 
-// -------------------------
-// Actions
-
-BEGIN_ACTION
-	:	LBrace		-> pushMode(MAction)
+PROLOGUE
+	: NestedPrologue
 	;
 
-LBRACE		: LBrace		;
-RBRACE		: RBrace		;
-fragment LBrace			: '{'	;
-fragment RBrace			: '}'	;
-// -------------------------
-// Actions
-//
-// Many language targets use {} as block delimiters and so we
-// must recursively match {} delimited blocks to balance the
-// braces. Additionally, we must make some assumptions about
-// literal string representation in the target language. We assume
-// that they are delimited by ' or " and so consume these
-// in their own alts so as not to inadvertantly match {}.
+// ==============================================================
+// Note, all prologue rules can be used in grammar declarations.
+// ==============================================================
+//mode RuleMode;
 
-mode MAction;
-	NESTED_ACTION			: LBrace			-> type(ACTION_CONTENT), pushMode(MAction)	;
-	ACTION_ESCAPE			: EscAny			-> type(ACTION_CONTENT)		;
-	ACTION_STRING_LITERAL	: DQuoteLiteral		-> type(ACTION_CONTENT)		;
-	ACTION_CHAR_LITERAL		: SQuoteLiteral		-> type(ACTION_CONTENT)		;
-	ACTION_BLOCK_COMMENT	: BlockComment 		-> type(ACTION_CONTENT)		;
-	ACTION_LINE_COMMENT		: LineComment 		-> type(ACTION_CONTENT)		;
-	END_ACTION				: RBrace		{ handleEndAction(); }		;
-	UNTERMINATED_ACTION		: EOF		-> type(ACTION_CONTENT), popMode		;
-	ACTION_CONTENT			: .							;
+mode EpilogueMode;
+	EPILOGUE: .* ;
 
-mode PercentAction;
-	SC_EPILOGUE : .*? -> type(SC_EPILOGUE), popMode ;

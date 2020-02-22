@@ -10,3 +10,5 @@ Bison/bin/
 Bison/obj/
 Antlr/bin/
 Antlr/obj/
+lexer-as-parser/bin/
+lexer-as-parser/obj/

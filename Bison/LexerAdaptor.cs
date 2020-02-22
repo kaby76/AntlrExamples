@@ -67,11 +67,11 @@ namespace Bison
 
 		protected void handleEndAction()
 		{
-			this.PopMode();
-			if (ModeStack.Any())
-			{
-				this.Type = BisonLexer.ACTION_CONTENT;
-			}
+			//this.PopMode();
+			//if (ModeStack.Any())
+			//{
+			//	this.Type = BisonLexer.ACTION_CONTENT;
+			//}
 		}
 
 		public override IToken Emit()

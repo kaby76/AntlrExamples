@@ -44,7 +44,7 @@ prologue_declarations:
 prologue_declaration:
   grammar_declaration
 | PROLOGUE
-| '%<flag>'
+//| '%<flag>'
 | '%define' variable value
 | '%defines'
 | '%defines' STRING
@@ -55,12 +55,12 @@ prologue_declaration:
 | '%glr-parser'
 | '%initial-action' actionBlock
 | '%language' STRING
-| '%name-prefix' STRING
+//| '%name-prefix' STRING
 | '%no-lines'
 | '%nondeterministic-parser'
 | '%output' STRING
 | '%param' params
-| '%pure-parser'
+//| '%pure-parser'
 | '%require' STRING
 | '%skeleton' STRING
 | '%token-table'
@@ -256,7 +256,7 @@ rhses_1:
 rhs:
 | rhs symbol named_ref_opt
 | rhs tag_opt actionBlock named_ref_opt
-| rhs '%?{...}'
+| rhs BRACED_PREDICATE
 | rhs '%empty'
 | rhs '%prec' symbol
 | rhs '%dprec' INT
@@ -314,14 +314,10 @@ string_as_id:
 ;
 
 epilogue_opt:
-| '%%' epilogue
-;
-
-epilogue: actionBlock
-|
+| '%%' EPILOGUE?
 ;
 
 actionBlock
-	:	BEGIN_ACTION ACTION_CONTENT* END_ACTION
+	:	BRACED_CODE
 	;
 

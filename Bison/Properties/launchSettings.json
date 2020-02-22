@@ -2,7 +2,7 @@
   "profiles": {
     "Bison": {
       "commandName": "Project",
-      "commandLineArgs": "../../../examples/calc.y"
+      "commandLineArgs": "../../../examples/ansi-c-grammar.y"
     }
   }
 }

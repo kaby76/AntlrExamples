@@ -22,8 +22,8 @@ namespace Bison
             {
                 System.Console.WriteLine("parse completed.");
             }
-//	    System.Console.WriteLine(tokens.OutputTokens());
-//	    System.Console.WriteLine(tree.OutputTree(tokens));
+	    System.Console.WriteLine(tokens.OutputTokens());
+	    System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static void Main(string[] args)
