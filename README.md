@@ -10,4 +10,4 @@ Mike Lischke.
 
 * [Antlr](https://github.com/kaby76/AntlrExamples/tree/master/Antlr) in Antlr. This program parses Antlr4 grammar files using Antlr.
 
-* [Antlr lexer is context free](https://github.com/kaby76/AntlrExamples/tree/master/lexer-as-parser). This program demos the use of the well-known expression grammar in the lexer. The rules can't have left recursion, and they all need to be marked with the _fragment_ keyword, but it works.
+* [Parsing context-free languages in the Antlr lexer](https://github.com/kaby76/AntlrExamples/tree/master/lexer-as-parser). This program demos the use of the well-known expression grammar in the lexer. The rules can't have left recursion, and they all need to be marked with the _fragment_ keyword, but it works.
