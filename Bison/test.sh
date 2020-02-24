@@ -1,7 +1,7 @@
 #
 dotnet build
 rm out
-for t in examples/*.y
+for t in ../../crawl/[0-9]*/*.y
 do
 	echo $t
 	echo $t ============================================= >> out 2>&1
