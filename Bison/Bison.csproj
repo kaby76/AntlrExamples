@@ -11,7 +11,6 @@
     </Antlr4>
     <Antlr4 Include="BisonLexer.g4">
       <CustomToolNamespace>Bison</CustomToolNamespace>
-      <GAtn>true</GAtn>
     </Antlr4>
   </ItemGroup>
 

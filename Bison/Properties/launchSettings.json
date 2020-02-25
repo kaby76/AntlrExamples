@@ -2,7 +2,7 @@
   "profiles": {
     "Bison": {
       "commandName": "Project",
-      "commandLineArgs": "C:\\Users\\kenne\\Documents\\crawl\\save\\978\\smt2.y"
+      "commandLineArgs": "C:\\Users\\kenne\\Documents\\AntlrExamples\\foo.y"
     }
   }
 }
