@@ -1,8 +1,8 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 2.1
 
+using Antlr4.Runtime.Tree;
 using System;
 using System.Collections.Generic;
-using Antlr4.Runtime.Tree;
 
 namespace Bison
 {
@@ -10,15 +10,15 @@ namespace Bison
 
     public class Program
     {
-        static void Try(string input)
+        private static void Try(string input)
         {
-            var str = new AntlrFileStream(input);
-            var lexer = new BisonLexer(str);
-            var tokens = new CommonTokenStream(lexer);
-            var parser = new BisonParser(tokens);
-            var listener = new ErrorListener<IToken>(parser, lexer, tokens);
+            AntlrFileStream str = new AntlrFileStream(input);
+            BisonLexer lexer = new BisonLexer(str);
+            CommonTokenStream tokens = new CommonTokenStream(lexer);
+            BisonParser parser = new BisonParser(tokens);
+            ErrorListener<IToken> listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
-            var tree = parser.input();
+            BisonParser.InputContext tree = parser.input();
             if (listener.had_error)
             {
                 System.Console.WriteLine("error in parse.");
@@ -26,7 +26,7 @@ namespace Bison
             else
             {
                 System.Console.WriteLine("parse completed.");
-                var visitor = new GrammarListener();
+                GrammarListener visitor = new GrammarListener();
                 ParseTreeWalker.Default.Walk(visitor, tree);
                 foreach (Tuple<string, List<List<string>>> r in visitor.rules)
                 {
@@ -38,18 +38,21 @@ namespace Bison
                     {
                         System.Console.Write(first ? "  :" : "  |");
                         first = false;
-                        foreach (var c in s)
+                        foreach (string c in s)
+                        {
                             System.Console.Write(" " + c);
+                        }
+
                         System.Console.WriteLine();
                     }
                     System.Console.WriteLine("  ;");
                 }
-            } 
+            }
             System.Console.WriteLine(tokens.OutputTokens());
             System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             Try(args[0]);
         }

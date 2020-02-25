@@ -1,18 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
 using System.Linq;
 
 namespace Bison
 {
     public class GrammarListener : BisonParserBaseListener
     {
-        public List<Tuple<string,List<List<string>>>> rules = new List<Tuple<string, List<List<string>>>>();
+        public List<Tuple<string, List<List<string>>>> rules = new List<Tuple<string, List<List<string>>>>();
         private string lhs;
         private List<List<string>> rhs;
 
@@ -23,8 +17,10 @@ namespace Bison
 
         public override void EnterRhs1(BisonParser.Rhs1Context context)
         {
-            rhs = new List<List<string>>();
-            rhs.Add(new List<string>());
+            rhs = new List<List<string>>
+            {
+                new List<string>()
+            };
         }
 
         public override void ExitRhs1(BisonParser.Rhs1Context context)
@@ -41,10 +37,10 @@ namespace Bison
         {
             if (context.ChildCount >= 2)
             {
-                var c = context.GetChild(1);
+                Antlr4.Runtime.Tree.IParseTree c = context.GetChild(1);
                 if (c is BisonParser.SymbolContext)
                 {
-                    var sym = c.GetText();
+                    string sym = c.GetText();
                     rhs.Last().Add(sym);
                 }
             }
@@ -52,7 +48,7 @@ namespace Bison
 
         public override void ExitRules(BisonParser.RulesContext context)
         {
-            rhs.RemoveAt(rhs.Count-1);
+            rhs.RemoveAt(rhs.Count - 1);
             rules.Add(new Tuple<string, List<List<string>>>(lhs, rhs));
         }
     }
