@@ -45,6 +45,9 @@ prologue_declaration:
   grammar_declaration
 | PROLOGUE
 //| '%<flag>'
+  | '%debug'
+  | '%locations'
+//| '%<flag>'
 | '%define' variable value
 | '%defines'
 | '%defines' STRING
@@ -55,7 +58,7 @@ prologue_declaration:
 | '%glr-parser'
 | '%initial-action' actionBlock
 | '%language' STRING
-//| '%name-prefix' STRING
+| PERCENT_NAME_PREFIX STRING
 | '%no-lines'
 | '%nondeterministic-parser'
 | '%output' STRING
@@ -63,13 +66,12 @@ prologue_declaration:
 | PERCENT_PURE_PARSER
 | PARSE actionBlock
 | LEX actionBlock
-| PERCENT_NAME_PREFIX STRING
-| LOCATIONS
 | '%require' STRING
 | '%skeleton' STRING
 | '%token-table'
 | '%verbose'
 | '%yacc'
+| ';'
 ;
 
 params:
