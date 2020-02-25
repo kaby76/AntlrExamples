@@ -58,10 +58,6 @@ fragment SQuoteLiteral
 	: SQuote ( EscSeq | ~['\r\n\\] )* SQuote
 	;
 
-fragment USQuoteLiteral
-	: SQuote ( EscSeq | ~['\r\n\\] )*
-	;
-
 fragment Esc
 	: '\\'
 	;
@@ -94,7 +90,7 @@ fragment NameChar
 	;
 
 fragment BlockComment
-	: '/*'  .*? ('*/' | EOF)
+	: '/*'  .*? ('*/')
 	;
 
 fragment LineComment
@@ -148,26 +144,29 @@ fragment PercentQuestion
 	;
 
 fragment ActionCode
-	: NestedAction
-	| EscAny
+    : Stuff*
+	;
+
+fragment Stuff
+	: EscAny
 	| DQuoteLiteral
 	| SQuoteLiteral
 	| BlockComment
 	| LineComment
-	| Ws
-	| ~('{' | '}')
+	| NestedAction
+	| ~('{' | '}' | '\'' | '"')
 	;
 
 fragment NestedPrologue
-	: PercentLBrace ActionCode* PercentRBrace
+	: PercentLBrace ActionCode PercentRBrace
 	;
 
 fragment NestedAction
-	: LBrace ActionCode* RBrace
+	: LBrace ActionCode RBrace
 	;
 
 fragment NestedPredicate
-	: PercentQuestion ActionCode* RBrace
+	: PercentQuestion ActionCode RBrace
 	;
 
 fragment Sp
