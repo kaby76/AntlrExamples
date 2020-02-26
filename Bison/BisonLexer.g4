@@ -1,4 +1,5 @@
 // Author -- Ken Domino
+// Copyright 2020
 // MIT License
 
 lexer grammar BisonLexer;
@@ -39,7 +40,7 @@ fragment NameStartChar
 	;	// ignores | ['\u10000-'\uEFFFF] ;
 
 fragment DQuoteLiteral
-	: DQuote ( EscSeq | ~["\r\n\\] )* DQuote
+	: DQuote ( EscSeq | ~["\r\n\\] | ( '\\' [\n\r]*) )* DQuote
 	;
 
 fragment DQuote
@@ -64,7 +65,8 @@ fragment Esc
 
 fragment EscSeq
 	:	Esc
-		[0btnfr"'\\]	// The standard escaped character set such as tab, newline, etc.
+		([abenrtv?"'\\]	// The standard escaped character set such as tab, newline, etc.
+		| [xuU]?[0-9]+) // C-style 
 	;
 
 fragment EscAny
@@ -87,10 +89,16 @@ fragment NameChar
 	|	'\u0300'..'\u036F'
 	|	'\u203F'..'\u2040'
 	| '.'
+	| '-'
 	;
 
 fragment BlockComment
-	: '/*'  .*? ('*/')
+	: '/*' 
+     (
+	   ('/' ~'*')
+	   | ~'/'
+	 )*
+	 '*/'
 	;
 
 fragment LineComment
@@ -302,10 +310,6 @@ NTERM
 	: '%nterm'
 	;
 
-OUTPUT
-	: '%output'
-	;
-
 PARAM
 	: '%param'
 	;
@@ -351,7 +355,7 @@ PERCENT_TOKEN
 	;
 
 TOKEN_TABLE
-	: '%token-table'
+	: '%token'[-_]'table'
 	;
 
 PERCENT_TYPE
@@ -374,12 +378,6 @@ PERCENT_YACC
      issued only since Bison 3.4. */
 PERCENT_PURE_PARSER
 	: '%pure'[-_]'parser'
-	;
-
-  /* Deprecated since Bison 3.0 (2013-07-25), but the warning is
-     issued only since Bison 3.3. */
-PERCENT_ERROR_VERBOSE
-	: '%error-verbose'
 	;
 
   /* Deprecated since Bison 2.6 (2012-07-19), but the warning is
@@ -412,13 +410,15 @@ OBS_FIXED_OUTPUT
 OBS_NO_DEFAULT_PREC
 	: '%no'[-_]'default'[-_]'prec'
 	;
+
 OBS_NO_LINES
 	: '%no'[-_]'lines'
 	;
 
 OBS_OUTPUT
-	: '%output'(Eqopt)
+	: '%output' Eqopt
 	;
+
 OBS_TOKEN_TABLE
 	: '%token'[-_]'table'
 	;
@@ -443,6 +443,8 @@ TAG_ANY:           '<*>';
 TAG_NONE:          '<>';
 STRING: DQuoteLiteral;
 INT: [0-9]+;
+LPAREN: '(';
+RPAREN: ')';
 
 BLOCK_COMMENT
 	:	BlockComment	-> channel(OFF_CHANNEL)

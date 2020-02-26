@@ -51,7 +51,7 @@ prologue_declaration:
 | '%define' variable value
 | '%defines'
 | '%defines' STRING
-| '%error-verbose'
+| OBS_PERCENT_ERROR_VERBOSE
 | '%expect' INT
 | '%expect-rr' INT
 | '%file-prefix' STRING
@@ -61,14 +61,14 @@ prologue_declaration:
 | PERCENT_NAME_PREFIX STRING
 | '%no-lines'
 | '%nondeterministic-parser'
-| '%output' STRING
+| OBS_OUTPUT STRING
 | '%param' params
 | PERCENT_PURE_PARSER
 | PARSE actionBlock
 | LEX actionBlock
 | '%require' STRING
 | '%skeleton' STRING
-| '%token-table'
+| TOKEN_TABLE
 | '%verbose'
 | '%yacc'
 | ';'
@@ -177,6 +177,7 @@ token_decl_1:
 // One symbol declaration for %token or %nterm.
 token_decl:
   id int_opt alias
+  | id id '(' id ')' alias    // Not in Bison, but used in https://github.com/ruby/ruby/parse.y
 ;
 
 int_opt:
