@@ -64,7 +64,7 @@ fragment Esc
 
 fragment EscSeq
 	:	Esc
-		[btnfr"'\\]	// The standard escaped character set such as tab, newline, etc.
+		[0btnfr"'\\]	// The standard escaped character set such as tab, newline, etc.
 	;
 
 fragment EscAny

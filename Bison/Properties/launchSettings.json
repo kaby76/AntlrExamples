@@ -2,7 +2,7 @@
   "profiles": {
     "Bison": {
       "commandName": "Project",
-      "commandLineArgs": "C:\\Users\\kenne\\Documents\\AntlrExamples\\foo.y"
+      "commandLineArgs": "c:\\Users\\kenne\\Documents\\crawl\\save\\1066\\turtle_parser.y"
     }
   }
 }
