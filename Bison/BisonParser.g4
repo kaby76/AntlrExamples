@@ -64,7 +64,7 @@ prologue_declaration:
 | OBS_OUTPUT STRING
 | '%param' params
 | PERCENT_PURE_PARSER
-| PARSE actionBlock
+| PARSE actionBlock+
 | LEX actionBlock
 | '%require' STRING
 | '%skeleton' STRING
@@ -304,11 +304,6 @@ id:
   ID
 | CHAR
 ;
-
-id_colon:
-  ID_COLON
-;
-
 
 symbol:
   id

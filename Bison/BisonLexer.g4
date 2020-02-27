@@ -25,7 +25,7 @@ fragment Underscore
 fragment NameStartChar
 	:	'A'..'Z'
 	|	'a'..'z'
-        | '_'
+    | '_'
 	|	'\u00C0'..'\u00D6'
 	|	'\u00D8'..'\u00F6'
 	|	'\u00F8'..'\u02FF'
@@ -37,6 +37,7 @@ fragment NameStartChar
 	|	'\u3001'..'\uD7FF'
 	|	'\uF900'..'\uFDCF'
 	|	'\uFDF0'..'\uFFFD'
+	| '$' // For PHP
 	;	// ignores | ['\u10000-'\uEFFFF] ;
 
 fragment DQuoteLiteral
@@ -246,7 +247,7 @@ DPREC
 	: '%dprec'
 	;
 
-EMPTY
+EMPTY_RULE
 	: '%empty'
 	;
 
@@ -467,5 +468,5 @@ PROLOGUE
 //mode RuleMode;
 
 mode EpilogueMode;
-	EPILOGUE: .* ;
+	EPILOGUE: .+ ;
 
