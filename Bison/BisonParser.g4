@@ -26,123 +26,121 @@
 parser grammar BisonParser;
 
 options {
-	tokenVocab = BisonLexer;
+    tokenVocab=BisonLexer;
 }
 
-input:
-  prologue_declarations '%%' bison_grammar epilogue_opt
-;
+input
+    : prologue_declarations '%%' bison_grammar epilogue_opt
+    ;
 
         /*------------------------------------.
         | Declarations: before the first %%.  |
         `------------------------------------*/
 
-prologue_declarations:
-| prologue_declarations prologue_declaration
-;
+prologue_declarations
+    : | prologue_declarations prologue_declaration
+    ;
 
-prologue_declaration:
-  grammar_declaration
-| PROLOGUE
+prologue_declaration
+    : grammar_declaration
+    | PROLOGUE
 //| '%<flag>'
-  | '%debug'
-  | '%locations'
+    | '%debug'
+    | '%locations'
 //| '%<flag>'
-| '%define' variable value
-| '%defines'
-| '%defines' STRING
-| OBS_PERCENT_ERROR_VERBOSE
-| '%expect' INT
-| '%expect-rr' INT
-| '%file-prefix' STRING
-| '%glr-parser'
-| '%initial-action' actionBlock
-| '%language' STRING
-| PERCENT_NAME_PREFIX STRING
-| '%no-lines'
-| '%nondeterministic-parser'
-| OBS_OUTPUT STRING
-| '%param' params
-| PERCENT_PURE_PARSER
-| PARSE actionBlock+
-| LEX actionBlock
-| '%require' STRING
-| '%skeleton' STRING
-| TOKEN_TABLE
-| '%verbose'
-| '%yacc'
-| ';'
-;
+    | '%define' variable value
+    | '%defines'
+    | '%defines' STRING
+    | OBS_PERCENT_ERROR_VERBOSE
+    | '%expect' INT
+    | '%expect-rr' INT
+    | '%file-prefix' STRING
+    | '%glr-parser'
+    | '%initial-action' actionBlock
+    | '%language' STRING
+    | PERCENT_NAME_PREFIX STRING
+    | '%no-lines'
+    | '%nondeterministic-parser'
+    | OBS_OUTPUT STRING
+    | '%param' params
+    | PERCENT_PURE_PARSER
+    | PARSE actionBlock+
+    | LEX actionBlock
+    | '%require' STRING
+    | '%skeleton' STRING
+    | TOKEN_TABLE
+    | '%verbose'
+    | '%yacc'
+    | ';'
+    ;
 
-params:
-   params actionBlock
-| actionBlock
-;
+params
+    : params actionBlock
+    | actionBlock
+    ;
 
 
 /*----------------------.
 | grammar_declaration.  |
 `----------------------*/
 
-grammar_declaration:
-  symbol_declaration
-| '%start' symbol
-| code_props_type actionBlock generic_symlist
-| '%default-prec'
-| '%no-default-prec'
-| '%code' actionBlock
-| '%code' ID actionBlock
-| '%union' union_name actionBlock
-;
+grammar_declaration
+    : symbol_declaration
+    | '%start' symbol
+    | code_props_type actionBlock generic_symlist
+    | '%default-prec'
+    | '%no-default-prec'
+    | '%code' actionBlock
+    | '%code' ID actionBlock
+    | '%union' union_name actionBlock
+    ;
 
-code_props_type:
-  '%destructor'
-| '%printer'
-;
+code_props_type
+    : '%destructor'
+    | '%printer'
+    ;
 
 /*---------.
 | %union.  |
 `---------*/
 
+union_name
+    : | ID
+    ;
 
-union_name:
-| ID
-;
+symbol_declaration
+    : '%nterm' nterm_decls
+    | '%token' token_decls
+    | '%type' symbol_decls
+    | precedence_declarator token_decls_for_prec
+    ;
 
+precedence_declarator
+    : '%left'
+    | '%right'
+    | '%nonassoc'
+    | '%precedence'
+    ;
 
-symbol_declaration:
-  '%nterm' nterm_decls
-| '%token' token_decls
-| '%type' symbol_decls
-| precedence_declarator token_decls_for_prec
-;
+tag_opt
+    : | TAG
+    ;
 
-precedence_declarator:
-  '%left'
-| '%right'
-| '%nonassoc'
-| '%precedence'
-;
+generic_symlist
+    : generic_symlist_item
+    | generic_symlist generic_symlist_item
+    ;
 
-tag_opt:
-| TAG
-;
+generic_symlist_item
+    : symbol
+    | tag
+    ;
 
-generic_symlist:
-  generic_symlist_item
-| generic_symlist generic_symlist_item
-;
-
-generic_symlist_item:
-  symbol
-| tag
-;
-
-tag:
-  TAG
-| '<*>'
-| '<>'
-;
+tag
+    : TAG
+    | '<*>'
+    | '<>'
+    ;
 
 /*-----------------------.
 | nterm_decls (%nterm).  |
@@ -153,41 +151,45 @@ tag:
 // Can easily be defined like symbol_decls but restricted to ID, but
 // using token_decls allows to reudce the number of rules, and also to
 // make nicer error messages on '%nterm 'a'' or '%nterm FOO 'foo''.
-nterm_decls:
-  token_decls
-;
+
+nterm_decls
+    : token_decls
+    ;
 
 /*-----------------------------------.
 | token_decls (%token, and %nterm).  |
 `-----------------------------------*/
 
 // A non empty list of possibly tagged symbols for %token or %nterm.
-token_decls:
-  token_decl_1
-| TAG token_decl_1
-| token_decls TAG token_decl_1
-;
+
+token_decls
+    : token_decl_1
+    | TAG token_decl_1
+    | token_decls TAG token_decl_1
+    ;
 
 // One or more symbol declarations for %token or %nterm.
-token_decl_1:
-  token_decl
-| token_decl_1 token_decl
-;
+
+token_decl_1
+    : token_decl
+    | token_decl_1 token_decl
+    ;
   
 // One symbol declaration for %token or %nterm.
-token_decl:
-  id int_opt alias
-  | id id '(' id ')' alias    // Not in Bison, but used in https://github.com/ruby/ruby/parse.y
-;
 
-int_opt:
-| INT
-;
+token_decl
+    : id int_opt alias
+    | id id '(' id ')' alias    // Not in Bison, but used in https://github.com/ruby/ruby/parse.y
+    ;
 
-alias:
-| string_as_id
+int_opt
+    : | INT
+    ;
+
+alias
+    : | string_as_id
 //| TSTRING
-;
+    ;
 
 
 /*-------------------------------------.
@@ -198,23 +200,26 @@ alias:
 //
 // Similar to %token (token_decls), but in '%left FOO 1 'foo'', it treats
 // FOO and 'foo' as two different symbols instead of aliasing them.
-token_decls_for_prec:
-  token_decl_for_prec_1
-| TAG token_decl_for_prec_1
-| token_decls_for_prec TAG token_decl_for_prec_1
-;
+
+token_decls_for_prec
+    : token_decl_for_prec_1
+    | TAG token_decl_for_prec_1
+    | token_decls_for_prec TAG token_decl_for_prec_1
+    ;
 
 // One or more token declarations for precedence declaration.
-token_decl_for_prec_1:
-  token_decl_for_prec
-| token_decl_for_prec_1 token_decl_for_prec
-;
+
+token_decl_for_prec_1
+    : token_decl_for_prec
+    | token_decl_for_prec_1 token_decl_for_prec
+    ;
 
 // One token declaration for precedence declaration.
-token_decl_for_prec:
-  id int_opt
-| string_as_id
-;
+
+token_decl_for_prec
+    : id int_opt
+    | string_as_id
+    ;
 
 
 /*-----------------------------------.
@@ -222,75 +227,77 @@ token_decl_for_prec:
 `-----------------------------------*/
 
 // A non empty list of typed symbols (for %type).
-symbol_decls:
-  symbol_decl_1
-| TAG symbol_decl_1
-| symbol_decls TAG symbol_decl_1
-;
+
+symbol_decls
+    : symbol_decl_1
+    | TAG symbol_decl_1
+    | symbol_decls TAG symbol_decl_1
+    ;
 
 // One or more token declarations (for %type).
-symbol_decl_1:
-  symbol
-  | symbol_decl_1 symbol
-;
+
+symbol_decl_1
+    : symbol
+    | symbol_decl_1 symbol
+    ;
 
         /*------------------------------------------.
         | The grammar section: between the two %%.  |
         `------------------------------------------*/
 
-bison_grammar:
-  rules_or_grammar_declaration
-| bison_grammar rules_or_grammar_declaration
-;
+bison_grammar
+    : rules_or_grammar_declaration
+    | bison_grammar rules_or_grammar_declaration
+    ;
 
 /* As a Bison extension, one can use the grammar declarations in the
    body of the grammar.  */
-rules_or_grammar_declaration:
-  rules
-| grammar_declaration ';'
-;
 
-rules:
-  id named_ref_opt ':' rhses_1
-;
+rules_or_grammar_declaration
+    : rules
+    | grammar_declaration ';'
+    ;
 
-rhses_1:
-  rhs                   # rhs1
-| rhses_1 '|' rhs       # rhs2
-| rhses_1 ';'           # rhs3
-;
+rules
+    : id named_ref_opt ':' rhses_1
+    ;
 
-rhs:
-| rhs symbol named_ref_opt
-| rhs tag_opt actionBlock named_ref_opt
-| rhs BRACED_PREDICATE
-| rhs '%empty'                          
-| rhs '%prec' symbol
-| rhs '%dprec' INT
-| rhs '%merge' TAG
-| rhs '%expect' INT
-| rhs '%expect-rr' INT
-;
+rhses_1
+    : rhs       # rhs1
+    | rhses_1 '|' rhs       # rhs2
+    | rhses_1 ';'       # rhs3
+    ;
 
-named_ref_opt:
-| BRACKETED_ID
-;
+rhs
+    : | rhs symbol named_ref_opt
+      | rhs tag_opt actionBlock named_ref_opt
+      | rhs BRACED_PREDICATE
+      | rhs '%empty'
+      | rhs '%prec' symbol
+      | rhs '%dprec' INT
+      | rhs '%merge' TAG
+      | rhs '%expect' INT
+      | rhs '%expect-rr' INT
+    ;
+
+named_ref_opt
+    : | BRACKETED_ID
+    ;
 
 
 /*---------------------.
 | variable and value.  |
 `---------------------*/
 
-variable:
-  ID
-;
+variable
+    : ID
+    ;
 
-
-value:
-| ID
-| STRING
-| actionBlock
-;
+value
+    : | ID
+      | STRING
+      | actionBlock
+    ;
 
 
 /*--------------.
@@ -300,26 +307,26 @@ value:
 /* Identifiers are returned as uniqstr values by the scanner.
    Depending on their use, we may need to make them genuine symbols.  */
 
-id:
-  ID
-| CHAR
-;
+id
+    : ID
+    | CHAR
+    ;
 
-symbol:
-  id
-| string_as_id
-;
+symbol
+    : id
+    | string_as_id
+    ;
 
 /* A string used as an ID: quote it.  */
-string_as_id:
-  STRING
-;
 
-epilogue_opt:
-| '%%' EPILOGUE?
-;
+string_as_id
+    : STRING
+    ;
+
+epilogue_opt
+    : | '%%' EPILOGUE?
+    ;
 
 actionBlock
-	:	BRACED_CODE
-	;
-
+    : BRACED_CODE
+    ;
