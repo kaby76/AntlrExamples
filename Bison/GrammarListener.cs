@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace Bison
+﻿namespace Bison
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+
     public class GrammarListener : BisonParserBaseListener
     {
         public List<Tuple<string, List<List<string>>>> rules = new List<Tuple<string, List<List<string>>>>();
