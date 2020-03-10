@@ -223,7 +223,7 @@ CODE
 	: '%code'
 	;
 
-PERCENT_FLAG
+PERCENT_DEBUG
 	: '%debug'
 	;
 

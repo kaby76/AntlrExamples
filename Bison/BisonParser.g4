@@ -45,33 +45,33 @@ prologue_declaration
     : grammar_declaration
     | PROLOGUE
 //| '%<flag>'
-    | '%debug'
-    | '%locations'
+    | PERCENT_DEBUG
+    | LOCATIONS
 //| '%<flag>'
-    | '%define' variable value
-    | '%defines'
-    | '%defines' STRING
+    | DEFINE variable value
+    | DEFINES
+    | DEFINES STRING
     | OBS_PERCENT_ERROR_VERBOSE
-    | '%expect' INT
-    | '%expect-rr' INT
-    | '%file-prefix' STRING
-    | '%glr-parser'
-    | '%initial-action' actionBlock
-    | '%language' STRING
+    | EXPECT INT
+    | EXPECT_RR INT
+    | PERCENT_FILE_PREFIX STRING
+    | GLR_PARSER
+    | INITIAL_ACTION actionBlock
+    | LANGUAGE STRING
     | PERCENT_NAME_PREFIX STRING
-    | '%no-lines'
-    | '%nondeterministic-parser'
+    | NO_LINES
+    | NONDETERMINISTIC_PARSER
     | OBS_OUTPUT STRING
-    | '%param' params
+    | PARAM params
     | PERCENT_PURE_PARSER
     | PARSE actionBlock+
     | LEX actionBlock
-    | '%require' STRING
-    | '%skeleton' STRING
+    | REQUIRE STRING
+    | SKELETON STRING
     | TOKEN_TABLE
-    | '%verbose'
-    | '%yacc'
-    | ';'
+    | VERBOSE
+    | PERCENT_YACC
+    | SEMICOLON
     ;
 
 params
@@ -86,18 +86,18 @@ params
 
 grammar_declaration
     : symbol_declaration
-    | '%start' symbol
+    | PERCENT_START symbol
     | code_props_type actionBlock generic_symlist
-    | '%default-prec'
-    | '%no-default-prec'
-    | '%code' actionBlock
-    | '%code' ID actionBlock
-    | '%union' union_name actionBlock
+    | DEFAULT_PREC
+    | NO_DEFAULT_PREC
+    | CODE actionBlock
+    | CODE ID actionBlock
+    | PERCENT_UNION union_name actionBlock
     ;
 
 code_props_type
-    : '%destructor'
-    | '%printer'
+    : DESTRUCTOR
+    | PRINTER
     ;
 
 /*---------.
@@ -109,17 +109,17 @@ union_name
     ;
 
 symbol_declaration
-    : '%nterm' nterm_decls
-    | '%token' token_decls
-    | '%type' symbol_decls
+    : NTERM nterm_decls
+    | PERCENT_TOKEN token_decls
+    | PERCENT_TYPE symbol_decls
     | precedence_declarator token_decls_for_prec
     ;
 
 precedence_declarator
-    : '%left'
-    | '%right'
-    | '%nonassoc'
-    | '%precedence'
+    : PERCENT_LEFT
+    | PERCENT_RIGHT
+    | PERCENT_NONASSOC
+    | PRECEDENCE
     ;
 
 tag_opt
@@ -138,8 +138,8 @@ generic_symlist_item
 
 tag
     : TAG
-    | '<*>'
-    | '<>'
+    | TAG_ANY
+    | TAG_NONE
     ;
 
 /*-----------------------.
@@ -179,7 +179,7 @@ token_decl_1
 
 token_decl
     : id int_opt alias
-    | id id '(' id ')' alias    // Not in Bison, but used in https://github.com/ruby/ruby/parse.y
+    | id id LPAREN id RPAREN alias    // Not in Bison, but used in https://github.com/ruby/ruby/parse.y
     ;
 
 int_opt
@@ -255,29 +255,29 @@ bison_grammar
 
 rules_or_grammar_declaration
     : rules
-    | grammar_declaration ';'
+    | grammar_declaration SEMICOLON
     ;
 
 rules
-    : id named_ref_opt ':' rhses_1
+    : id named_ref_opt COLON rhses_1
     ;
 
 rhses_1
     : rhs       # rhs1
-    | rhses_1 '|' rhs       # rhs2
-    | rhses_1 ';'       # rhs3
+    | rhses_1 PIPE rhs       # rhs2
+    | rhses_1 SEMICOLON       # rhs3
     ;
 
 rhs
     : | rhs symbol named_ref_opt
       | rhs tag_opt actionBlock named_ref_opt
       | rhs BRACED_PREDICATE
-      | rhs '%empty'
-      | rhs '%prec' symbol
-      | rhs '%dprec' INT
-      | rhs '%merge' TAG
-      | rhs '%expect' INT
-      | rhs '%expect-rr' INT
+      | rhs EMPTY_RULE
+      | rhs PERCENT_PREC symbol
+      | rhs DPREC INT
+      | rhs MERGE TAG
+      | rhs EXPECT INT
+      | rhs EXPECT_RR INT
     ;
 
 named_ref_opt
