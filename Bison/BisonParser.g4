@@ -44,10 +44,8 @@ prologue_declarations
 prologue_declaration
     : grammar_declaration
     | PROLOGUE
-//| '%<flag>'
     | PERCENT_DEBUG
     | LOCATIONS
-//| '%<flag>'
     | DEFINE variable value
     | DEFINES
     | DEFINES STRING
