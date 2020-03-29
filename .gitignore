@@ -12,3 +12,4 @@ Antlr/bin/
 Antlr/obj/
 lexer-as-parser/bin/
 lexer-as-parser/obj/
+Flex/obj/
