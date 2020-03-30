@@ -44,6 +44,60 @@ namespace Flex
         protected void handleEndAction()
         {
         }
+
+        public void BEGIN(int type)
+        { }
+
+        public void FLEX_EXIT(int ret)
+        { }
+
+        public void ACTION_ECHO()
+        { }
+
+        public void RETURNCHAR()
+        { }
+
+        public void sf_set_case_ins(int v)
+        { }
+
+        public void sf_set_skip_ws(int v)
+        { }
+
+        public void sf_set_dot_all(int v)
+        { }
+
+        public void yy_pop_state()
+        { }
+
+
+        public int linenum;
+
+        public string yytext;
+
+        public void add_action(string v)
+        { }
+
+        public void RETURNNAME()
+        { }
+
+        public void START_CODEBLOCK(bool v)
+        { }
+
+        public bool yytext_is_array;
+
+        public void yy_push_state(int v)
+        { }
+
+        public int sectnum;
+
+        public void mark_defs1()
+        { }
+
+        public void line_directive_out(string a, int b)
+        { }
+
+        public void format_synerr(string f)
+        { }
     }
 }
 

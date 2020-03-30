@@ -104,11 +104,6 @@ fragment Esc
 	: '\\'
 	;
 
-fragment EscSeq
-	:	Esc
-		([abefnrtv?"'\\]	// The standard escaped character set such as tab, newline, etc.
-		| [xuU]?[0-9]+) // C-style 
-	;
 
 fragment EscAny
 	:	Esc .
@@ -148,11 +143,6 @@ fragment LineComment
 
 fragment LineCommentExt
 	: '//' ~'\n'* ( '\n' Hws* '//' ~'\n'* )*
-	;
-
-fragment Ws
-	: Hws
-	| Vws
 	;
 
 fragment Hws
@@ -226,17 +216,7 @@ fragment Eqopt
 	: (Sp [=])?
 	;
 
-fragment Nl :
-    [\r]?[\n]
-	;
 
-fragment OptWs :
-    [ \t]*
-    ;
-
-fragment Lexopt :
-    [aceknopr]
-	;
 
 fragment Alnum :
     ( Alpha | Digit )
@@ -247,7 +227,7 @@ fragment Alpha :
 	;
 
 fragment Blank :
-	[ \t]
+	' ' | '\t'
 	;
 
 // Cntrl?
@@ -276,96 +256,110 @@ fragment Upper :
 
 // XDigit?
 
+fragment Ws :
+	Blank+
+	;
+
+fragment OptWs :
+	Blank*
+	;
+
+fragment NotWs :
+	~( ' ' | '\t' | '\r' | '\n')
+	;
+
+fragment Nl :
+    [\r]?[\n]
+	;
+
+
 fragment Name :
 	(Alpha | Digit | '$') (Alpha | Digit | [_.\-/$])*
 	;
 
+fragment Scname :
+	Name
+	;
+
+fragment EscSeq
+	:	Esc
+		([abefnrtv?"'\\]	// The standard escaped character set such as tab, newline, etc.
+		| [xuU]?[0-9]+) // C-style 
+	;
+
+fragment First_ccl_char :
+	~( '\\' | '\n')
+	| EscSeq
+	;
+	
+fragment Ccl_char :
+	~( '\\' | '\n' | ']')
+	| EscSeq
+	;
 
 fragment Ccl_expr :
 	'[:' '^'? Alpha+ ':]'
 	;
 
-// -------------------------
-// Comments
-
-BLOCK_COMMENT
-	:	BlockComment	-> channel(OFF_CHANNEL)
+fragment Lexopt :
+    [aceknopr]
 	;
 
-LINE_COMMENT
-	:	LineComment		-> channel(OFF_CHANNEL)
+fragment M4qstart :
+	'[['
 	;
 
-
-OPEN_BRACKET : '[' ;
-CLOSE_BRACKET : ']' ;
-DQUOTE : '"' ;
-EQUAL : '=' ;
-OPEN_CURLY : '{' ;
-CLOSE_CURLY : '}' ;
-NL : Nl ;
-UP : '^' ;
-LT : '<' ;
-GT : '>' ;
-STAR : '*' ;
-COMMA : ',' ;
-DOLLAR : '$' ;
-VBAR : '|' ;
-SLASH : '/' ;
-PLUS : '+' ;
-QUESTION : '?' ;
-DOT : '.' ;
-OPEN_PAREN : '(' ;
-CLOSE_PAREN : ')' ;
-MINUS : '-' ;
+fragment M4qend :
+	']]'
+	;
 
 // ===================================================================
 
 mode INITIAL;
 
-IUpWs : Ws { input.LA(-1) == '\n' }? { START_CODEBLOCK(true); } ;
-IUpStartComment : '/*' { input.LA(-1) == '\n' }? { add_action("/*[\"["); yy_push_state( COMMENT ); } ;
-IPoundOptWsLineWs : '#' { input.LA(-1) == '\n' }? OptWs 'line' Ws { yy_push_state( LINEDIR ); } ;
-SCDECL : '%s' { input.LA(-1) == '\n' }? Id? ;
-XSCDECL : '%x' { input.LA(-1) == '\n' }? Id? ;
-IEndCodeBlock : '%{' { input.LA(-1) == '\n' }? .* Nl { START_CODEBLOCK(false); } ;
-ITop : '%top' { input.LA(-1) == '\n' }? Ws '{' Ws Nl {
-                brace_start_line = linenum;
-                ++linenum;
-                buf_linedir( &top_buf, infilename?infilename:"<stdin>", linenum);
-                brace_depth = 1;
-                yy_push_state(CODEBLOCK_MATCH_BRACE);
-            } ;
-IDiscard : Ws -> skip ;
-SECTEND:   '%%' { input.LA(-1) == '\n' }? .* {
-			sectnum = 2;
-			bracelevel = 0;
-			mark_defs1();
-			line_directive_out(NULL, 1);
-			BEGIN(SECT2PROLOG);
-			return SECTEND;
-			} ;
-IUpPointer_nl : '%pointer' { input.LA(-1) == '\n' }? .* Nl { yytext_is_array = false; ++linenum; } ;
-IUpArrayNl : '%array' { input.LA(-1) == '\n' }? .* NL	{ yytext_is_array = true; ++linenum; } ;
-IUpOption : '%option' { input.LA(-1) == '\n' }? -> type(TOK_OPTION), pushMode(OPTION);
-IUpPercentLexoptOptWsDigitOptWsLn : '%' Lexopt OptWs Digit* OptWs Nl { ++linenum; } ;
-NLOPTION : Nl -> popMode ;
+	I_initial_upws : Ws { this.InputStream.LA(-1) == '\n' }? { START_CODEBLOCK(true); } ;
+	I_initial_upstartcomment : '/*' { this.InputStream.LA(-1) == '\n' }? { add_action("/*[\"["); yy_push_state( COMMENT ); } ;
+	I_initial_poundoptwslinews : '#' { this.InputStream.LA(-1) == '\n' }? OptWs 'line' Ws { yy_push_state( LINEDIR ); } ;
+	I_initial_percents : '%s' { this.InputStream.LA(-1) == '\n' }? Id? { Type=SCDECL; } ;
+	I_initial_percentx : '%x' { this.InputStream.LA(-1) == '\n' }? Id? { Type=XSCDECL; } ;
+	I_initial_percentcurly : '%{' { this.InputStream.LA(-1) == '\n' }? .* Nl { START_CODEBLOCK(false); } ;
+	I_initial_top : '%top' { this.InputStream.LA(-1) == '\n' }? Ws '{' Ws Nl {
+					brace_start_line = linenum;
+					++linenum;
+					buf_linedir( &top_buf, infilename?infilename:"<stdin>", linenum);
+					brace_depth = 1;
+					yy_push_state(CODEBLOCK_MATCH_BRACE);
+				} ;
+	I_initial_ws : Ws -> skip ;
+	I_initial_perper : '%%' { this.InputStream.LA(-1) == '\n' }? .* {
+				sectnum = 2;
+				bracelevel = 0;
+				mark_defs1();
+				line_directive_out(NULL, 1);
+				BEGIN(SECT2PROLOG);
+				return SECTEND;
+				} ;
+	I_initial_UpPointer_nl : '%pointer' { this.InputStream.LA(-1) == '\n' }? .* Nl { yytext_is_array = false; ++linenum; } ;
+	I_initial_UpArrayNl : '%array' { this.InputStream.LA(-1) == '\n' }? .* Nl	{ yytext_is_array = true; ++linenum; } ;
+	I_initial_UpOption : '%option' { this.InputStream.LA(-1) == '\n' }? -> type(TOK_OPTION), pushMode(OPTION);
+	I_initial_UpPercentLexoptOptWsDigitOptWsLn : '%' Lexopt OptWs Digit* OptWs Nl { ++linenum; } ;
+	I_initial_NLOPTION : Nl -> popMode ;
 
 // ===================================================================
 
 mode OPTION;
 
-TOK_OUTFILE : 'outfile' ;
-TOK_EXTRA_TYPE : 'extra-type' ;
-TOK_PREFIX : 'prefix' ;
-TOK_YYCLASS : 'yyclass' ;
-TOK_HEADER_FILE : 'header' '-file'? ;
-TOK_TABLES_FILE : 'tables-file' ;
+	TOK_OUTFILE : 'outfile' ;
+	TOK_EXTRA_TYPE : 'extra-type' ;
+	TOK_PREFIX : 'prefix' ;
+	TOK_YYCLASS : 'yyclass' ;
+	TOK_HEADER_FILE : 'header' '-file'? ;
+	TOK_TABLES_FILE : 'tables-file' ;
 
 
 mode SECT2;
 
-	BlankLine : OptWs Nl // { input.LA(1); }
+	BlankLine : OptWs Nl // { this.InputStream.LA(1); }
 		-> channel(OFF_CHANNEL);
 
 mode GROUP_WITH_PARAMS;
@@ -414,13 +408,16 @@ mode FIRSTCCL;
 
 	Icll_expr : Ccl_expr {
 			format_synerr(
-				_( "bad character class expression: %s" ),
-					yytext );
+				"bad character class expression: %s"
+				+ yytext );
 			BEGIN(CCL); Type=CCE_ALNUM;
 			} ;
 
 mode CCL;
 
+	I_up : '^' { BEGIN(CCL); Type=CARET; } ;
+	I_ret : ~('\\' | '\n') { RETURNCHAR(); } ;
+	I_closebracket : ']' { BEGIN(SECT2); Type=CLOSE_BRACKET; } ;
 	I_ccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
 	I_ccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
 	I_ccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
@@ -449,7 +446,7 @@ mode CCL;
 
 	I_ccl_cll_expr : Ccl_expr {
 			format_synerr(
-				_( "bad character class expression: %s" ),
+				"bad character class expression: %s" +
 					yytext );
 			BEGIN(CCL); Type=CCE_ALNUM;
 			} ;
