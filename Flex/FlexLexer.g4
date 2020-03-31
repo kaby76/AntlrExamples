@@ -159,18 +159,25 @@ fragment M4qend :
 // ===================================================================
 
 mode ACTION;
+I_action : ;
 
 mode CODEBLOCK;
+I_codeblock : ;
 
 mode ACTION_STRING;
+I_action_string : ;
 
 mode PERCENT_BRACE_ACTION;
+I_percent_brace_action : ;
 
 mode CHARACTER_CONSTANT;
+I_character_constant : ;
 
 mode COMMENT;
+I_comment : ;
 
 mode CODE_COMMENT;
+I_code_comment : ;
 
 mode INITIAL;
 
