@@ -158,6 +158,20 @@ fragment M4qend :
 
 // ===================================================================
 
+mode ACTION;
+
+mode CODEBLOCK;
+
+mode ACTION_STRING;
+
+mode PERCENT_BRACE_ACTION;
+
+mode CHARACTER_CONSTANT;
+
+mode COMMENT;
+
+mode CODE_COMMENT;
+
 mode INITIAL;
 
 	I_initial_upws : Ws { this.InputStream.LA(-1) == '\n' }? { START_CODEBLOCK(true); } ;
