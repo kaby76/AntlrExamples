@@ -222,6 +222,19 @@ mode CODE_COMMENT;
 
 	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
 
+mode COMMENT_DISCARD;
+
+	I_comment_discard_end : '*/' { yy_pop_state(); };
+	I_comment_discard_star : '*' { } ;
+	I_comment_discard_ws : ~('*' | '\n') { } ;
+	I_comment_discard_nl : Nl { ++linenum; } ;
+
+mode EXTENDED_COMMENT;
+
+	I_extended_comment_cp : ')' { yy_pop_state(); } ;
+	I_extended_comment_ws : ~('\n' | ')')+ { } ;
+	I_extended_comment_nl : Nl { ++linenum; } ;
+
 // ===================================================================
 
 mode OPTION;
