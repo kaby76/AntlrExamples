@@ -235,6 +235,18 @@ mode EXTENDED_COMMENT;
 	I_extended_comment_ws : ~('\n' | ')')+ { } ;
 	I_extended_comment_nl : Nl { ++linenum; } ;
 
+
+mode LINEDIR;
+
+	I_linedir_nl : '\n' { yy_pop_state(); } ;
+	I_linedir_digits : Digit+ { linenum = myctoi(yytext); } ;
+	I_linedir_str : '"' ~('"' | '\n')* '"' {
+			free(infilename);
+			infilename = xstrdup(yytext + 1);
+			infilename[strlen( infilename ) - 1] = '\0';
+		} ;
+	I_linedir_dot : . -> skip ;
+
 // ===================================================================
 
 mode OPTION;
