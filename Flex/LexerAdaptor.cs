@@ -98,6 +98,16 @@ namespace Flex
 
         public void format_synerr(string f)
         { }
+
+
+        public static int bracelevel, didadef, indented_code;
+        public static bool doing_rule_action = false;
+        public static int option_sense;
+        public bool doing_codeblock = false;
+        public int brace_depth = 0, brace_start_line = 0;
+        public const int MAXLINE = 100000;
+        public char[] nmdef = new char[MAXLINE];
+
     }
 }
 

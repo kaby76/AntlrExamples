@@ -58,163 +58,6 @@ CCL_OP_UNION
 
 // ======================= Common fragments =========================
 
-fragment Underscore
-	: '_'
-	;
-
-fragment NameStartChar
-	:	'A'..'Z'
-	|	'a'..'z'
-    | '_'
-	|	'\u00C0'..'\u00D6'
-	|	'\u00D8'..'\u00F6'
-	|	'\u00F8'..'\u02FF'
-	|	'\u0370'..'\u037D'
-	|	'\u037F'..'\u1FFF'
-	|	'\u200C'..'\u200D'
-	|	'\u2070'..'\u218F'
-	|	'\u2C00'..'\u2FEF'
-	|	'\u3001'..'\uD7FF'
-	|	'\uF900'..'\uFDCF'
-	|	'\uFDF0'..'\uFFFD'
-	| '$' // For PHP
-	;	// ignores | ['\u10000-'\uEFFFF] ;
-
-fragment DQuoteLiteral
-	: DQuote ( EscSeq | ~["\r\n\\] | ( '\\' [\n\r]*) )* DQuote
-	;
-
-fragment DQuote
-	: '"'
-	;
-
-fragment SQuote
-	: '\''
-	;
-
-fragment CharLiteral
-	: SQuote ( EscSeq | ~['\r\n\\] )  SQuote
-	;
-
-fragment SQuoteLiteral
-	: SQuote ( EscSeq | ~['\r\n\\] )* SQuote
-	;
-
-fragment Esc
-	: '\\'
-	;
-
-
-fragment EscAny
-	:	Esc .
-	;
-
-fragment Id
-	: NameStartChar NameChar*
-	;
-
-fragment Type
-	: ([\t\r\n\f a-zA-Z0-9] | '[' | ']' | '{' | '}' | '.' | '_' | '(' | ')' | ',')+
-	;
-
-fragment NameChar
-	:	NameStartChar
-	|	'0'..'9'
-	|	Underscore
-	|	'\u00B7'
-	|	'\u0300'..'\u036F'
-	|	'\u203F'..'\u2040'
-	| '.'
-	| '-'
-	;
-
-fragment BlockComment
-	: '/*' 
-     (
-	   ('/' ~'*')
-	   | ~'/'
-	 )*
-	 '*/'
-	;
-
-fragment LineComment
-	: '//' ~[\r\n]*
-	;
-
-fragment LineCommentExt
-	: '//' ~'\n'* ( '\n' Hws* '//' ~'\n'* )*
-	;
-
-fragment Hws
-	: [ \t]
-	;
-
-fragment Vws
-	: [\r\n\f]
-	;
-
-/* Four types of user code:
-    - prologue (code between '%{' '%}' in the first section, before %%);
-    - actions, printers, union, etc, (between braced in the middle section);
-    - epilogue (everything after the second %%).
-    - predicate (code between '%?{' and '{' in middle section); */
-
-// -------------------------
-// Actions
-
-fragment LBrace
-	: '{'
-	;
-
-fragment RBrace
-	: '}'
-	;
-
-fragment PercentLBrace
-	: '%{'
-	;
-
-fragment PercentRBrace
-	: '%}'
-	;
-
-fragment PercentQuestion
-	: '%?{'
-	;
-
-fragment ActionCode
-    : Stuff*
-	;
-
-fragment Stuff
-	: EscAny
-	| DQuoteLiteral
-	| SQuoteLiteral
-	| BlockComment
-	| LineComment
-	| NestedAction
-	| ~('{' | '}' | '\'' | '"')
-	;
-
-fragment NestedPrologue
-	: PercentLBrace ActionCode PercentRBrace
-	;
-
-fragment NestedAction
-	: LBrace ActionCode RBrace
-	;
-
-fragment NestedPredicate
-	: PercentQuestion ActionCode RBrace
-	;
-
-fragment Sp
-	: Ws*
-	;
-
-fragment Eqopt
-	: (Sp [=])?
-	;
 
 
 
@@ -282,7 +125,7 @@ fragment Scname :
 	;
 
 fragment EscSeq
-	:	Esc
+	:	'\\'
 		([abefnrtv?"'\\]	// The standard escaped character set such as tab, newline, etc.
 		| [xuU]?[0-9]+) // C-style 
 	;
@@ -320,8 +163,8 @@ mode INITIAL;
 	I_initial_upws : Ws { this.InputStream.LA(-1) == '\n' }? { START_CODEBLOCK(true); } ;
 	I_initial_upstartcomment : '/*' { this.InputStream.LA(-1) == '\n' }? { add_action("/*[\"["); yy_push_state( COMMENT ); } ;
 	I_initial_poundoptwslinews : '#' { this.InputStream.LA(-1) == '\n' }? OptWs 'line' Ws { yy_push_state( LINEDIR ); } ;
-	I_initial_percents : '%s' { this.InputStream.LA(-1) == '\n' }? Id? { Type=SCDECL; } ;
-	I_initial_percentx : '%x' { this.InputStream.LA(-1) == '\n' }? Id? { Type=XSCDECL; } ;
+	I_initial_percents : '%s' { this.InputStream.LA(-1) == '\n' }? Name? { Type=SCDECL; } ;
+	I_initial_percentx : '%x' { this.InputStream.LA(-1) == '\n' }? Name? { Type=XSCDECL; } ;
 	I_initial_percentcurly : '%{' { this.InputStream.LA(-1) == '\n' }? .* Nl { START_CODEBLOCK(false); } ;
 	I_initial_top : '%top' { this.InputStream.LA(-1) == '\n' }? Ws '{' Ws Nl {
 					brace_start_line = linenum;
@@ -339,11 +182,45 @@ mode INITIAL;
 				BEGIN(SECT2PROLOG);
 				return SECTEND;
 				} ;
-	I_initial_UpPointer_nl : '%pointer' { this.InputStream.LA(-1) == '\n' }? .* Nl { yytext_is_array = false; ++linenum; } ;
-	I_initial_UpArrayNl : '%array' { this.InputStream.LA(-1) == '\n' }? .* Nl	{ yytext_is_array = true; ++linenum; } ;
-	I_initial_UpOption : '%option' { this.InputStream.LA(-1) == '\n' }? -> type(TOK_OPTION), pushMode(OPTION);
-	I_initial_UpPercentLexoptOptWsDigitOptWsLn : '%' Lexopt OptWs Digit* OptWs Nl { ++linenum; } ;
-	I_initial_NLOPTION : Nl -> popMode ;
+	I_initial_uppointer_nl : '%pointer' { this.InputStream.LA(-1) == '\n' }? .* Nl { yytext_is_array = false; ++linenum; } ;
+	I_initial_uparraynl : '%array' { this.InputStream.LA(-1) == '\n' }? .* Nl	{ yytext_is_array = true; ++linenum; } ;
+	I_initial_upoption : '%option' { this.InputStream.LA(-1) == '\n' }? -> type(TOK_OPTION), pushMode(OPTION);
+	I_initial_uppercentlexoptoptwsdigitoptwsln : '%' Lexopt OptWs Digit* OptWs Nl { ++linenum; } ;
+	I_initial_upname : Name { this.InputStream.LA(-1) == '\n' }? {
+			if(yyleng < MAXLINE)
+        	{
+				strncpy( nmstr, yytext, sizeof(nmstr) );
+			}
+			else
+			{
+			   synerr("Definition name too long\n");
+			   FLEX_EXIT(EXIT_FAILURE);
+			}
+
+			didadef = false;
+			BEGIN(PICKUPDEF);
+		} ;
+	I_initial_scname : Scname { Type=RETURNNAME; } ;
+	I_initial_upoptwsnl : OptWs { this.InputStream.LA(-1) == '\n' }? Nl { ++linenum; } ;
+	I_initial_optwsnl : OptWs Nl { ACTION_ECHO(); ++linenum; } ;
+
+// ===================================================================
+
+mode COMMENT;
+
+	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
+	I_comment_dot : . { ACTION_ECHO(); } ;
+	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+	
+	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } ;
+
+mode CODE_COMMENT;
+
+	I_code_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
+	I_code_comment_dot : . { ACTION_ECHO(); } ;
+	I_code_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+
+	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
 
 // ===================================================================
 
