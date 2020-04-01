@@ -185,13 +185,31 @@ mode ACTION;
 
 mode ACTION_STRING;
 
-	I_action_string : ;
+	I_action_string_m4qstart : M4qstart { ACTION_ECHO_QSTART(); } ;
+	I_action_string_m4qend : M4qend { ACTION_ECHO_QEND(); } ;
+	I_action_string_any : ~('[' | ']' | '"' | '\\' | '\n')+ { ACTION_ECHO(); } ;
+	I_action_string_dq : '"' { ACTION_ECHO(); BEGIN(ACTION); } ;
+	I_action_string_bn : ('\\' | '\n')* { ACTION_ECHO(); } ;
+	I_action_string_bbn : '\\' ('\\' | '\n')* { ACTION_ECHO(); } ;
+	I_action_string_nl : Nl {
+		++linenum;
+		ACTION_ECHO();
+		if (bracelevel <= 0)
+		{
+			BEGIN(SECT2);
+		}
+		else
+		{
+			BEGIN(ACTION);
+		}
+	} ;
+	I_action_string_dot : . { ACTION_ECHO(); } ;
 
 mode CCL;
 
-	I_up : '^' { BEGIN(CCL); Type=CARET; } ;
-	I_ret : ~('\\' | '\n') { RETURNCHAR(); } ;
-	I_closebracket : ']' { BEGIN(SECT2); Type=CLOSE_BRACKET; } ;
+	I_ccl_min : '-/' ~(']' | '\n')	{ Type=MINUS; } ;
+	I_ccl_ret : ~('\\' | '\n') { RETURNCHAR(); } ;
+	I_ccl_closebracket : ']' { BEGIN(SECT2); Type=CLOSE_BRACKET; } ;
 	I_ccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
 	I_ccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
 	I_ccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
@@ -223,10 +241,33 @@ mode CCL;
 				"bad character class expression: %s" +
 					yytext );
 			BEGIN(CCL); Type=CCE_ALNUM;
-			} ;
+		} ;
+	I_ccl_esqseq : EscSeq {
+			yylval = myesc(yytext );
+			if ( YY_START == FIRSTCCL )
+				BEGIN(CCL);
+			return CHAR;
+		} ;
 
 mode CHARACTER_CONSTANT;
-I_character_constant : ;
+
+	I_character_constant_any : ~('[' | ']' | '\'' | '\\' | '\n')+ { ACTION_ECHO(); } ;
+	I_character_constant_dq : '\'' { ACTION_ECHO(); BEGIN(ACTION); } ;
+	I_character_constant_bn : ('\\' | '\n')* { ACTION_ECHO(); } ;
+	I_character_constant_bbn : '\\' ('\\' | '\n')* { ACTION_ECHO(); } ;
+	I_character_constant_nl : Nl {
+		++linenum;
+		ACTION_ECHO();
+		if (bracelevel <= 0)
+		{
+			BEGIN(SECT2);
+		}
+		else
+		{
+			BEGIN(ACTION);
+		}
+	} ;
+	I_character_constant_dot : . { ACTION_ECHO(); } ;
 
 mode CODE_COMMENT;
 
@@ -238,7 +279,50 @@ mode CODE_COMMENT;
 
 
 mode CODEBLOCK;
-I_codeblock : ;
+
+	I_codeblock_cl : '%}' .* Nl { ++linenum; END_CODEBLOCK(); } ;
+	I_codeblock_other : ~('\n' | '%' | '[' | ']')* { ACTION_ECHO(); } ;
+	I_codeblock_dot : . { ACTION_ECHO(); } ;
+	I_codeblock_nl : Nl {
+			++linenum;
+			ACTION_ECHO();
+			if ( indented_code ) END_CODEBLOCK();
+		} ;
+	I_codeblock_m4qstart : M4qstart { ACTION_ECHO_QSTART(); } ;
+	I_codeblock_m4qend : M4qend { ACTION_ECHO_QEND(); } ;
+
+mode CODEBLOCK_MATCH_BRACE;
+
+	I_codeblock_match_brace_cl : '}' {
+                if( --brace_depth == 0)
+				{
+                    /* TODO: Matched. */
+                    yy_pop_state();
+                }
+				else
+				{
+                    buf_strnappend(&top_buf, yytext, yyleng);
+				}
+        } ;
+	I_codeblock_match_brace_op : '{' {
+                brace_depth++;
+                buf_strnappend(&top_buf, yytext, yyleng);
+        } ;
+	I_codeblock_match_brace_nl : Nl {
+                ++linenum;
+                buf_strnappend(&top_buf, yytext, yyleng);
+        } ;
+	I_codeblock_match_brace_m4qstart : M4qstart {
+			buf_strnappend(top_buf, escaped_qstart, (int) strlen(escaped_qstart));
+		} ;
+    I_codeblock_match_brace_m4qend : M4qend {
+			buf_strnappend(top_buf, escaped_qend, (int) strlen(escaped_qend));
+		} ;
+	I_codeblock_match_brace_other :
+		( ~('{' | '}' | '\r' | '\n' | '[' | ']')+
+		| ~('{' | '}' | '\r' | '\n')) {
+			buf_strnappend(top_buf, yytext, yyleng);
+		} ;
 
 // ===================================================================
 
@@ -269,6 +353,9 @@ mode EXTENDED_COMMENT;
 
 mode FIRSTCCL;
 
+	I_firstccl_up : '^' '/' ~('-' | ']' | '\n') { BEGIN(CCL); Type=CARET; } ;
+	I_firstccl_upother : '^' '/' ('-' | ']') { Type=CARET; } ;
+	I_firstccl_dot : . { BEGIN(CCL); RETURNCHAR(); } ;
 	I_firstccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
 	I_firstccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
 	I_firstccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
@@ -375,7 +462,20 @@ mode LINEDIR;
 		} ;
 	I_linedir_dot : . -> skip ;
 
-// ===================================================================
+mode NUM;
+
+	I_num_digit : Digit+ {
+			yylval = myctoi( yytext );
+			Type=NUMBER;
+		} ;
+	I_num_comma : ',' { Type=COMMA; } ;
+	I_num_cb : '}' {
+			BEGIN(SECT2);
+			if ( lex_compat || posix_compat )
+				Type=END_REPEAT_POSIX;
+			else
+				Type=END_REPEAT_FLEX;
+		} ;
 
 mode OPTION;
 
