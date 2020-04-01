@@ -479,12 +479,151 @@ mode NUM;
 
 mode OPTION;
 
-	TOK_OUTFILE : 'outfile' ;
-	TOK_EXTRA_TYPE : 'extra-type' ;
-	TOK_PREFIX : 'prefix' ;
-	TOK_YYCLASS : 'yyclass' ;
-	TOK_HEADER_FILE : 'header' '-file'? ;
-	TOK_TABLES_FILE : 'tables-file' ;
+	I_option_nl : Nl { ++linenum; BEGIN(INITIAL); } ;
+	I_option_ws : Ws { option_sense = true; } ;
+	I_option_eq : '=' { Type=EQUAL; } ;
+	I_option_no : 'no' { option_sense = ! option_sense; } ;
+	I_options_7bit : '7bit'	{ csize = option_sense ? 128 : 256; } ;
+	I_options_8bit : '8bit'	{ csize = option_sense ? 256 : 128; } ;
+	I_options_align : 'align' { long_align = option_sense; } ;
+	I_options_always_interactive : 'always-interactive' {
+			ACTION_M4_IFDEF( "M4\"_YY_ALWAYS_INTERACTIVE", option_sense );
+            interactive = option_sense;
+		} ;
+	I_options_array : 'array' { yytext_is_array = option_sense; } ;
+	I_options_backup : 'backup' { backing_up_report = option_sense; } ;
+	I_options_batch : 'batch' { interactive = ! option_sense; } ;
+    I_options_bison_bridge : 'bison-bridge' { bison_bridge_lval = option_sense; } ;
+    I_options_bison_locations : 'bison-locations' {
+			if((bison_bridge_lloc = option_sense))
+				bison_bridge_lval = true;
+         } ;
+	I_options_cpp : 'c++' { C_plus_plus = option_sense; } ;
+	I_options_caseful : 'caseful' | 'case-sensitive' { sf_set_case_ins(!option_sense); } ;
+	I_options_caseless : 'caseless' | 'case-insensitive' { sf_set_case_ins(option_sense); } ;
+	I_options_debug : 'debug' { ddebug = option_sense; } ;
+	I_options_default : 'default' { spprdflt = ! option_sense; } ;
+	I_options_ecs : 'ecs' { useecs = option_sense; } ;
+	I_options_fast : 'fast' {
+			useecs = usemecs = false;
+			use_read = fullspd = true;
+		} ;
+	I_options_full : 'full' {
+			useecs = usemecs = false;
+			use_read = fulltbl = true;
+		} ;
+	I_options_input : 'input' { ACTION_IFDEF("YY_NO_INPUT", ! option_sense); } ;
+	I_options_interactive : 'interactive' { interactive = option_sense; } ;
+	I_options_lex_compat : 'lex-compat' { lex_compat = option_sense; } ;
+	I_options_posix_compat : 'posix-compat' { posix_compat = option_sense; } ;
+	I_options_line : 'line' { gen_line_dirs = option_sense; } ;
+	I_options_main : 'main'	{
+			ACTION_M4_IFDEF( "M4\"_YY_MAIN", option_sense);
+            /* Override yywrap */
+            if( option_sense == true )
+                do_yywrap = false;
+		} ;
+	I_options_meta_ecs : 'meta-ecs' { usemecs = option_sense; } ;
+	I_options_never_interactive : 'never-interactive' {
+			ACTION_M4_IFDEF( "M4\"_YY_NEVER_INTERACTIVE", option_sense );
+            interactive = !option_sense;
+		} ;
+	I_options_perf_report : 'perf-report' { performance_report += option_sense ? 1 : -1; } ;
+	I_options_pointer : 'pointer' { yytext_is_array = ! option_sense; } ;
+	I_options_read : 'read' { use_read = option_sense; } ;
+    I_options_reentrant : 'reentrant' { reentrant = option_sense; } ;
+	I_options_reject : 'reject' { reject_really_used = option_sense; } ;
+	I_options_stack : 'stack' { ACTION_M4_IFDEF( "M4\"_YY_STACK_USED", option_sense ); } ;
+	I_options_stdinit : 'stdinit' { do_stdinit = option_sense; } ;
+	I_options_stdout : 'stdout' { use_stdout = option_sense;  } ;
+    I_options_unistd : 'unistd' { ACTION_IFDEF("YY_NO_UNISTD_H", ! option_sense); } ;
+	I_options_unput : 'unput' { ACTION_M4_IFDEF("M4\"_YY_NO_UNPUT", ! option_sense); } ;
+	I_options_verbose : 'verbose' { printstats = option_sense; } ;
+	I_options_warn : 'warn' { nowarn = ! option_sense; } ;
+	I_options_yylineno : 'yylineno' { do_yylineno = option_sense; ACTION_M4_IFDEF("M4\"_YY_USE_LINENO", option_sense); } ;
+	I_options_yymore : 'yymore' { yymore_really_used = option_sense; } ;
+	I_options_yywrapo : 'yywrap' { do_yywrap = option_sense; } ;
+	I_options_yy_push_state : 'yy_push_state' { ACTION_M4_IFDEF("M4\"_YY_NO_PUSH_STATE", ! option_sense); } ;
+	I_options_yy_pop_state : 'yy_pop_state' { ACTION_M4_IFDEF("M4\"_YY_NO_POP_STATE", ! option_sense); } ;
+	I_options_yy_top_state : 'yy_top_state' { ACTION_M4_IFDEF("M4\"_YY_NO_TOP_STATE", ! option_sense); } ;
+	I_options_yy_scan_buffer : 'yy_scan_buffer' { ACTION_M4_IFDEF("M4\"_YY_NO_SCAN_BUFFER", ! option_sense); } ;
+	I_options_yy_scan_bytes : 'yy_scan_bytes' { ACTION_M4_IFDEF("M4\"_YY_NO_SCAN_BYTES", ! option_sense); } ;
+	I_options_yy_scan_string : 'yy_scan_string' { ACTION_M4_IFDEF("M4\"_YY_NO_SCAN_STRING", ! option_sense); } ;
+    I_options_yyalloc : 'yyalloc' { ACTION_M4_IFDEF("M4\"_YY_NO_FLEX_ALLOC", ! option_sense); } ;
+    I_options_yyrealloc : 'yyrealloc' { ACTION_M4_IFDEF("M4\"_YY_NO_FLEX_REALLOC", ! option_sense); } ;
+    I_options_yyfree : 'yyfree' { ACTION_M4_IFDEF("M4\"_YY_NO_FLEX_FREE", ! option_sense); } ;
+    I_options_yyget_debug : 'yyget_debug' { ACTION_M4_IFDEF("M4\"_YY_NO_GET_DEBUG", ! option_sense); } ;
+    I_options_yyset_debug : 'yyset_debug' { ACTION_M4_IFDEF("M4\"_YY_NO_SET_DEBUG", ! option_sense); } ;
+    I_options_yyget_extra : 'yyget_extra' { ACTION_M4_IFDEF("M4\"_YY_NO_GET_EXTRA", ! option_sense); } ;
+    I_options_yyset_extra : 'yyset_extra' {    ACTION_M4_IFDEF("M4\"_YY_NO_SET_EXTRA", ! option_sense); } ;
+    I_options_yyget_leng : 'yyget_leng' {      ACTION_M4_IFDEF("M4\"_YY_NO_GET_LENG", ! option_sense); } ;
+    I_options_yyget_text : 'yyget_text' {      ACTION_M4_IFDEF("M4\"_YY_NO_GET_TEXT", ! option_sense); } ;
+    I_options_yyget_column : 'yyget_column' {    ACTION_M4_IFDEF("M4\"_YY_NO_GET_COLUMN", ! option_sense); } ;
+    I_options_yyset_column : 'yyset_column' {    ACTION_M4_IFDEF("M4\"_YY_NO_SET_COLUMN", ! option_sense); } ;
+    I_options_yyget_lineno : 'yyget_lineno' {    ACTION_M4_IFDEF("M4\"_YY_NO_GET_LINENO", ! option_sense); } ;
+    I_options_yyset_lineno : 'yyset_lineno' {    ACTION_M4_IFDEF("M4\"_YY_NO_SET_LINENO", ! option_sense); } ;
+    I_options_yyget_in : 'yyget_in' {        ACTION_M4_IFDEF("M4\"_YY_NO_GET_IN", ! option_sense); } ;
+    I_options_yyset_in : 'yyset_in' {        ACTION_M4_IFDEF("M4\"_YY_NO_SET_IN", ! option_sense); } ;
+    I_options_yyget_out : 'yyget_out' {       ACTION_M4_IFDEF("M4\"_YY_NO_GET_OUT", ! option_sense); } ;
+    I_options_yyset_out : 'yyset_out' {       ACTION_M4_IFDEF("M4\"_YY_NO_SET_OUT", ! option_sense); } ;
+    I_options_yyget_lval : 'yyget_lval' {      ACTION_M4_IFDEF("M4\"_YY_NO_GET_LVAL", ! option_sense); } ;
+    I_options_yyset_lval : 'yyset_lval' {      ACTION_M4_IFDEF("M4\"_YY_NO_SET_LVAL", ! option_sense); } ;
+    I_options_yyget_lloc : 'yyget_lloc' {      ACTION_M4_IFDEF("M4\"_YY_NO_GET_LLOC", ! option_sense); } ;
+    I_options_yyset_lloc : 'yyset_lloc' {      ACTION_M4_IFDEF("M4\"_YY_NO_SET_LLOC", ! option_sense); } ;
+	I_options_extra_type : 'extra-type'	{ Type=TOK_EXTRA_TYPE; } ;
+	I_options_outfile : 'outfile' {	Type=TOK_OUTFILE; } ;
+	I_options_prefix : 'prefix' { Type=TOK_PREFIX; } ;
+	I_options_yyclass : 'yyclass' {	Type=TOK_YYCLASS; } ;
+	I_options_header_file : 'header' '-file'? { Type=TOK_HEADER_FILE; } ;
+	I_options_tables_file : 'tables-file' { Type=TOK_TABLES_FILE; } ;
+	I_options_tables_verify : 'tables-verify'  {
+                    tablesverify = option_sense;
+                    if(!tablesext && option_sense)
+                        tablesext = true;
+         } ;
+	I_options_string : '\"' ~('"' | '\n')* '\"'	{
+			if(yyleng-1 < MAXLINE)
+        	{
+				strncpy( nmstr, yytext + 1, sizeof(nmstr) );
+			}
+			else
+			{
+			   synerr("Option line too long\n");
+			   FLEX_EXIT(EXIT_FAILURE);
+			}
+			nmstr[strlen( nmstr ) - 1] = '\0';
+			Type=NAME;
+		} ;			
+
+mode PICKUPDEF;
+
+	I_pickupdef_ws : Ws -> skip ;
+	I_pickupdef_notws : NotWs ~('\r' | '\n')* {
+			if(yyleng < MAXLINE)
+ 		    {
+				strncpy( nmdef, yytext, sizeof(nmdef) );
+ 		    }
+ 		    else
+ 		    {
+				format_synerr("Definition value for {%s} too long\n", nmstr);
+ 		        FLEX_EXIT(EXIT_FAILURE);
+			}
+			/* Skip trailing whitespace. */
+			{
+			    size_t i = strlen( nmdef );
+			    while (i > 0 && (nmdef[i-1] == ' ' || nmdef[i-1] == '\t'))
+			       --i;
+			    nmdef[i] = '\0';
+			}
+			ndinstal( nmstr, nmdef );
+			didadef = true;
+		} ;
+	I_pickupdef_nl : Nl {
+			if ( ! didadef )
+				synerr("incomplete name definition");
+			BEGIN(INITIAL);
+			++linenum;
+		} ;
 
 mode PERCENT_BRACE_ACTION;
 I_percent_brace_action : ;
