@@ -161,23 +161,152 @@ fragment M4qend :
 mode ACTION;
 I_action : ;
 
-mode CODEBLOCK;
-I_codeblock : ;
-
 mode ACTION_STRING;
 I_action_string : ;
 
-mode PERCENT_BRACE_ACTION;
-I_percent_brace_action : ;
+mode CCL;
+
+	I_up : '^' { BEGIN(CCL); Type=CARET; } ;
+	I_ret : ~('\\' | '\n') { RETURNCHAR(); } ;
+	I_closebracket : ']' { BEGIN(SECT2); Type=CLOSE_BRACKET; } ;
+	I_ccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
+	I_ccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
+	I_ccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
+	//I_ccl_cce_cntrl : Cntl { BEGIN(CCL); Type=CCE_CNTRL; } ;
+	I_ccl_cce_digit : Digit { BEGIN(CCL); Type=CCE_DIGIT; } ;
+	//I_ccl_cce_graph : Graph { BEGIN(CCL); Type=CCE_GRAPH; } ;
+	I_ccl_cce_lower : Lower { BEGIN(CCL); Type=CCE_LOWER; } ;
+	//I_ccl_cce_print : Print { BEGIN(CCL); Type=CCE_PRINT; } ;
+	//I_ccl_cce_punct : Punct { BEGIN(CCL); Type=CCE_PUNCT; } ;
+	I_ccl_cce_space : Space { BEGIN(CCL); Type=CCE_SPACE; } ;
+	I_ccl_cce_upper : Upper { BEGIN(CCL); Type=CCE_UPPER; } ;
+	//I_ccl_cce_xdigit : Xdigit { BEGIN(CCL); Type=CCE_XDIGIT; } ;
+
+	I_ccl_cce_neg_alnum : '^' Alnum  { BEGIN(CCL); Type=CCE_NEG_ALNUM; } ;
+	I_ccl_cce_neg_alpha : '^' Alpha  { BEGIN(CCL); Type=CCE_NEG_ALPHA; } ;
+	I_ccl_cce_neg_blank : '^' Blank { BEGIN(CCL); Type=CCE_NEG_BLANK; } ;
+	//I_ccl_cce_neg_cntrl : '^' Cntl { BEGIN(CCL); Type=CCE_NEG_CNTRL; } ;
+	I_ccl_cce_neg_digit : '^' Digit { BEGIN(CCL); Type=CCE_NEG_DIGIT; } ;
+	//I_ccl_cce_neg_graph : '^' Graph { BEGIN(CCL); Type=CCE_NEG_GRAPH; } ;
+	I_ccl_cce_neg_lower : '^' Lower { BEGIN(CCL); Type=CCE_NEG_LOWER; } ;
+	//I_ccl_cce_neg_print : '^' Print { BEGIN(CCL); Type=CCE_NEG_PRINT; } ;
+	//I_ccl_cce_neg_punct : '^' Punct { BEGIN(CCL); Type=CCE_NEG_PUNCT; } ;
+	I_ccl_cce_neg_space : '^' Space { BEGIN(CCL); Type=CCE_NEG_SPACE; } ;
+	I_ccl_cce_neg_upper : '^' Upper { BEGIN(CCL); Type=CCE_NEG_UPPER; } ;
+	//I_ccl_cce_neg_xdigit : '^' Xdigit { BEGIN(CCL); Type=CCE_NEG_XDIGIT; } ;
+
+	I_ccl_cll_expr : Ccl_expr {
+			format_synerr(
+				"bad character class expression: %s" +
+					yytext );
+			BEGIN(CCL); Type=CCE_ALNUM;
+			} ;
 
 mode CHARACTER_CONSTANT;
 I_character_constant : ;
 
-mode COMMENT;
-I_comment : ;
+mode CODE_COMMENT;
+
+	I_code_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
+	I_code_comment_dot : . { ACTION_ECHO(); } ;
+	I_code_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+
+	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
 
 mode CODE_COMMENT;
-I_code_comment : ;
+
+	I_code_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
+	I_code_comment_dot : . { ACTION_ECHO(); } ;
+	I_code_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+
+	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
+
+mode CODEBLOCK;
+I_codeblock : ;
+
+// ===================================================================
+
+mode COMMENT;
+
+	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
+	I_comment_dot : . { ACTION_ECHO(); } ;
+	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+	
+	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } ;
+
+// ===================================================================
+
+mode COMMENT;
+
+	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
+	I_comment_dot : . { ACTION_ECHO(); } ;
+	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+	
+	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } ;
+
+mode COMMENT_DISCARD;
+
+	I_comment_discard_end : '*/' { yy_pop_state(); };
+	I_comment_discard_star : '*' { } ;
+	I_comment_discard_ws : ~('*' | '\n') { } ;
+	I_comment_discard_nl : Nl { ++linenum; } ;
+
+mode EXTENDED_COMMENT;
+
+	I_extended_comment_cp : ')' { yy_pop_state(); } ;
+	I_extended_comment_ws : ~('\n' | ')')+ { } ;
+	I_extended_comment_nl : Nl { ++linenum; } ;
+
+
+mode FIRSTCCL;
+
+	I_firstccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
+	I_firstccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
+	I_firstccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
+	//I_firstccl_cce_cntrl : Cntl { BEGIN(CCL); Type=CCE_CNTRL; } ;
+	I_firstccl_cce_digit : Digit { BEGIN(CCL); Type=CCE_DIGIT; } ;
+	//I_firstccl_cce_graph : Graph { BEGIN(CCL); Type=CCE_GRAPH; } ;
+	I_firstccl_cce_lower : Lower { BEGIN(CCL); Type=CCE_LOWER; } ;
+	//I_firstccl_cce_print : Print { BEGIN(CCL); Type=CCE_PRINT; } ;
+	//I_firstccl_cce_punct : Punct { BEGIN(CCL); Type=CCE_PUNCT; } ;
+	I_firstccl_cce_space : Space { BEGIN(CCL); Type=CCE_SPACE; } ;
+	I_firstccl_cce_upper : Upper { BEGIN(CCL); Type=CCE_UPPER; } ;
+	//I_firstccl_cce_xdigit : Xdigit { BEGIN(CCL); Type=CCE_XDIGIT; } ;
+
+	I_firstccl_cce_neg_alnum : '^' Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
+	I_firstccl_cce_neg_alpha : '^' Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
+	I_firstccl_cce_neg_blank : '^' Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
+	//I_firstccl_cce_neg_cntrl : '^' Cntl { BEGIN(CCL); Type=CCE_CNTRL; } ;
+	I_firstccl_cce_neg_digit : '^' Digit { BEGIN(CCL); Type=CCE_DIGIT; } ;
+	//I_firstccl_cce_neg_graph : '^' Graph { BEGIN(CCL); Type=CCE_GRAPH; } ;
+	I_firstccl_cce_neg_lower : '^' Lower { BEGIN(CCL); Type=CCE_LOWER; } ;
+	//I_firstccl_cce_neg_print : '^' Print { BEGIN(CCL); Type=CCE_PRINT; } ;
+	//I_firstccl_cce_neg_punct : '^' Punct { BEGIN(CCL); Type=CCE_PUNCT; } ;
+	I_firstccl_cce_neg_space : '^' Space { BEGIN(CCL); Type=CCE_SPACE; } ;
+	I_firstccl_cce_neg_upper : '^' Upper { BEGIN(CCL); Type=CCE_UPPER; } ;
+	//I_firstccl_cce_neg_xdigit : '^' Xdigit { BEGIN(CCL); Type=CCE_XDIGIT; } ;
+
+	Icll_expr : Ccl_expr {
+			format_synerr(
+				"bad character class expression: %s"
+				+ yytext );
+			BEGIN(CCL); Type=CCE_ALNUM;
+			} ;
+
+mode GROUP_MINUS_PARAMS;
+
+    I_group_minus_params_colon : ':' { BEGIN(SECT2); } ;
+    I_group_minus_params_i : 'i' { sf_set_case_ins(0); } ;
+    I_group_minus_params_s : 's' { sf_set_dot_all(0); } ;
+    I_group_minus_params_x : 'x' { sf_set_skip_ws(0); } ;
+
+mode GROUP_WITH_PARAMS;
+
+    I_group_with_params_colon : ':' { BEGIN(SECT2); } ;
+    I_group_with_params_dash : '-'  { BEGIN(GROUP_MINUS_PARAMS); } ;
+    I_group_with_params_i : 'i' { sf_set_case_ins(1); } ;
+    I_group_with_params_s : 's' { sf_set_dot_all(1); } ;
+    I_group_with_params_x : 'x' { sf_set_skip_ws(1); } ;
 
 mode INITIAL;
 
@@ -225,37 +354,6 @@ mode INITIAL;
 	I_initial_upoptwsnl : OptWs { this.InputStream.LA(-1) == '\n' }? Nl { ++linenum; } ;
 	I_initial_optwsnl : OptWs Nl { ACTION_ECHO(); ++linenum; } ;
 
-// ===================================================================
-
-mode COMMENT;
-
-	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
-	I_comment_dot : . { ACTION_ECHO(); } ;
-	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
-	
-	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } ;
-
-mode CODE_COMMENT;
-
-	I_code_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
-	I_code_comment_dot : . { ACTION_ECHO(); } ;
-	I_code_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
-
-	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
-
-mode COMMENT_DISCARD;
-
-	I_comment_discard_end : '*/' { yy_pop_state(); };
-	I_comment_discard_star : '*' { } ;
-	I_comment_discard_ws : ~('*' | '\n') { } ;
-	I_comment_discard_nl : Nl { ++linenum; } ;
-
-mode EXTENDED_COMMENT;
-
-	I_extended_comment_cp : ')' { yy_pop_state(); } ;
-	I_extended_comment_ws : ~('\n' | ')')+ { } ;
-	I_extended_comment_nl : Nl { ++linenum; } ;
-
 
 mode LINEDIR;
 
@@ -279,98 +377,11 @@ mode OPTION;
 	TOK_HEADER_FILE : 'header' '-file'? ;
 	TOK_TABLES_FILE : 'tables-file' ;
 
+mode PERCENT_BRACE_ACTION;
+I_percent_brace_action : ;
+
 
 mode SECT2;
 
 	BlankLine : OptWs Nl // { this.InputStream.LA(1); }
 		-> channel(OFF_CHANNEL);
-
-mode GROUP_WITH_PARAMS;
-
-    I_group_with_params_colon : ':' { BEGIN(SECT2); } ;
-    I_group_with_params_dash : '-'  { BEGIN(GROUP_MINUS_PARAMS); } ;
-    I_group_with_params_i : 'i' { sf_set_case_ins(1); } ;
-    I_group_with_params_s : 's' { sf_set_dot_all(1); } ;
-    I_group_with_params_x : 'x' { sf_set_skip_ws(1); } ;
-
-mode GROUP_MINUS_PARAMS;
-
-    I_group_minus_params_colon : ':' { BEGIN(SECT2); } ;
-    I_group_minus_params_i : 'i' { sf_set_case_ins(0); } ;
-    I_group_minus_params_s : 's' { sf_set_dot_all(0); } ;
-    I_group_minus_params_x : 'x' { sf_set_skip_ws(0); } ;
-
-
-mode FIRSTCCL;
-
-	I_firstccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
-	I_firstccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
-	I_firstccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
-	//I_firstccl_cce_cntrl : Cntl { BEGIN(CCL); Type=CCE_CNTRL; } ;
-	I_firstccl_cce_digit : Digit { BEGIN(CCL); Type=CCE_DIGIT; } ;
-	//I_firstccl_cce_graph : Graph { BEGIN(CCL); Type=CCE_GRAPH; } ;
-	I_firstccl_cce_lower : Lower { BEGIN(CCL); Type=CCE_LOWER; } ;
-	//I_firstccl_cce_print : Print { BEGIN(CCL); Type=CCE_PRINT; } ;
-	//I_firstccl_cce_punct : Punct { BEGIN(CCL); Type=CCE_PUNCT; } ;
-	I_firstccl_cce_space : Space { BEGIN(CCL); Type=CCE_SPACE; } ;
-	I_firstccl_cce_upper : Upper { BEGIN(CCL); Type=CCE_UPPER; } ;
-	//I_firstccl_cce_xdigit : Xdigit { BEGIN(CCL); Type=CCE_XDIGIT; } ;
-
-	I_firstccl_cce_neg_alnum : '^' Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
-	I_firstccl_cce_neg_alpha : '^' Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
-	I_firstccl_cce_neg_blank : '^' Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
-	//I_firstccl_cce_neg_cntrl : '^' Cntl { BEGIN(CCL); Type=CCE_CNTRL; } ;
-	I_firstccl_cce_neg_digit : '^' Digit { BEGIN(CCL); Type=CCE_DIGIT; } ;
-	//I_firstccl_cce_neg_graph : '^' Graph { BEGIN(CCL); Type=CCE_GRAPH; } ;
-	I_firstccl_cce_neg_lower : '^' Lower { BEGIN(CCL); Type=CCE_LOWER; } ;
-	//I_firstccl_cce_neg_print : '^' Print { BEGIN(CCL); Type=CCE_PRINT; } ;
-	//I_firstccl_cce_neg_punct : '^' Punct { BEGIN(CCL); Type=CCE_PUNCT; } ;
-	I_firstccl_cce_neg_space : '^' Space { BEGIN(CCL); Type=CCE_SPACE; } ;
-	I_firstccl_cce_neg_upper : '^' Upper { BEGIN(CCL); Type=CCE_UPPER; } ;
-	//I_firstccl_cce_neg_xdigit : '^' Xdigit { BEGIN(CCL); Type=CCE_XDIGIT; } ;
-
-	Icll_expr : Ccl_expr {
-			format_synerr(
-				"bad character class expression: %s"
-				+ yytext );
-			BEGIN(CCL); Type=CCE_ALNUM;
-			} ;
-
-mode CCL;
-
-	I_up : '^' { BEGIN(CCL); Type=CARET; } ;
-	I_ret : ~('\\' | '\n') { RETURNCHAR(); } ;
-	I_closebracket : ']' { BEGIN(SECT2); Type=CLOSE_BRACKET; } ;
-	I_ccl_cce_alnum : Alnum  { BEGIN(CCL); Type=CCE_ALNUM; } ;
-	I_ccl_cce_alpha : Alpha  { BEGIN(CCL); Type=CCE_ALPHA; } ;
-	I_ccl_cce_blank : Blank { BEGIN(CCL); Type=CCE_BLANK; } ;
-	//I_ccl_cce_cntrl : Cntl { BEGIN(CCL); Type=CCE_CNTRL; } ;
-	I_ccl_cce_digit : Digit { BEGIN(CCL); Type=CCE_DIGIT; } ;
-	//I_ccl_cce_graph : Graph { BEGIN(CCL); Type=CCE_GRAPH; } ;
-	I_ccl_cce_lower : Lower { BEGIN(CCL); Type=CCE_LOWER; } ;
-	//I_ccl_cce_print : Print { BEGIN(CCL); Type=CCE_PRINT; } ;
-	//I_ccl_cce_punct : Punct { BEGIN(CCL); Type=CCE_PUNCT; } ;
-	I_ccl_cce_space : Space { BEGIN(CCL); Type=CCE_SPACE; } ;
-	I_ccl_cce_upper : Upper { BEGIN(CCL); Type=CCE_UPPER; } ;
-	//I_ccl_cce_xdigit : Xdigit { BEGIN(CCL); Type=CCE_XDIGIT; } ;
-
-	I_ccl_cce_neg_alnum : '^' Alnum  { BEGIN(CCL); Type=CCE_NEG_ALNUM; } ;
-	I_ccl_cce_neg_alpha : '^' Alpha  { BEGIN(CCL); Type=CCE_NEG_ALPHA; } ;
-	I_ccl_cce_neg_blank : '^' Blank { BEGIN(CCL); Type=CCE_NEG_BLANK; } ;
-	//I_ccl_cce_neg_cntrl : '^' Cntl { BEGIN(CCL); Type=CCE_NEG_CNTRL; } ;
-	I_ccl_cce_neg_digit : '^' Digit { BEGIN(CCL); Type=CCE_NEG_DIGIT; } ;
-	//I_ccl_cce_neg_graph : '^' Graph { BEGIN(CCL); Type=CCE_NEG_GRAPH; } ;
-	I_ccl_cce_neg_lower : '^' Lower { BEGIN(CCL); Type=CCE_NEG_LOWER; } ;
-	//I_ccl_cce_neg_print : '^' Print { BEGIN(CCL); Type=CCE_NEG_PRINT; } ;
-	//I_ccl_cce_neg_punct : '^' Punct { BEGIN(CCL); Type=CCE_NEG_PUNCT; } ;
-	I_ccl_cce_neg_space : '^' Space { BEGIN(CCL); Type=CCE_NEG_SPACE; } ;
-	I_ccl_cce_neg_upper : '^' Upper { BEGIN(CCL); Type=CCE_NEG_UPPER; } ;
-	//I_ccl_cce_neg_xdigit : '^' Xdigit { BEGIN(CCL); Type=CCE_NEG_XDIGIT; } ;
-
-	I_ccl_cll_expr : Ccl_expr {
-			format_synerr(
-				"bad character class expression: %s" +
-					yytext );
-			BEGIN(CCL); Type=CCE_ALNUM;
-			} ;
-
