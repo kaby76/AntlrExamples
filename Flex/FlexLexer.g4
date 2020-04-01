@@ -66,7 +66,8 @@ fragment Alnum :
 	;
 
 fragment Alpha :
-	[A-Za-z]
+	('a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+	|'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' )
 	;
 
 fragment Blank :
@@ -159,10 +160,32 @@ fragment M4qend :
 // ===================================================================
 
 mode ACTION;
-I_action : ;
+	I_action_m4qstart : M4qstart { ACTION_ECHO_QSTART(); } ;
+	I_action_m4qend : M4qend { ACTION_ECHO_QEND(); } ;
+	I_action_opencurly : '{' { ACTION_ECHO(); ++bracelevel; } ;
+	I_action_closecurly : '}' { ACTION_ECHO(); --bracelevel; } ;
+	I_action_alpha : ~('a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+			| 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+			| '_' | '{' | '}' | '"' | '\'' | '/' | '\n' | '[' | ']')+
+			{ ACTION_ECHO(); } ;
+	I_action_dq : '"' { ACTION_ECHO(); BEGIN(ACTION_STRING); } ;
+	I_action_nl : Nl {
+                ++linenum;
+                ACTION_ECHO();
+                if (bracelevel <= 0) {
+                   if ( doing_rule_action )
+                      add_action( "\tYY_BREAK]\"]\n" );
+
+                   doing_rule_action = false;
+                   BEGIN(SECT2);
+                }
+             } ;
+	I_action_dot : . { ACTION_ECHO(); } ;
+
 
 mode ACTION_STRING;
-I_action_string : ;
+
+	I_action_string : ;
 
 mode CCL;
 
@@ -213,13 +236,6 @@ mode CODE_COMMENT;
 
 	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
 
-mode CODE_COMMENT;
-
-	I_code_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
-	I_code_comment_dot : . { ACTION_ECHO(); } ;
-	I_code_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
-
-	I_code_comment_end : '*/' { ACTION_ECHO(); yy_pop_state(); } ;
 
 mode CODEBLOCK;
 I_codeblock : ;
@@ -236,13 +252,6 @@ mode COMMENT;
 
 // ===================================================================
 
-mode COMMENT;
-
-	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
-	I_comment_dot : . { ACTION_ECHO(); } ;
-	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
-	
-	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } ;
 
 mode COMMENT_DISCARD;
 
