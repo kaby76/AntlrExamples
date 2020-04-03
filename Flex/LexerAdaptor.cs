@@ -60,10 +60,10 @@ namespace Flex
         public void sf_set_case_ins(bool v)
         { }
 
-        public void sf_set_skip_ws(int v)
+        public void sf_set_skip_ws(bool v)
         { }
 
-        public void sf_set_dot_all(int v)
+        public void sf_set_dot_all(bool v)
         { }
 
         public void yy_pop_state()
@@ -100,14 +100,15 @@ namespace Flex
         { }
 
 
-        public static int bracelevel, didadef;
+        public static int bracelevel;
+        public static bool didadef;
         public static bool indented_code;
         public static bool doing_rule_action = false;
         public static bool option_sense;
         public bool doing_codeblock = false;
         public int brace_depth = 0, brace_start_line = 0;
         public const int MAXLINE = 100000;
-        public char[] nmdef = new char[MAXLINE];
+        public string nmdef;
         public int csize;
         public bool interactive;
         public bool long_align;
@@ -142,7 +143,7 @@ namespace Flex
         public int yylval;
         public int cclval;
         public void synerr(string s) { }
-        public string myesc(string s) { return s; }
+        public int myesc(string s) { return 0; }
 
         public void strncpy(string s1, string s2, int n) { }
         public void ACTION_IFDEF(string s, bool b) { }
@@ -161,7 +162,28 @@ namespace Flex
         public void yyless(int i) { }
         public int _sf_top_ix;
         public char input() { return ' '; }
-
+        public int myctoi(string s) { return 0; }
+        public void free(string s) { }
+        public string infilename;
+        public string xstrdup(string s) { return s; }
+        public int strlen(string s) { return 0; }
+        public void ndinstal(string a, string b) { }
+        public void yy_set_bol(int i) { }
+        public void mark_prolog() { }
+        public void yyterminate() { }
+        public bool sf_skip_ws() { return false; }
+        public bool in_rule;
+        public bool continued_action;
+        public void unput(char c) { }
+        public bool no_section3_escape;
+        public void outn(string s) { }
+        public int ccllookup(string s) { return 0; }
+        public int cclreuse;
+        public void cclinstal(string s, int i) { }
+        public int lastccl;
+        public void PUT_BACK_STRING(string s, int i) { }
+        public bool trlcontxt;
+        public string ndlookup(string s) { return s; }
     }
 }
 

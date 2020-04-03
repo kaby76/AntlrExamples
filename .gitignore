@@ -15,3 +15,4 @@ lexer-as-parser/obj/
 Flex/obj/
 Antlr/.antlr/
 mysql/.antlr/
+Flex/bin/

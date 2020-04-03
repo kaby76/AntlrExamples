@@ -54,9 +54,19 @@ CCE_NEG_UPPER,
 ERROR,
 MINUS,
 EQUAL,
+CARET,
+COMMA,
+NAME,
+SC,
+QUOTE,
+EXIT_FAILURE,
+RETURNNAME,
 CLOSE_BRACKET,
 CCL_OP_DIFF,
-CCL_OP_UNION
+CCL_OP_UNION,
+SECT3_NOESCAPE,
+SECT3,
+CARETISBOL
 }
 
 // ======================= Common fragments =========================
@@ -249,7 +259,7 @@ mode CCL;
 			yylval = myesc(yytext );
 			if ( YY_START == FIRSTCCL )
 				BEGIN(CCL);
-			return CHAR;
+			Type=CHAR;
 		} ;
 
 mode CHARACTER_CONSTANT;
@@ -304,27 +314,27 @@ mode CODEBLOCK_MATCH_BRACE;
                 }
 				else
 				{
-                    buf_strnappend(&top_buf, yytext, yyleng);
+                    //buf_strnappend(&top_buf, yytext, yyleng);
 				}
         } ;
 	I_codeblock_match_brace_op : '{' {
                 brace_depth++;
-                buf_strnappend(&top_buf, yytext, yyleng);
+                //buf_strnappend(&top_buf, yytext, yyleng);
         } ;
 	I_codeblock_match_brace_nl : Nl {
                 ++linenum;
-                buf_strnappend(&top_buf, yytext, yyleng);
+                //buf_strnappend(&top_buf, yytext, yyleng);
         } ;
 	I_codeblock_match_brace_m4qstart : M4qstart {
-			buf_strnappend(top_buf, escaped_qstart, (int) strlen(escaped_qstart));
+			//buf_strnappend(top_buf, escaped_qstart, (int) strlen(escaped_qstart));
 		} ;
     I_codeblock_match_brace_m4qend : M4qend {
-			buf_strnappend(top_buf, escaped_qend, (int) strlen(escaped_qend));
+			//buf_strnappend(top_buf, escaped_qend, (int) strlen(escaped_qend));
 		} ;
 	I_codeblock_match_brace_other :
 		( ~('{' | '}' | '\r' | '\n' | '[' | ']')+
 		| ~('{' | '}' | '\r' | '\n')) {
-			buf_strnappend(top_buf, yytext, yyleng);
+			//buf_strnappend(top_buf, yytext, yyleng);
 		} ;
 
 // ===================================================================
@@ -395,17 +405,17 @@ mode FIRSTCCL;
 mode GROUP_MINUS_PARAMS;
 
     I_group_minus_params_colon : ':' { BEGIN(SECT2); } ;
-    I_group_minus_params_i : 'i' { sf_set_case_ins(0); } ;
-    I_group_minus_params_s : 's' { sf_set_dot_all(0); } ;
-    I_group_minus_params_x : 'x' { sf_set_skip_ws(0); } ;
+    I_group_minus_params_i : 'i' { sf_set_case_ins(false); } ;
+    I_group_minus_params_s : 's' { sf_set_dot_all(false); } ;
+    I_group_minus_params_x : 'x' { sf_set_skip_ws(false); } ;
 
 mode GROUP_WITH_PARAMS;
 
     I_group_with_params_colon : ':' { BEGIN(SECT2); } ;
     I_group_with_params_dash : '-'  { BEGIN(GROUP_MINUS_PARAMS); } ;
-    I_group_with_params_i : 'i' { sf_set_case_ins(1); } ;
-    I_group_with_params_s : 's' { sf_set_dot_all(1); } ;
-    I_group_with_params_x : 'x' { sf_set_skip_ws(1); } ;
+    I_group_with_params_i : 'i' { sf_set_case_ins(true); } ;
+    I_group_with_params_s : 's' { sf_set_dot_all(true); } ;
+    I_group_with_params_x : 'x' { sf_set_skip_ws(true); } ;
 
 mode INITIAL;
 
@@ -418,7 +428,7 @@ mode INITIAL;
 	I_initial_top : '%top' { this.InputStream.LA(-1) == '\n' }? Ws '{' Ws Nl {
 					brace_start_line = linenum;
 					++linenum;
-					buf_linedir( &top_buf, infilename?infilename:"<stdin>", linenum);
+					//buf_linedir( &top_buf, infilename?infilename:"<stdin>", linenum);
 					brace_depth = 1;
 					yy_push_state(CODEBLOCK_MATCH_BRACE);
 				} ;
@@ -427,9 +437,9 @@ mode INITIAL;
 				sectnum = 2;
 				bracelevel = 0;
 				mark_defs1();
-				line_directive_out(NULL, 1);
+				line_directive_out(null, 1);
 				BEGIN(SECT2PROLOG);
-				return SECTEND;
+				Type=SECTEND;
 				} ;
 	I_initial_uppointer_nl : '%pointer' { this.InputStream.LA(-1) == '\n' }? .* Nl { yytext_is_array = false; ++linenum; } ;
 	I_initial_uparraynl : '%array' { this.InputStream.LA(-1) == '\n' }? .* Nl	{ yytext_is_array = true; ++linenum; } ;
@@ -438,7 +448,7 @@ mode INITIAL;
 	I_initial_upname : Name { this.InputStream.LA(-1) == '\n' }? {
 			if(yyleng < MAXLINE)
         	{
-				strncpy( nmstr, yytext, sizeof(nmstr) );
+				strncpy( nmstr, yytext, nmstr.Length );
 			}
 			else
 			{
@@ -461,7 +471,7 @@ mode LINEDIR;
 	I_linedir_str : '"' ~('"' | '\n')* '"' {
 			free(infilename);
 			infilename = xstrdup(yytext + 1);
-			infilename[strlen( infilename ) - 1] = '\0';
+			//infilename[strlen( infilename ) - 1] = '\0';
 		} ;
 	I_linedir_dot : . -> skip ;
 
@@ -587,14 +597,14 @@ mode OPTION;
 	I_options_string : '"' ~('"' | '\n')* '"'	{
 			if(yyleng-1 < MAXLINE)
         	{
-				strncpy( nmstr, yytext + 1, sizeof(nmstr) );
+				strncpy( nmstr, yytext + 1, nmstr.Length );
 			}
 			else
 			{
 			   synerr("Option line too long\n");
 			   FLEX_EXIT(EXIT_FAILURE);
 			}
-			nmstr[strlen( nmstr ) - 1] = '\0';
+			//nmstr[nmstr.Length - 1] = '\0';
 			Type=NAME;
 		} ;			
 
@@ -604,19 +614,19 @@ mode PICKUPDEF;
 	I_pickupdef_notws : NotWs ~('\r' | '\n')* {
 			if(yyleng < MAXLINE)
  		    {
-				strncpy( nmdef, yytext, sizeof(nmdef) );
+				strncpy( nmdef, yytext, nmdef.Length );
  		    }
  		    else
  		    {
-				format_synerr("Definition value for {%s} too long\n", nmstr);
+				format_synerr("Definition value for {%s} too long " +  nmstr);
  		        FLEX_EXIT(EXIT_FAILURE);
 			}
 			/* Skip trailing whitespace. */
 			{
-			    size_t i = strlen( nmdef );
+			    int i = strlen( nmdef );
 			    while (i > 0 && (nmdef[i-1] == ' ' || nmdef[i-1] == '\t'))
 			       --i;
-			    nmdef[i] = '\0';
+			    //nmdef[i] = '\0';
 			}
 			ndinstal( nmstr, nmdef );
 			didadef = true;
@@ -677,15 +687,15 @@ mode SECT2;
             Type='<';
         } ;
 	I_sect2_optwsup :  OptWs { this.InputStream.LA(-1) == '\n' }? '^' { Type='^'; } ;
-	I_sect2_dq : '"' { BEGIN(QUOTE); return '"'; } ;
+	I_sect2_dq : '"' { BEGIN(QUOTE); Type= '"'; } ;
 	I_sect2_ocdigit : '{/' Digit {
 			BEGIN(NUM);
 			if ( lex_compat || posix_compat )
-				return BEGIN_REPEAT_POSIX;
+				Type= BEGIN_REPEAT_POSIX;
 			else
-				return BEGIN_REPEAT_FLEX;
+				Type= BEGIN_REPEAT_FLEX;
 		} ;
-	I_sect2_dolblanknl : '$/' (Blank | Nl) { return '$'; } ;
+	I_sect2_dolblanknl : '$/' (Blank | Nl) { Type= '$'; } ;
 	I_sect2_wsperoc : Ws '%{' {
 			bracelevel = 1;
 			BEGIN(PERCENT_BRACE_ACTION);
@@ -693,21 +703,21 @@ mode SECT2;
 			{
 				doing_rule_action = true;
 				in_rule = false;
-				return '\n';
+				Type= '\n';
 			}
 		} ;
 	I_sect2_wsbar : Ws '"' .* Nl {
             if (sf_skip_ws()){
                 /* We're in the middle of a (?x: ) pattern. */
                 /* Push back everything starting at the "|" */
-                int amt = (int) (strchr (yytext, '|') - yytext);
+                int amt = 0;// (int) (strchr (yytext, '|') - yytext);
                 yyless(amt);
             }
             else {
                 add_action("]\"]");
                 continued_action = true;
                 ++linenum;
-                return '\n';
+                Type= '\n';
             }
         } ;
 	I_sect2_wscom : Ws { this.InputStream.LA(-1) == '\n' }? '/*' {
@@ -740,7 +750,7 @@ mode SECT2;
                 {
                 doing_rule_action = true;
                 in_rule = false;
-                return '\n';
+                Type= '\n';
                 }
 	        }
 		} ;
@@ -759,11 +769,11 @@ mode SECT2;
                     {
                     doing_rule_action = true;
                     in_rule = false;
-                    return '\n';
+                    Type= '\n';
                     }
             }
 		} ;
-	I_sect2_upoptwseof : OptWs* EOF { Type=EOF; } ;
+	I_sect2_upoptwseof : OptWs* EOF { Type=TokenConstants.EOF; } ;
 
 	I_sect2_perper : '%%' { this.InputStream.LA(-1) == '\n' }? .* {
 			sectnum = 3;
@@ -776,7 +786,7 @@ mode SECT2;
 			int cclval;
 			if(yyleng < MAXLINE)
 			{
-				strncpy( nmstr, yytext, sizeof(nmstr) );
+				strncpy( nmstr, yytext, nmstr.Length );
 			}
 			else
 			{
@@ -786,7 +796,7 @@ mode SECT2;
 			/* Check to see if we've already encountered this
 			 * ccl.
 			 */
-			if (0 /* <--- This "0" effectively disables the reuse of a
+			if (false /* <--- This "0" effectively disables the reuse of a
                    * character class (purely based on its source text).
                    * The reason it was disabled is so yacc/bison can parse
                    * ccl operations, such as ccl difference and union.
@@ -798,7 +808,7 @@ mode SECT2;
 
 				yylval = cclval;
 				++cclreuse;
-				return PREVCCL;
+				Type= PREVCCL;
 			}
 			else
 			{
@@ -813,7 +823,7 @@ mode SECT2;
 				yyless( 1 );
 
 				BEGIN(FIRSTCCL);
-				return '[';
+				Type= '[';
 			}
 		} ;
 	I_sect2_minus : '{-}' {  Type=CCL_OP_DIFF; } ;
@@ -824,36 +834,37 @@ mode SECT2;
      * context.
      */
 	I_sect2_name : '{' Name '}' Space? {
-			char *nmdefptr;
-            int end_is_ws, end_ch;
+			string nmdefptr;
+            int end_is_ws;
+			char end_ch;
 
             end_ch = yytext[yyleng-1];
             end_is_ws = end_ch != '}' ? 1 : 0;
 
  			if(yyleng-1 < MAXLINE)
 			{
-				strncpy( nmstr, yytext + 1, sizeof(nmstr) );
+				strncpy( nmstr, yytext + 1, nmstr.Length );
  			}
  			else
  			{
  				synerr("Input line too long\n");
  				FLEX_EXIT(EXIT_FAILURE);
  			}
-			nmstr[yyleng - 2 - end_is_ws] = '\0';  /* chop trailing brace */
+			//nmstr[yyleng - 2 - end_is_ws] = '\0';  /* chop trailing brace */
 
-			if ( (nmdefptr = ndlookup( nmstr )) == 0 )
+			if ( (nmdefptr = ndlookup( nmstr )) == null )
 				format_synerr(
 				 "undefined definition " + nmstr );
 
 			else
 			{ /* push back name surrounded by ()'s */
-				size_t len = strlen( nmdefptr );
-                if (end_is_ws)
+				int len = strlen( nmdefptr );
+                if (end_is_ws != 0)
                     unput(end_ch);
 
 				if ( lex_compat || nmdefptr[0] == '^' ||
 				     (len > 0 && nmdefptr[len - 1] == '$')
-                     || (end_is_ws && trlcontxt && !sf_skip_ws()))
+                     || (end_is_ws != 0 && trlcontxt && !sf_skip_ws()))
 					{ /* don't use ()'s after all */
 					PUT_BACK_STRING(nmdefptr, 0);
 
@@ -901,7 +912,7 @@ mode SECT2;
 	I_sect2_cp : ')' {
 			if (_sf_top_ix > 0) {
 				sf_pop();
-				return ')';
+				Type= ')';
 			} else
 				synerr("unbalanced parenthesis");
 		} ;
