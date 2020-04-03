@@ -581,7 +581,7 @@ mode OPTION;
                     if(!tablesext && option_sense)
                         tablesext = true;
          } ;
-	I_options_string : '\"' ~('"' | '\n')* '\"'	{
+	I_options_string : '"' ~('"' | '\n')* '"'	{
 			if(yyleng-1 < MAXLINE)
         	{
 				strncpy( nmstr, yytext + 1, sizeof(nmstr) );
@@ -628,8 +628,280 @@ mode PICKUPDEF;
 mode PERCENT_BRACE_ACTION;
 I_percent_brace_action : ;
 
+mode RECOVER;
+
+	I_recover_bl : .* Nl { ++linenum; BEGIN(INITIAL); } ;
+
+mode SECT2PROLOG;
+
+	I_sect2prolog_peropen : '%{' { this.InputStream.LA(-1) == '\n' }? { ++bracelevel; yyless( 2 );	/* eat only %{ */ } ;
+	I_sect2prolog_perclose : '%}' { this.InputStream.LA(-1) == '\n' }? { --bracelevel; yyless( 2 );	/* eat only %{ */ } ;
+	I_sect2prolog_sb : Ws { this.InputStream.LA(-1) == '\n' }? { START_CODEBLOCK(true); /* indented code in prolog */ } ;
+	I_sect2prolog_notws : NotWs { this.InputStream.LA(-1) == '\n' }? .* {
+			/* non-indented code */
+			if ( bracelevel <= 0 )
+			{
+				/* not in %{ ... %} */
+				yyless( 0 );	/* put it all back */
+				yy_set_bol( 1 );
+				mark_prolog();
+				BEGIN(SECT2);
+			} else {
+				START_CODEBLOCK(true);
+			}
+		} ;
+	I_sect2prolog_dot : . { ACTION_ECHO(); } ;
+	I_sect2prolog_eof : EOF {
+			mark_prolog();
+			sectnum = 0;
+			yyterminate(); /* to stop the parser */
+			} ;
+
 
 mode SECT2;
 
-	BlankLine : OptWs Nl // { this.InputStream.LA(1); }
-		-> channel(OFF_CHANNEL);
+	I_sect2_optwsln : OptWs { this.InputStream.LA(-1) == '\n' }? Nl { ++linenum; /* allow blank lines in section 2 */ } ;
+	I_sect2_optwsperop : OptWs { this.InputStream.LA(-1) == '\n' }? '%{' {
+			indented_code = false;
+			doing_codeblock = true;
+			bracelevel = 1;
+			BEGIN(PERCENT_BRACE_ACTION);
+		} ;
+	I_sect2_optwslt : OptWs { this.InputStream.LA(-1) == '\n' }? '<' {
+            /* Allow "<" to appear in (?x) patterns. */
+            if (!sf_skip_ws())
+                BEGIN(SC);
+            Type='<';
+        } ;
+	I_sect2_optwsup :  OptWs { this.InputStream.LA(-1) == '\n' }? '^' { Type='^'; } ;
+	I_sect2_dq : '"' { BEGIN(QUOTE); return '"'; } ;
+	I_sect2_ocdigit : '{/' Digit {
+			BEGIN(NUM);
+			if ( lex_compat || posix_compat )
+				return BEGIN_REPEAT_POSIX;
+			else
+				return BEGIN_REPEAT_FLEX;
+		} ;
+	I_sect2_dolblanknl : '$/' (Blank | Nl) { return '$'; } ;
+	I_sect2_wsperoc : Ws '%{' {
+			bracelevel = 1;
+			BEGIN(PERCENT_BRACE_ACTION);
+			if ( in_rule )
+			{
+				doing_rule_action = true;
+				in_rule = false;
+				return '\n';
+			}
+		} ;
+	I_sect2_wsbar : Ws '"' .* Nl {
+            if (sf_skip_ws()){
+                /* We're in the middle of a (?x: ) pattern. */
+                /* Push back everything starting at the "|" */
+                int amt = (int) (strchr (yytext, '|') - yytext);
+                yyless(amt);
+            }
+            else {
+                add_action("]\"]");
+                continued_action = true;
+                ++linenum;
+                return '\n';
+            }
+        } ;
+	I_sect2_wscom : Ws { this.InputStream.LA(-1) == '\n' }? '/*' {
+            if (sf_skip_ws()){
+                /* We're in the middle of a (?x: ) pattern. */
+                yy_push_state(COMMENT_DISCARD);
+            }
+            else{
+                yyless( yyleng - 2 );	/* put back '/', '*' */
+                bracelevel = 0;
+                continued_action = false;
+                BEGIN(ACTION);
+            }
+		} ;
+	I_sect2_upws : Ws { this.InputStream.LA(-1) == '\n' }? { /* allow indented rules */ ; } ;
+	I_sect2_ws : Ws {
+        if (sf_skip_ws()){
+            /* We're in the middle of a (?x: ) pattern. */
+        }
+        else{
+            /* This rule is separate from the one below because
+                * otherwise we get variable trailing context, so
+                * we can't build the scanner using -{f,F}.
+                */
+            bracelevel = 0;
+            continued_action = false;
+            BEGIN(ACTION);
+
+            if ( in_rule )
+                {
+                doing_rule_action = true;
+                in_rule = false;
+                return '\n';
+                }
+	        }
+		} ;
+	I_sect2_optwsnl : OptWs Nl {
+            if (sf_skip_ws()){
+                /* We're in the middle of a (?x: ) pattern. */
+                ++linenum;
+            }
+            else{
+                bracelevel = 0;
+                continued_action = false;
+                BEGIN(ACTION);
+                unput( '\n' );	/* so <ACTION> sees it */
+
+                if ( in_rule )
+                    {
+                    doing_rule_action = true;
+                    in_rule = false;
+                    return '\n';
+                    }
+            }
+		} ;
+	I_sect2_upoptwseof : OptWs* EOF { Type=EOF; } ;
+
+	I_sect2_perper : '%%' { this.InputStream.LA(-1) == '\n' }? .* {
+			sectnum = 3;
+			BEGIN(no_section3_escape ? SECT3_NOESCAPE : SECT3);
+			outn("/* Begin user sect3 */");
+			yyterminate(); /* to stop the parser */
+		} ;
+	I_sect2_bigfatthing : '[' ( First_ccl_char | Ccl_expr )
+		( Ccl_char | Ccl_expr )* {
+			int cclval;
+			if(yyleng < MAXLINE)
+			{
+				strncpy( nmstr, yytext, sizeof(nmstr) );
+			}
+			else
+			{
+				synerr("Input line too long\n");
+				FLEX_EXIT(EXIT_FAILURE);
+			}
+			/* Check to see if we've already encountered this
+			 * ccl.
+			 */
+			if (0 /* <--- This "0" effectively disables the reuse of a
+                   * character class (purely based on its source text).
+                   * The reason it was disabled is so yacc/bison can parse
+                   * ccl operations, such as ccl difference and union.
+                   */
+                &&  (cclval = ccllookup( nmstr )) != 0 )
+				{
+				if ( input() != ']' )
+					synerr( _( "bad character class" ) );
+
+				yylval = cclval;
+				++cclreuse;
+				return PREVCCL;
+			}
+			else
+			{
+				/* We fudge a bit.  We know that this ccl will
+				 * soon be numbered as lastccl + 1 by cclinit.
+				 */
+				cclinstal( nmstr, lastccl + 1 );
+
+				/* Push back everything but the leading bracket
+				 * so the ccl can be rescanned.
+				 */
+				yyless( 1 );
+
+				BEGIN(FIRSTCCL);
+				return '[';
+			}
+		} ;
+	I_sect2_minus : '{-}' {  Type=CCL_OP_DIFF; } ;
+	I_sect2_plus : '{+}' { Type=CCL_OP_UNION; } ;
+
+    /* Check for :space: at the end of the rule so we don't
+     * wrap the expanded regex in '(' ')' -- breaking trailing
+     * context.
+     */
+	I_sect2_name : '{' Name '}' Space? {
+			char *nmdefptr;
+            int end_is_ws, end_ch;
+
+            end_ch = yytext[yyleng-1];
+            end_is_ws = end_ch != '}' ? 1 : 0;
+
+ 			if(yyleng-1 < MAXLINE)
+			{
+				strncpy( nmstr, yytext + 1, sizeof(nmstr) );
+ 			}
+ 			else
+ 			{
+ 				synerr( _("Input line too long\n"));
+ 				FLEX_EXIT(EXIT_FAILURE);
+ 			}
+			nmstr[yyleng - 2 - end_is_ws] = '\0';  /* chop trailing brace */
+
+			if ( (nmdefptr = ndlookup( nmstr )) == 0 )
+				format_synerr(
+				 "undefined definition {%s}",
+						nmstr );
+
+			else
+			{ /* push back name surrounded by ()'s */
+				size_t len = strlen( nmdefptr );
+                if (end_is_ws)
+                    unput(end_ch);
+
+				if ( lex_compat || nmdefptr[0] == '^' ||
+				     (len > 0 && nmdefptr[len - 1] == '$')
+                     || (end_is_ws && trlcontxt && !sf_skip_ws()))
+					{ /* don't use ()'s after all */
+					PUT_BACK_STRING(nmdefptr, 0);
+
+					if ( nmdefptr[0] == '^' )
+						BEGIN(CARETISBOL);
+				}
+				else
+				{
+					unput(')');
+					PUT_BACK_STRING(nmdefptr, 0);
+					unput('(');
+				}
+			}
+		} ;
+	I_sect2_opencomment : '/*' {
+			if (sf_skip_ws())
+				yy_push_state(COMMENT_DISCARD);
+            else
+			{
+				/* Push back the "*" and return "/" as usual. */
+				yyless(1);
+				Type='/';
+            }
+        } ;
+	I_sect2_opqp : '(?#' {
+			if (lex_compat || posix_compat){
+				/* Push back the "?#" and treat it like a normal parens. */
+				yyless(1);
+				sf_push(); 
+				Type='(';
+			}
+			else
+				yy_push_state(EXTENDED_COMMENT);
+		} ;
+	I_sect2_opq : '(?' {
+			sf_push();
+			if (lex_compat || posix_compat)
+				/* Push back the "?" and treat it like a normal parens. */
+				yyless(1);
+			else
+				BEGIN(GROUP_WITH_PARAMS);
+			Type='(';
+		} ;
+	I_sect2_op : '(' { sf_push(); Type='('; } ;
+	I_sect2_cp : ')' {
+			if (_sf_top_ix > 0) {
+				sf_pop();
+				return ')';
+			} else
+				synerr(_("unbalanced parenthesis"));
+		} ;
+	I_sect2_end : ('/' | '|' | '*' | '+' | '?' | '.' | '(' | ')' | '{' | '}') { Type=yytext[0]; } ;
+	I_sect2_dot : .	{ RETURNCHAR(); } ;
