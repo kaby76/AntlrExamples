@@ -57,7 +57,7 @@ namespace Flex
         public void RETURNCHAR()
         { }
 
-        public void sf_set_case_ins(int v)
+        public void sf_set_case_ins(bool v)
         { }
 
         public void sf_set_skip_ws(int v)
@@ -100,13 +100,67 @@ namespace Flex
         { }
 
 
-        public static int bracelevel, didadef, indented_code;
+        public static int bracelevel, didadef;
+        public static bool indented_code;
         public static bool doing_rule_action = false;
-        public static int option_sense;
+        public static bool option_sense;
         public bool doing_codeblock = false;
         public int brace_depth = 0, brace_start_line = 0;
         public const int MAXLINE = 100000;
         public char[] nmdef = new char[MAXLINE];
+        public int csize;
+        public bool interactive;
+        public bool long_align;
+        public bool backing_up_report;
+        public bool bison_bridge_lval;
+        public bool bison_bridge_lloc;
+        public bool C_plus_plus;
+        public bool lex_compat;
+        public bool posix_compat;
+        public bool ddebug;
+        public bool spprdflt;
+        public bool useecs;
+        public bool usemecs;
+        public bool use_read;
+        public bool fullspd;
+        public bool fulltbl;
+        public bool gen_line_dirs;
+        public bool do_yywrap;
+        public int performance_report;
+        public bool reentrant;
+        public bool reject_really_used;
+        public bool do_stdinit;
+        public bool use_stdout;
+        public bool printstats;
+        public bool nowarn;
+        public bool do_yylineno;
+        public bool yymore_really_used;
+        public bool tablesverify;
+        public bool tablesext;
+        public int yyleng;
+        public string nmstr;
+        public int yylval;
+        public int cclval;
+        public void synerr(string s) { }
+        public string myesc(string s) { return s; }
+
+        public void strncpy(string s1, string s2, int n) { }
+        public void ACTION_IFDEF(string s, bool b) { }
+        public void ACTION_ECHO_QSTART() { }
+
+        public void ACTION_ECHO_QEND() { }
+
+        public int YY_START;
+
+        public void END_CODEBLOCK() { }
+        public void START_CODEBLOCK() { }
+
+        public void ACTION_M4_IFDEF(string s, bool b) { }
+        public void sf_pop() { }
+        public void sf_push() { }
+        public void yyless(int i) { }
+        public int _sf_top_ix;
+        public char input() { return ' '; }
 
     }
 }

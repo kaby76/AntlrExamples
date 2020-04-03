@@ -52,6 +52,9 @@ CCE_NEG_XDIGIT,
 CCE_NEG_LOWER,
 CCE_NEG_UPPER,
 ERROR,
+MINUS,
+EQUAL,
+CLOSE_BRACKET,
 CCL_OP_DIFF,
 CCL_OP_UNION
 }
@@ -238,7 +241,7 @@ mode CCL;
 
 	I_ccl_cll_expr : Ccl_expr {
 			format_synerr(
-				"bad character class expression: %s" +
+				"bad character class expression: " +
 					yytext );
 			BEGIN(CCL); Type=CCE_ALNUM;
 		} ;
@@ -791,7 +794,7 @@ mode SECT2;
                 &&  (cclval = ccllookup( nmstr )) != 0 )
 				{
 				if ( input() != ']' )
-					synerr( _( "bad character class" ) );
+					synerr("bad character class");
 
 				yylval = cclval;
 				++cclreuse;
@@ -833,15 +836,14 @@ mode SECT2;
  			}
  			else
  			{
- 				synerr( _("Input line too long\n"));
+ 				synerr("Input line too long\n");
  				FLEX_EXIT(EXIT_FAILURE);
  			}
 			nmstr[yyleng - 2 - end_is_ws] = '\0';  /* chop trailing brace */
 
 			if ( (nmdefptr = ndlookup( nmstr )) == 0 )
 				format_synerr(
-				 "undefined definition {%s}",
-						nmstr );
+				 "undefined definition " + nmstr );
 
 			else
 			{ /* push back name surrounded by ()'s */
@@ -901,7 +903,7 @@ mode SECT2;
 				sf_pop();
 				return ')';
 			} else
-				synerr(_("unbalanced parenthesis"));
+				synerr("unbalanced parenthesis");
 		} ;
 	I_sect2_end : ('/' | '|' | '*' | '+' | '?' | '.' | '(' | ')' | '{' | '}') { Type=yytext[0]; } ;
 	I_sect2_dot : .	{ RETURNCHAR(); } ;
