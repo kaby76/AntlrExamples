@@ -1,5 +1,5 @@
 lexer grammar FlexLexer;
-
+ 
 channels {
 	OFF_CHANNEL		// non-default channel for whitespace and comments
 }
@@ -26,7 +26,7 @@ END_REPEAT_POSIX,
 BEGIN_REPEAT_FLEX,
 END_REPEAT_FLEX,
 PREVCCL,
-CHAR,
+CHAR, 
 CCE_ALNUM,
 CCE_ALPHA,
 CCE_BLANK,
@@ -66,7 +66,11 @@ CCL_OP_DIFF,
 CCL_OP_UNION,
 SECT3_NOESCAPE,
 SECT3,
-CARETISBOL
+CARETISBOL,
+PLUS,
+QUESTION,
+BEGIN_REPEAT_FLEX,
+END_REPEAT_FLEX
 }
 
 // ======================= Common fragments =========================
