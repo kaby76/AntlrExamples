@@ -29,14 +29,14 @@ namespace Flex
         public bool fulltbl;
         public bool gen_line_dirs;
         public bool in_rule;
-        public string infilename;
+        public string infilename = "";
         public bool interactive;
         public int lastccl;
         public bool lex_compat;
         public int linenum;
         public bool long_align;
-        public string nmdef;
-        public string nmstr;
+        public string nmdef = "";
+        public string nmstr = "";
         public bool no_section3_escape;
         public bool nowarn;
         public int performance_report;
@@ -57,7 +57,7 @@ namespace Flex
         public int yyleng;
         public int yylval;
         public bool yymore_really_used;
-        public string yytext;
+        public string yytext = "";
         public bool yytext_is_array;
         protected int percent_percent_count;
         private readonly ICharStream _input;
@@ -247,7 +247,9 @@ namespace Flex
         }
 
         public void yy_pop_state()
-        { }
+        {
+            PopMode();
+        }
 
         public void yy_push_state(int v)
         {

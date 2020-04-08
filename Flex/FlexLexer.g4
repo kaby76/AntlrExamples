@@ -346,11 +346,11 @@ mode CODEBLOCK_MATCH_BRACE;
 
 mode COMMENT;
 
-	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } ;
-	I_comment_dot : . { ACTION_ECHO(); } ;
-	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } ;
+	I_comment_noblahblah : ~('[' | ']' | '*' | '\n')* { ACTION_ECHO(); } -> skip ;
+	I_comment_dot : . { ACTION_ECHO(); } -> skip ;
+	I_comment_nl : Nl { ++linenum; ACTION_ECHO(); } -> skip ;
 	
-	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } ;
+	I_comment_end : '*/' { add_action("*/]\"]"); yy_pop_state(); } -> skip ;
 
 // ===================================================================
 
