@@ -1,12 +1,54 @@
 namespace Flex
 {
     using Antlr4.Runtime;
-    using Antlr4.Runtime.Misc;
 
     public abstract class LexerAdaptor : Lexer
     {
         private readonly ICharStream _input;
         protected int percent_percent_count;
+        public static int bracelevel;
+        public static bool didadef;
+        public static bool indented_code;
+        public static bool doing_rule_action = false;
+        public static bool option_sense;
+        public bool doing_codeblock = false;
+        public int brace_depth = 0, brace_start_line = 0;
+        public const int MAXLINE = 100000;
+        public string nmdef;
+        public int csize;
+        public bool interactive;
+        public bool long_align;
+        public bool backing_up_report;
+        public bool bison_bridge_lval;
+        public bool bison_bridge_lloc;
+        public bool C_plus_plus;
+        public bool lex_compat;
+        public bool posix_compat;
+        public bool ddebug;
+        public bool spprdflt;
+        public bool useecs;
+        public bool usemecs;
+        public bool use_read;
+        public bool fullspd;
+        public bool fulltbl;
+        public bool gen_line_dirs;
+        public bool do_yywrap;
+        public int performance_report;
+        public bool reentrant;
+        public bool reject_really_used;
+        public bool do_stdinit;
+        public bool use_stdout;
+        public bool printstats;
+        public bool nowarn;
+        public bool do_yylineno;
+        public bool yymore_really_used;
+        public bool tablesverify;
+        public bool tablesext;
+        public int yyleng;
+        public string nmstr;
+        public int yylval;
+        public int cclval;
+
 
         public LexerAdaptor(
                     Antlr4.Runtime.ICharStream input,
@@ -69,7 +111,6 @@ namespace Flex
         public void yy_pop_state()
         { }
 
-
         public int linenum;
 
         public string yytext;
@@ -99,91 +140,145 @@ namespace Flex
         public void format_synerr(string f)
         { }
 
+        public void synerr(string s)
+        {
+        }
 
-        public static int bracelevel;
-        public static bool didadef;
-        public static bool indented_code;
-        public static bool doing_rule_action = false;
-        public static bool option_sense;
-        public bool doing_codeblock = false;
-        public int brace_depth = 0, brace_start_line = 0;
-        public const int MAXLINE = 100000;
-        public string nmdef;
-        public int csize;
-        public bool interactive;
-        public bool long_align;
-        public bool backing_up_report;
-        public bool bison_bridge_lval;
-        public bool bison_bridge_lloc;
-        public bool C_plus_plus;
-        public bool lex_compat;
-        public bool posix_compat;
-        public bool ddebug;
-        public bool spprdflt;
-        public bool useecs;
-        public bool usemecs;
-        public bool use_read;
-        public bool fullspd;
-        public bool fulltbl;
-        public bool gen_line_dirs;
-        public bool do_yywrap;
-        public int performance_report;
-        public bool reentrant;
-        public bool reject_really_used;
-        public bool do_stdinit;
-        public bool use_stdout;
-        public bool printstats;
-        public bool nowarn;
-        public bool do_yylineno;
-        public bool yymore_really_used;
-        public bool tablesverify;
-        public bool tablesext;
-        public int yyleng;
-        public string nmstr;
-        public int yylval;
-        public int cclval;
-        public void synerr(string s) { }
-        public int myesc(string s) { return 0; }
+        public int myesc(string s)
+        {
+            return 0;
+        }
 
-        public void strncpy(string s1, string s2, int n) { }
-        public void ACTION_IFDEF(string s, bool b) { }
-        public void ACTION_ECHO_QSTART() { }
+        public void strncpy(string s1, string s2, int n)
+        {
+        }
 
-        public void ACTION_ECHO_QEND() { }
+        public void ACTION_IFDEF(string s, bool b)
+        {
+        }
+
+        public void ACTION_ECHO_QSTART()
+        {
+        }
+
+        public void ACTION_ECHO_QEND()
+        {
+        }
 
         public int YY_START;
 
-        public void END_CODEBLOCK() { }
-        public void START_CODEBLOCK() { }
+        public void END_CODEBLOCK()
+        {
+        }
 
-        public void ACTION_M4_IFDEF(string s, bool b) { }
-        public void sf_pop() { }
-        public void sf_push() { }
-        public void yyless(int i) { }
+        public void START_CODEBLOCK()
+        {
+        }
+
+        public void ACTION_M4_IFDEF(string s, bool b)
+        {
+        }
+
+        public void sf_pop()
+        {
+        }
+
+        public void sf_push()
+        {
+        }
+
+        public void yyless(int i)
+        {
+        }
+
         public int _sf_top_ix;
-        public char input() { return ' '; }
-        public int myctoi(string s) { return 0; }
-        public void free(string s) { }
+
+        public char input()
+        {
+            return ' ';
+        }
+
+        public int myctoi(string s)
+        {
+            return 0;
+        }
+
+        public void free(string s)
+        {
+        }
+
         public string infilename;
-        public string xstrdup(string s) { return s; }
-        public int strlen(string s) { return 0; }
-        public void ndinstal(string a, string b) { }
-        public void yy_set_bol(int i) { }
-        public void mark_prolog() { }
-        public void yyterminate() { }
-        public bool sf_skip_ws() { return false; }
+
+        public string xstrdup(string s)
+        {
+            return s;
+        }
+
+        public int strlen(string s)
+        {
+            return 0;
+        }
+
+        public void ndinstal(string a, string b)
+        {
+        }
+
+        public void yy_set_bol(int i)
+        {
+        }
+
+        public void mark_prolog()
+        {
+        }
+
+        public void yyterminate()
+        {
+        }
+
+        public bool sf_skip_ws()
+        {
+            return false;
+        }
+
         public bool in_rule;
         public bool continued_action;
-        public void unput(char c) { }
+
+        public void unput(char c)
+        {
+        }
+
         public bool no_section3_escape;
-        public void outn(string s) { }
-        public int ccllookup(string s) { return 0; }
+
+        public void outn(string s)
+        {
+        }
+
+        public int ccllookup(string s)
+        {
+            return 0;
+        }
+
         public int cclreuse;
-        public void cclinstal(string s, int i) { }
+
+        public void cclinstal(string s, int i)
+        {
+        }
+
         public int lastccl;
-        public void PUT_BACK_STRING(string s, int i) { }
+
+        public void PUT_BACK_STRING(string s, int i)
+        {
+        }
+
         public bool trlcontxt;
-        public string ndlookup(string s) { return s; }
+
+        public string ndlookup(string s)
+        {
+            return s;
+        }
+
+        public void ECHO()
+        {
+        }
     }
 }
-

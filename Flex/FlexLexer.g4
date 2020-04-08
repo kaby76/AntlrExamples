@@ -9,24 +9,10 @@ options {
 }
 
 tokens {
-SECTEND,
-SCDECL,
-XSCDECL,
-TOK_OPTION,
-TOK_OUTFILE,
-TOK_EXTRA_TYPE,
-TOK_PREFIX,
-TOK_YYCLASS,
-TOK_HEADER_FILE,
-TOK_TABLES_FILE,
-EOF_OP,
-BEGIN_REPEAT_POSIX,
-NUMBER,
-END_REPEAT_POSIX,
 BEGIN_REPEAT_FLEX,
-END_REPEAT_FLEX,
-PREVCCL,
-CHAR, 
+BEGIN_REPEAT_FLEX,
+BEGIN_REPEAT_POSIX,
+CARET,
 CCE_ALNUM,
 CCE_ALPHA,
 CCE_BLANK,
@@ -34,43 +20,53 @@ CCE_CNTRL,
 CCE_DIGIT,
 CCE_GRAPH,
 CCE_LOWER,
-CCE_PRINT,
-CCE_PUNCT,
-CCE_SPACE,
-CCE_XDIGIT,
-CCE_UPPER,
 CCE_NEG_ALNUM,
 CCE_NEG_ALPHA,
 CCE_NEG_BLANK,
 CCE_NEG_CNTRL,
 CCE_NEG_DIGIT,
 CCE_NEG_GRAPH,
+CCE_NEG_LOWER,
 CCE_NEG_PRINT,
 CCE_NEG_PUNCT,
 CCE_NEG_SPACE,
-CCE_NEG_XDIGIT,
-CCE_NEG_LOWER,
 CCE_NEG_UPPER,
-ERROR,
-MINUS,
-EQUAL,
-CARET,
-COMMA,
-NAME,
-SC,
-QUOTE,
-EXIT_FAILURE,
-RETURNNAME,
-CLOSE_BRACKET,
+CCE_NEG_XDIGIT,
+CCE_PRINT,
+CCE_PUNCT,
+CCE_SPACE,
+CCE_UPPER,
+CCE_XDIGIT,
 CCL_OP_DIFF,
 CCL_OP_UNION,
-SECT3_NOESCAPE,
-SECT3,
-CARETISBOL,
+CHAR, 
+CLOSE_BRACKET,
+COMMA,
+END_REPEAT_FLEX,
+END_REPEAT_FLEX,
+END_REPEAT_POSIX,
+EOF_OP,
+EQUAL,
+ERROR,
+EXIT_FAILURE,
+MINUS,
+NAME,
+NUMBER,
 PLUS,
+PREVCCL,
 QUESTION,
-BEGIN_REPEAT_FLEX,
-END_REPEAT_FLEX
+QUOTE,
+RETURNNAME,
+SCDECL,
+SECTEND,
+TOK_EXTRA_TYPE,
+TOK_HEADER_FILE,
+TOK_OPTION,
+TOK_OUTFILE,
+TOK_PREFIX,
+TOK_TABLES_FILE,
+TOK_YYCLASS,
+XSCDECL
 }
 
 // ======================= Common fragments =========================
@@ -221,6 +217,11 @@ mode ACTION_STRING;
 		}
 	} ;
 	I_action_string_dot : . { ACTION_ECHO(); } ;
+
+mode CARETISBOL;
+
+	I_caretisbol : '^' { BEGIN(SECT2); Type='^'; } ;
+
 
 mode CCL;
 
@@ -649,6 +650,21 @@ mode RECOVER;
 
 	I_recover_bl : .* Nl { ++linenum; BEGIN(INITIAL); } ;
 
+mode SC;
+
+	I_sc_optwsnloptws : OptWs Nl OptWs { ++linenum; } ;
+	I_sc_comst : (',' | '*') { Type=yytext[0]; } ;
+	I_sc_gt : '>' { BEGIN(SECT2); Type='>'; } ;
+	I_sc_gto : '>' '/^' { BEGIN(CARETISBOL); Type='>'; } ;
+	I_sc_scname : Name { RETURNNAME(); } ;
+	I_sc_dot : . {
+			format_synerr("bad <start condition>: " +
+				yytext );
+		} ;
+
+
+
+
 mode SECT2PROLOG;
 
 	I_sect2prolog_peropen : '%{' { this.InputStream.LA(-1) == '\n' }? { ++bracelevel; yyless( 2 );	/* eat only %{ */ } ;
@@ -922,3 +938,16 @@ mode SECT2;
 		} ;
 	I_sect2_end : ('/' | '|' | '*' | '+' | '?' | '.' | '(' | ')' | '{' | '}') { Type=yytext[0]; } ;
 	I_sect2_dot : .	{ RETURNCHAR(); } ;
+
+mode SECT3;
+
+	I_sect3_m4qstart : M4qstart { /* fputs(escaped_qstart, yyout); */ } ;
+	I_sect3_m4qend : M4qend { /* fputs(escaped_qend, yyout); */ } ;
+	I_sect3_echo1 : ('^' | '[' | ']')* { ECHO(); } ;
+	// Unclear what [][] means.
+
+mode SECT3_NOESCAPE;
+
+	I_sect3_noescape_m4qstart : M4qstart { /* ffprintf(yyout, "[""[%s]""]", escaped_qstart); */ } ;
+	I_sect3_noescape_m4qend : M4qend { /* fprintf(yyout, "[""[%s]""]", escaped_qend); */ } ;
+	// Unclear what [][] means.

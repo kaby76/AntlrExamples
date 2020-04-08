@@ -1,9 +1,5 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 2.1
 
-using Antlr4.Runtime.Tree;
-using System;
-using System.Collections.Generic;
-
 namespace Flex
 {
     using Antlr4.Runtime;
