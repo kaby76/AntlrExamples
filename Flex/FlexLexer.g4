@@ -648,13 +648,13 @@ mode PICKUPDEF;
 			}
 			ndinstal( nmstr, nmdef );
 			didadef = true;
-		} ;
+		} -> skip ;
 	I_pickupdef_nl : Nl {
 			if ( ! didadef )
 				synerr("incomplete name definition");
 			BEGIN(INITIAL);
 			++linenum;
-		} ;
+		} -> skip;
 
 mode PERCENT_BRACE_ACTION;
 I_percent_brace_action : ;

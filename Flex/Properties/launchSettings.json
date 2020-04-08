@@ -2,7 +2,7 @@
   "profiles": {
     "Flex": {
       "commandName": "Project",
-      "commandLineArgs": "c:\\Users\\kenne\\Documents\\crawl\\save\\630/Dcs.y"
+      "commandLineArgs": "c:\\Users\\kenne\\Documents\\flex\\src\\scan.l"
     }
   }
 }
