@@ -437,7 +437,7 @@ mode INITIAL;
 	I_initial_percentcurly : '%{' // { this.InputStream.LA(-1) == '\n' }?
 		.* Nl { START_CODEBLOCK(false); } -> skip ;
 	I_initial_top : '%top' // { this.InputStream.LA(-1) == '\n' }?
-		Ws '{' Ws Nl {
+		Ws? '{' Ws? Nl {
 					brace_start_line = linenum;
 					++linenum;
 					//buf_linedir( &top_buf, infilename?infilename:"<stdin>", linenum);

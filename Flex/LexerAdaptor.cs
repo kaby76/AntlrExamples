@@ -219,11 +219,18 @@ namespace Flex
             return false;
         }
 
-        public void START_CODEBLOCK(bool v)
-        { }
-
-        public void START_CODEBLOCK()
+        public void START_CODEBLOCK(bool x)
         {
+            /* Emit the needed line directive... */
+            if (indented_code == false)
+            {
+                linenum++;
+                line_directive_out(null, 1);
+            }
+            add_action("[[");
+            yy_push_state(FlexLexer.CODEBLOCK);
+            indented_code = x;
+            if (indented_code) ACTION_ECHO();
         }
 
         public int strlen(string s)
