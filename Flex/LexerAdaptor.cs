@@ -108,7 +108,9 @@ namespace Flex
         { }
 
         public void BEGIN(int type)
-        { }
+        {
+            PushMode(type);
+        }
 
         public void cclinstal(string s, int i)
         {
