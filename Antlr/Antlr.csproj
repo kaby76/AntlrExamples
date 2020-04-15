@@ -1,16 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>Antlr</RootNamespace>
   </PropertyGroup>
   
   <ItemGroup>
     <Antlr4 Include="ANTLRv4Parser.g4">
-      <CustomToolNamespace>Antlr</CustomToolNamespace>
+      <CustomToolNamespace>GrammarGrammar</CustomToolNamespace>
     </Antlr4>
     <Antlr4 Include="ANTLRv4Lexer.g4">
-      <CustomToolNamespace>Antlr</CustomToolNamespace>
+      <CustomToolNamespace>GrammarGrammar</CustomToolNamespace>
     </Antlr4>
   </ItemGroup>
 

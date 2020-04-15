@@ -2,6 +2,7 @@
 namespace Antlr
 {
     using Antlr4.Runtime;
+    using GrammarGrammar;
 
     public class Program
     {
