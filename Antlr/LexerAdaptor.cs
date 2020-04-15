@@ -75,12 +75,6 @@ namespace GrammarGrammar
             {
                 Type = (ANTLRv4Lexer.ACTION_CONTENT);
             }
-
-            PopMode();
-            if (ModeStack.Count > 0)
-            {
-                CurrentRuleType = (ANTLRv4Lexer.ACTION_CONTENT);
-            }
         }
 
         public void handleOptionsLBrace()

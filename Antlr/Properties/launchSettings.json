@@ -2,7 +2,7 @@
   "profiles": {
     "Antlr": {
       "commandName": "Project",
-      "commandLineArgs": "c:/users/kenne/documents/antlrexamples/antlr/antlrv4parser.g4"
+      "commandLineArgs": "c:/users/kenne/documents/antlrexamples/antlr/antlrv4lexer.g4"
     }
   }
 }
