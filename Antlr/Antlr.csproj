@@ -4,6 +4,9 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>Antlr</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Fun.g4" />
+  </ItemGroup>
   
   <ItemGroup>
     <Antlr4 Include="ANTLRv4Parser.g4">
@@ -12,6 +15,7 @@
     <Antlr4 Include="ANTLRv4Lexer.g4">
       <Package>GrammarGrammar</Package>
     </Antlr4>
+    <Antlr4 Include="Fun.g4" />
   </ItemGroup>
 
   <ItemGroup>
