@@ -6,7 +6,11 @@ namespace yes1
     {
         static void Main(string[] args)
         {
-            var str = new AntlrInputStream(System.Console.In);
+            ICharStream str = null;
+            if (args.Length == 0)
+                str = new AntlrInputStream(System.Console.In);
+            else
+                str = new AntlrFileStream(args[0]);
             var lexer = new Yes1Lexer(str);
             var tokens = new CommonTokenStream(lexer);
             var parser = new Yes1Parser(tokens);
