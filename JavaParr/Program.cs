@@ -1,5 +1,5 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 3.0
-namespace Java
+namespace JavaParr
 {
     using Antlr4.Runtime;
     using System.IO;
@@ -10,9 +10,9 @@ namespace Java
         {
             var input = File.OpenText(args[0]);
             var str = new AntlrInputStream(input);
-            var lexer = new Java9Lexer(str);
+            var lexer = new JavaLexer(str);
             var tokens = new CommonTokenStream(lexer);
-            var parser = new Java9Parser(tokens);
+            var parser = new JavaParser(tokens);
             var listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
             var tree = parser.compilationUnit();
