@@ -2,6 +2,7 @@
 namespace JavaParr
 {
     using Antlr4.Runtime;
+    using System;
     using System.IO;
 
     public class Program
@@ -15,6 +16,7 @@ namespace JavaParr
             var parser = new JavaParser(tokens);
             var listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
+            var start = DateTime.Now;
             var tree = parser.compilationUnit();
             if (listener.had_error)
             {
@@ -24,8 +26,10 @@ namespace JavaParr
             {
                 System.Console.WriteLine("parse completed.");
             }
+            var end = DateTime.Now;
             System.Console.WriteLine(tokens.OutputTokens());
             System.Console.WriteLine(tree.OutputTree(tokens));
+            System.Console.WriteLine(end - start);
         }
     }
 }
