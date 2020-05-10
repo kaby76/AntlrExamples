@@ -112,11 +112,7 @@ compilationUnit
     ;
 
 packageDeclaration
-    : packageModifier* 'package' packageName ';'
-    ;
-
-packageModifier
-    : annotation
+    : annotation* 'package' packageName ';'
     ;
 
 annotation
