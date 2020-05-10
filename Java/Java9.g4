@@ -107,7 +107,7 @@ using System.Text.RegularExpressions;
 }
 
 compilationUnit
-    : ( packageDeclaration ? importDeclaration * typeDeclaration * EOF )
+    : packageDeclaration? importDeclaration* typeDeclaration* EOF
     | modularCompilation
     ;
 
