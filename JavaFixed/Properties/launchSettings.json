@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Java": {
+      "commandName": "Project",
+      "commandLineArgs": "c:/Users/kenne/Documents/grammars-v4/java/java9/examples/module-info.java"
+    }
+  }
+}

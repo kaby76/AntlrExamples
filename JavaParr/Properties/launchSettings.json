@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "JavaParr": {
+      "commandName": "Project",
+      "commandLineArgs": "c:/users/kenne/documents/java-parser-test/android-sdk-sources-for-api-level-5/android/accounts/AccountManager.java"
+    }
+  }
+}
