@@ -97,19 +97,6 @@ typeName
 
 // LEXER
 
-xxx
-    : Identifier
-    | TO
-    | MODULE
-    | OPEN
-    | WITH
-    | PROVIDES
-    | USES
-    | OPENS
-    | REQUIRES
-    | EXPORTS
-    ;
-
 packageOrTypeName
     : Identifier
     | packageOrTypeName DOT Identifier
