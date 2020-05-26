@@ -8,18 +8,20 @@
   <ItemGroup>
     <Antlr4 Include="BisonParser.g4">
       <CustomToolNamespace>Bison</CustomToolNamespace>
+      <Package>Bison</Package>
     </Antlr4>
     <Antlr4 Include="BisonLexer.g4">
       <CustomToolNamespace>Bison</CustomToolNamespace>
+      <Package>Bison</Package>
     </Antlr4>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.8.0" />
-    <PackageReference Include="Antlr4BuildTasks" Version="2.1" />
+    <PackageReference Include="Antlr4BuildTasks" Version="4.0" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup>
     <NoWarn>3021;1701;1702</NoWarn>
   </PropertyGroup>
 
