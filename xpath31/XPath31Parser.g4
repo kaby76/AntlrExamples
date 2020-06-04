@@ -7,12 +7,18 @@
 // I have gone through this grammar very, very carefully to make sure
 // that it is essentially identical to the spec, that it implements
 // the lexical and parsing structures as stated in the spec.
+// All others that I have found on the web (e.g., github.com) do not
+// faithfully implement the spec, or are incomplete. This implementation
+// is complete.
+//
 // I have verified this grammar against thousands of test expressions.
 // All online xpath "parsers" only seem to require data in xml format. This
 // is a pure, no bullshit parser.
 //
 // A side note on the implementation of this grammar. I copied the grammar
-// from the spec then employed Antlrvsix to refactor the grammar.
+// from the spec then employed Antlrvsix to refactor the grammar. The parser
+// and lexer are split, but they could be combined as there is no super classing
+// of the parser nor lexer.
 //
 // Note on alternatives:
 // https://github.com/exquery/xpath3-parser/blob/master/src/main/antlr4/org/exquery/xpath/parser/XPath3.g4
