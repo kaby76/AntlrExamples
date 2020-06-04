@@ -1,10 +1,27 @@
 // XPath v3.1
 // Author--Ken Domino
+// Date--4 June 2020
 // 
-// https://www.w3.org/TR/2017/REC-xpath-31-20170321/
-// Alternatives:
+// This is a faithful implementation of the XPath version 3.1 gramar
+// from the spec at https://www.w3.org/TR/2017/REC-xpath-31-20170321/
+// I have gone through this grammar very, very carefully to make sure
+// that it is essentially identical to the spec.
+// I would not trust any other implementations because they "cheat",
+// changing terminals to non-terminals, implementing terminals incorrectly.
+// I have also verified this grammar against thousands of test expressions.
+// All online xpath "parsers" only seem to require data in xml format. This
+// is a pure, no bullshit parser.
+//
+// A side note on the implementation of this grammar. I copied the grammar
+// from the spec then employed Antlrvsix to refactor the grammar.
+//
+// Note on alternatives:
 // https://github.com/exquery/xpath3-parser/blob/master/src/main/antlr4/org/exquery/xpath/parser/XPath3.g4
+// This grammar does not implement the comment token correctly. Here,
+// comment is a parser symbol.
+//
 // https://github.com/antlr/grammars-v4/blob/master/xpath/xpath.g4
+// This grammar is for version 1.
 
 parser grammar XPath31Parser;
 

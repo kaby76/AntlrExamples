@@ -1,0 +1,1715 @@
+Xpath     : //@*
+Relativize: descendant-or-self::@*
+
+Xpath     : ''
+Relativize: self::''
+
+Xpath     : '+'
+Relativize: self::'+'
+
+Xpath     : @*
+Relativize: self::@*
+
+Xpath     : @*/.
+Relativize: self::@*/.
+
+Xpath     : *
+Relativize: *a[name() = "b"]
+
+Xpath     : *|@*
+Relativize: *a[name() = "b"] | self::@*
+
+Xpath     : '001' = 1
+Relativize: self::'001' = 1
+
+Xpath     : '0'=true()
+Relativize: self::'0'=true()
+
+Xpath     : *[1]
+Relativize: *self::[1]
+
+Xpath     : '1' and '0'
+Relativize: self::'1' and '0'
+
+Xpath     : @*[2]
+Relativize: self::@*[2]
+
+Xpath     : '200'
+Relativize: self::'200'
+
+Xpath     : '2'>'1'
+Relativize: self::'2'>'1'
+
+Xpath     : 25-*
+Relativize: self::25-*
+
+Xpath     : * +3
+Relativize: * self::+3
+
+Xpath     : *[3]
+Relativize: *self::[3]
+
+Xpath     : (* - 4)**
+Relativize: (* self::- 4)**
+
+Xpath     : *[4]
+Relativize: *self::[4]
+
+Xpath     : (* - 4) div 2
+Relativize: (* self::- 4) div 2
+
+Xpath     : '....5....|'
+Relativize: self::'....5.... | self::'
+
+Xpath     : @*-5
+Relativize: self::@*-5
+
+Xpath     : ' 6 '*div
+Relativize: self::' 6 '*div
+
+Xpath     : ' 6 ' div 2
+Relativize: self::' 6 ' div 2
+
+Xpath     : 'ABC'
+Relativize: self::'ABC'
+
+Xpath     : 'abcdæfgh'
+Relativize: self::'abcdæfgh'
+
+Xpath     : 'abcdèfgh'
+Relativize: self::'abcdèfgh'
+
+Xpath     : 'ace' != 'abc'
+Relativize: self::'ace' != 'abc'
+
+Xpath     : 'ace' != 'ace'
+Relativize: self::'ace' != 'ace'
+
+Xpath     : //ancestor::*
+Relativize: descendant-or-self::ancestor::*
+
+Xpath     : 'ancestor::*'
+Relativize: self::'ancestor::*'
+
+Xpath     : @*/ancestor::*
+Relativize: self::@*/ancestor::*
+
+Xpath     : @*/ancestor::*/near-north/*[4]/@*/following::node()
+Relativize: self::@*/ancestor::*/near-north/*[4]/@*/following::node()
+
+Xpath     : @*/ancestor::*/near-north/*[4]/@*/preceding::*
+Relativize: self::@*/ancestor::*/near-north/*[4]/@*/preceding::*
+
+Xpath     : @*/ancestor::*/near-north/*[4]/@*/preceding::comment()
+Relativize: self::@*/ancestor::*/near-north/*[4]/@*/preceding::comment()
+
+Xpath     : @*/ancestor::*/near-north/*[4]/@*/preceding::node()
+Relativize: self::@*/ancestor::*/near-north/*[4]/@*/preceding::node()
+
+Xpath     : @*/ancestor::*/near-north/*[4]/@*/preceding::processing-instruction()
+Relativize: self::@*/ancestor::*/near-north/*[4]/@*/preceding::processing-instruction()
+
+Xpath     : @*/ancestor::*/near-north/*[4]/@*/preceding::text()
+Relativize: self::@*/ancestor::*/near-north/*[4]/@*/preceding::text()
+
+Xpath     : 'ancestor-or-self::*'
+Relativize: self::'ancestor-or-self::*'
+
+Xpath     : @*/ancestor-or-self::*
+Relativize: self::@*/ancestor-or-self::*
+
+Xpath     : 'Apply-templates'
+Relativize: self::'Apply-templates'
+
+Xpath     : @att1
+Relativize: self::@att1
+
+Xpath     : @attr
+Relativize: self::@attr
+
+Xpath     : attribute :: *
+Relativize: self::attribute :: *
+
+Xpath     : @attribute1
+Relativize: self::@attribute1
+
+Xpath     : attribute :: div
+Relativize: self::attribute :: div
+
+Xpath     : 'b'
+Relativize: self::'b'
+
+Xpath     : 'baseParam1Data'
+Relativize: self::'baseParam1Data'
+
+Xpath     : 'baseSubParam0Data'
+Relativize: self::'baseSubParam0Data'
+
+Xpath     : boolean('')
+Relativize: self::boolean('')
+
+Xpath     : boolean(-0)
+Relativize: self::boolean(-0)
+
+Xpath     : boolean('0')
+Relativize: self::boolean('0')
+
+Xpath     : boolean(0)
+Relativize: self::boolean(0)
+
+Xpath     : boolean(0 div 0)
+Relativize: self::boolean(0 div 0)
+
+Xpath     : boolean('1')
+Relativize: self::boolean('1')
+
+Xpath     : boolean(1)
+Relativize: self::boolean(1)
+
+Xpath     : boolean(1 div 0)
+Relativize: self::boolean(1 div 0)
+
+Xpath     : boolean(doc)
+Relativize: self::boolean(doc)
+
+Xpath     : boolean(foo)
+Relativize: self::boolean(foo)
+
+Xpath     : 'bug'
+Relativize: self::'bug'
+
+Xpath     : 'Call-template'
+Relativize: self::'Call-template'
+
+Xpath     : ceiling(0.0)
+Relativize: self::ceiling(0.0)
+
+Xpath     : ceiling(1)=1
+Relativize: self::ceiling(1)=1
+
+Xpath     : ceiling(1.1)=2
+Relativize: self::ceiling(1.1)=2
+
+Xpath     : ceiling(-1.5)=-1
+Relativize: self::ceiling(-1.5)=-1
+
+Xpath     : ceiling(1.54)
+Relativize: self::ceiling(1.54)
+
+Xpath     : ceiling(2.999999)
+Relativize: self::ceiling(2.999999)
+
+Xpath     : ceiling(n0)
+Relativize: self::ceiling(n0)
+
+Xpath     : ceiling(n1)
+Relativize: self::ceiling(n1)
+
+Xpath     : ceiling(n2)
+Relativize: self::ceiling(n2)
+
+Xpath     : ceiling(number('xxx'))
+Relativize: self::ceiling(number('xxx'))
+
+Xpath     : @center-attr-2
+Relativize: self::@center-attr-2
+
+Xpath     : 'child::*'
+Relativize: self::'child::*'
+
+Xpath     : @*/child::*
+Relativize: self::@*/child::*
+
+Xpath     : child :: sub
+Relativize: self::child :: sub
+
+Xpath     : @*|comment()|processing-instruction()|text()|*
+Relativize: self::@* | self::comment() | self::processing-instruction() | self::text() | *a[name() = "b"]
+
+Xpath     : *|@*|comment()|processing-instruction()|text()
+Relativize: *a[name() = "b"] | self::@* | self::comment() | self::processing-instruction() | self::text()
+
+Xpath     : *|@*|comment()|text()
+Relativize: *a[name() = "b"] | self::@* | self::comment() | self::text()
+
+Xpath     : concat("a","b","c","d","ef")
+Relativize: self::concat("a","b","c","d","ef")
+
+Xpath     : concat("bc", string(23))
+Relativize: self::concat("bc", string(23))
+
+Xpath     : concat("cd", 34)
+Relativize: self::concat("cd", 34)
+
+Xpath     : concat("cd", "34")
+Relativize: self::concat("cd", "34")
+
+Xpath     : concat(a, 34)
+Relativize: self::concat(a, 34)
+
+Xpath     : concat(a, b)
+Relativize: self::concat(a, b)
+
+Xpath     : concat(a, b, c, d, e)
+Relativize: self::concat(a, b, c, d, e)
+
+Xpath     : concat(/*, /*[@attr='whatsup'])
+Relativize: self::concat(/*, /*[@attr='whatsup'])
+
+Xpath     : concat(false(),'ly')
+Relativize: self::concat(false(),'ly')
+
+Xpath     : concat(left,right,orig)
+Relativize: self::concat(left,right,orig)
+
+Xpath     : concat(team[1]/@score, '-', team[2]/@score)
+Relativize: self::concat(team[1]/@score, '-', team[2]/@score)
+
+Xpath     : concat(team[1], ' versus ', team[2])
+Relativize: self::concat(team[1], ' versus ', team[2])
+
+Xpath     : 'condition false'
+Relativize: self::'condition false'
+
+Xpath     : 'condition true'
+Relativize: self::'condition true'
+
+Xpath     : contains('','')
+Relativize: self::contains('','')
+
+Xpath     : contains(., '&')
+Relativize: self::contains(., '&')
+
+Xpath     : contains('ab', 'abc')
+Relativize: self::contains('ab', 'abc')
+
+Xpath     : contains('abc', '')
+Relativize: self::contains('abc', '')
+
+Xpath     : contains('abc', 'bc')
+Relativize: self::contains('abc', 'bc')
+
+Xpath     : contains('abc', 'bcd')
+Relativize: self::contains('abc', 'bcd')
+
+Xpath     : contains(concat(.,'BC'),concat('A','B','C'))
+Relativize: self::contains(concat(.,'BC'),concat('A','B','C'))
+
+Xpath     : contains(., '°')
+Relativize: self::contains(., '°')
+
+Xpath     : contains(doc/@attr, 'amwi')
+Relativize: self::contains(doc/@attr, 'amwi')
+
+Xpath     : contains(doc/@attr, 'TEST')
+Relativize: self::contains(doc/@attr, 'TEST')
+
+Xpath     : contains(doc, 'CYCL')
+Relativize: self::contains(doc, 'CYCL')
+
+Xpath     : contains(doc, 'TEST')
+Relativize: self::contains(doc, 'TEST')
+
+Xpath     : contains('ENCYCLOPEDIA', 'CYCL')
+Relativize: self::contains('ENCYCLOPEDIA', 'CYCL')
+
+Xpath     : contains('ENCYCLOPEDIA', 'TEST')
+Relativize: self::contains('ENCYCLOPEDIA', 'TEST')
+
+Xpath     : contains('foo','o')
+Relativize: self::contains('foo','o')
+
+Xpath     : contains(main,sub)
+Relativize: self::contains(main,sub)
+
+Xpath     : contains('true()', 'e')
+Relativize: self::contains('true()', 'e')
+
+Xpath     : 'correct'
+Relativize: self::'correct'
+
+Xpath     : count(//@*)
+Relativize: self::count(//@*)
+
+Xpath     : count(.//@*)
+Relativize: self::count(.//@*)
+
+Xpath     : count(*)
+Relativize: self::count(*)
+
+Xpath     : count(a/@*)
+Relativize: self::count(a/@*)
+
+Xpath     : count(a/attribute::*)
+Relativize: self::count(a/attribute::*)
+
+Xpath     : count(a/comment())
+Relativize: self::count(a/comment())
+
+Xpath     : count(a[@ex=''])
+Relativize: self::count(a[@ex=''])
+
+Xpath     : count(a[@ex!=''])
+Relativize: self::count(a[@ex!=''])
+
+Xpath     : count(a[@ex])
+Relativize: self::count(a[@ex])
+
+Xpath     : count(alpha/*[last()][name()='z'])
+Relativize: self::count(alpha/*[last()][name()='z'])
+
+Xpath     : count(ancestor-or-self::*/@att1)
+Relativize: self::count(ancestor-or-self::*/@att1)
+
+Xpath     : count(ancestor-or-self::node())
+Relativize: self::count(ancestor-or-self::node())
+
+Xpath     : count(a[not(@ex='')])
+Relativize: self::count(a[not(@ex='')])
+
+Xpath     : count(a[not(@ex)])
+Relativize: self::count(a[not(@ex)])
+
+Xpath     : count(a[not(string-length(@ex)=0)])
+Relativize: self::count(a[not(string-length(@ex)=0)])
+
+Xpath     : count(a-set/a/text())
+Relativize: self::count(a-set/a/text())
+
+Xpath     : count(a[string-length(@ex)=0])
+Relativize: self::count(a[string-length(@ex)=0])
+
+Xpath     : count(a[string-length(@ex) > 0])
+Relativize: self::count(a[string-length(@ex) > 0])
+
+Xpath     : count(a/text())
+Relativize: self::count(a/text())
+
+Xpath     : count(a[@why='value'])
+Relativize: self::count(a[@why='value'])
+
+Xpath     : count(a[@why!='value'])
+Relativize: self::count(a[@why!='value'])
+
+Xpath     : count(.//comment())
+Relativize: self::count(.//comment())
+
+Xpath     : count(descendant::*)
+Relativize: self::count(descendant::*)
+
+Xpath     : count(descendant-or-self::*)
+Relativize: self::count(descendant-or-self::*)
+
+Xpath     : count(descendant-or-self::*/@att1)
+Relativize: self::count(descendant-or-self::*/@att1)
+
+Xpath     : count(descendant-or-self::*/namespace::*)
+Relativize: self::count(descendant-or-self::*/namespace::*)
+
+Xpath     : count(div)
+Relativize: self::count(div)
+
+Xpath     : count(/doc/alpha[last()]/h)
+Relativize: self::count(/doc/alpha[last()]/h)
+
+Xpath     : count(/doc/chapter/note)
+Relativize: self::count(/doc/chapter/note)
+
+Xpath     : count(following::node()|following::*/@*)
+Relativize: self::count(following::node() | following::*/@*)
+
+Xpath     : count(following-sibling::*)
+Relativize: self::count(following-sibling::*)
+
+Xpath     : count(id('c'))
+Relativize: self::count(id('c'))
+
+Xpath     : count(id('d b c k'))
+Relativize: self::count(id('d b c k'))
+
+Xpath     : count(id('k'))
+Relativize: self::count(id('k'))
+
+Xpath     : count(namespace::*[name(.)!='xml'])
+Relativize: self::count(namespace::*[name(.)!='xml'])
+
+Xpath     : count(preceding::text())
+Relativize: self::count(preceding::text())
+
+Xpath     : count(//section//@*)
+Relativize: self::count(//section//@*)
+
+Xpath     : count(section[1]//@*)
+Relativize: self::count(section[1]//@*)
+
+Xpath     : count(section[1]//@title)
+Relativize: self::count(section[1]//@title)
+
+Xpath     : count(section[2]//@*)
+Relativize: self::count(section[2]//@*)
+
+Xpath     : count(section[2]//@title)
+Relativize: self::count(section[2]//@title)
+
+Xpath     : count(section[3]//@*)
+Relativize: self::count(section[3]//@*)
+
+Xpath     : count(section[3]//@title)
+Relativize: self::count(section[3]//@title)
+
+Xpath     : count(//section//@title)
+Relativize: self::count(//section//@title)
+
+Xpath     : count(//@title)
+Relativize: self::count(//@title)
+
+Xpath     : count(.//@title)
+Relativize: self::count(.//@title)
+
+Xpath     : count(//tr)
+Relativize: self::count(//tr)
+
+Xpath     : count(//tr[count(./td) = 3])
+Relativize: self::count(//tr[count(./td) = 3])
+
+Xpath     : count(*/z[2])
+Relativize: self::count(*/z[2])
+
+Xpath     : 'CY'
+Relativize: self::'CY'
+
+Xpath     : 'Data'
+Relativize: self::'Data'
+
+Xpath     : 'default'
+Relativize: self::'default'
+
+Xpath     : 'descendant::*'
+Relativize: self::'descendant::*'
+
+Xpath     : @*/descendant::node()
+Relativize: self::@*/descendant::node()
+
+Xpath     : 'descendant-or-self::*'
+Relativize: self::'descendant-or-self::*'
+
+Xpath     : @*/descendant-or-self::node()
+Relativize: self::@*/descendant-or-self::node()
+
+Xpath     : 'descending'
+Relativize: self::'descending'
+
+Xpath     : @div -5
+Relativize: self::@div -5
+
+Xpath     : @div - 5
+Relativize: self::@div - 5
+
+Xpath     : @div-5
+Relativize: self::@div-5
+
+Xpath     : 'duh'
+Relativize: self::'duh'
+
+Xpath     : 'en'
+Relativize: self::'en'
+
+Xpath     : 'error'
+Relativize: self::'error'
+
+Xpath     : 'error1!'
+Relativize: self::'error1!'
+
+Xpath     : 'error2!'
+Relativize: self::'error2!'
+
+Xpath     : 'error3!'
+Relativize: self::'error3!'
+
+Xpath     : 'error4!'
+Relativize: self::'error4!'
+
+Xpath     : 'error5!'
+Relativize: self::'error5!'
+
+Xpath     : 'error6!'
+Relativize: self::'error6!'
+
+Xpath     : 'fallback'
+Relativize: self::'fallback'
+
+Xpath     : false()
+Relativize: self::false()
+
+Xpath     : false()=''
+Relativize: self::false()=''
+
+Xpath     : false()=0
+Relativize: self::false()=0
+
+Xpath     : false() and 1 div 0
+Relativize: self::false() and 1 div 0
+
+Xpath     : false() and false()
+Relativize: self::false() and false()
+
+Xpath     : false() and true()
+Relativize: self::false() and true()
+
+Xpath     : false()!=false()
+Relativize: self::false()!=false()
+
+Xpath     : false() or false()
+Relativize: self::false() or false()
+
+Xpath     : false() or true()
+Relativize: self::false() or true()
+
+Xpath     : false()!=true()
+Relativize: self::false()!=true()
+
+Xpath     : fa/../mi | Aflat/natural/la | Csharp//* | /doc/do | *//ti
+Relativize: self::fa/../mi | self::Aflat/natural/la | self::Csharp//* | a[name() = "b"] | *descendant-or-self::ti
+
+Xpath     : 'first'
+Relativize: self::'first'
+
+Xpath     : @flag
+Relativize: self::@flag
+
+Xpath     : floor(0.0)
+Relativize: self::floor(0.0)
+
+Xpath     : floor(1)=1
+Relativize: self::floor(1)=1
+
+Xpath     : floor(-1.5)
+Relativize: self::floor(-1.5)
+
+Xpath     : floor(-1.5)=-2
+Relativize: self::floor(-1.5)=-2
+
+Xpath     : floor(1.9)
+Relativize: self::floor(1.9)
+
+Xpath     : floor(1.9)=1
+Relativize: self::floor(1.9)=1
+
+Xpath     : floor(2.999999)
+Relativize: self::floor(2.999999)
+
+Xpath     : floor(n0)
+Relativize: self::floor(n0)
+
+Xpath     : floor(n1)
+Relativize: self::floor(n1)
+
+Xpath     : floor(n2)
+Relativize: self::floor(n2)
+
+Xpath     : floor(number('xxx'))
+Relativize: self::floor(number('xxx'))
+
+Xpath     : 'following::*'
+Relativize: self::'following::*'
+
+Xpath     : @*/following::*
+Relativize: self::@*/following::*
+
+Xpath     : @*/following::comment()
+Relativize: self::@*/following::comment()
+
+Xpath     : @*/following::processing-instruction()
+Relativize: self::@*/following::processing-instruction()
+
+Xpath     : 'following-sibling::*'
+Relativize: self::'following-sibling::*'
+
+Xpath     : @*/following-sibling::*
+Relativize: self::@*/following-sibling::*
+
+Xpath     : @*/following::text()
+Relativize: self::@*/following::text()
+
+Xpath     : 'foo' and 'fop'
+Relativize: self::'foo' and 'fop'
+
+Xpath     : 'Gadzookz'
+Relativize: self::'Gadzookz'
+
+Xpath     : 'global'
+Relativize: self::'global'
+
+Xpath     : @group
+Relativize: self::@group
+
+Xpath     : @height*@width
+Relativize: self::@height*@width
+
+Xpath     : 'H' != '  H'
+Relativize: self::'H' != '  H'
+
+Xpath     : 'H' != 'H  '
+Relativize: self::'H' != 'H  '
+
+Xpath     : @h | @w
+Relativize: self::@h | self::@w
+
+Xpath     : ./@id
+Relativize: self::@id
+
+Xpath     : @id
+Relativize: self::@id
+
+Xpath     : id('c a d')
+Relativize: self::id('c a d')
+
+Xpath     : id('c')/@id
+Relativize: self::id('c')/@id
+
+Xpath     : id('d b c')
+Relativize: self::id('d b c')
+
+Xpath     : id('id0')/a/b
+Relativize: self::id('id0')/a/b
+
+Xpath     : id('id0')/c/c/a
+Relativize: self::id('id0')/c/c/a
+
+Xpath     : id('id10')/a
+Relativize: self::id('id10')/a
+
+Xpath     : id('id13')
+Relativize: self::id('id13')
+
+Xpath     : id('id2')/a | id('id5') | id('id15')/a
+Relativize: self::id('id2')/a | self::id('id5') | self::id('id15')/a
+
+Xpath     : id('id4')
+Relativize: self::id('id4')
+
+Xpath     : id('id8')/b/b
+Relativize: self::id('id8')/b/b
+
+Xpath     : id('id9')
+Relativize: self::id('id9')
+
+Xpath     : id(main/b)
+Relativize: self::id(main/b)
+
+Xpath     : id(main/@list)
+Relativize: self::id(main/@list)
+
+Xpath     : id('nomatch')/@id
+Relativize: self::id('nomatch')/@id
+
+Xpath     : 'incorrect'
+Relativize: self::'incorrect'
+
+Xpath     : 'In Import: Testing '
+Relativize: self::'In Import: Testing '
+
+Xpath     : 'In Include: Testing '
+Relativize: self::'In Include: Testing '
+
+Xpath     : @key
+Relativize: self::@key
+
+Xpath     : *//la | //Bflat | re
+Relativize: *descendant-or-self::la | descendant-or-self::Bflat | self::re
+
+Xpath     : lang('en')
+Relativize: self::lang('en')
+
+Xpath     : *[last()]
+Relativize: *self::[last()]
+
+Xpath     : *[last()=position()]
+Relativize: *self::[last()=position()]
+
+Xpath     : 'left'
+Relativize: self::'left'
+
+Xpath     : @level
+Relativize: self::@level
+
+Xpath     : 'level0'
+Relativize: self::'level0'
+
+Xpath     : 'level1'
+Relativize: self::'level1'
+
+Xpath     : 'level3'
+Relativize: self::'level3'
+
+Xpath     : 'local'
+Relativize: self::'local'
+
+Xpath     : local-name(.)
+Relativize: self::local-name(.)
+
+Xpath     : local-name()
+Relativize: self::local-name()
+
+Xpath     : local-name(a/@at1)
+Relativize: self::local-name(a/@at1)
+
+Xpath     : *[local-name()='bar']
+Relativize: *self::[local-name()='bar']
+
+Xpath     : local-name(namespace::*[1])
+Relativize: self::local-name(namespace::*[1])
+
+Xpath     : local-name(namespace::*[name(.)!='xml'])
+Relativize: self::local-name(namespace::*[name(.)!='xml'])
+
+Xpath     : local-name(namespace::*[string()='http://www.w3.org/1999/XMLSchema-instance'])
+Relativize: self::local-name(namespace::*[string()='http://www.w3.org/1999/XMLSchema-instance'])
+
+Xpath     : local-name(namespace::*[string()='test'])
+Relativize: self::local-name(namespace::*[string()='test'])
+
+Xpath     : 'lower-first'
+Relativize: self::'lower-first'
+
+Xpath     : 'main stylesheet, should have highest precedence'
+Relativize: self::'main stylesheet, should have highest precedence'
+
+Xpath     : @mark
+Relativize: self::@mark
+
+Xpath     : 'mdocs15a.xml'
+Relativize: self::'mdocs15a.xml'
+
+Xpath     : -(n1|n2)
+Relativize: self::-(n1 | self::n2)
+
+Xpath     : -(n-2/@attrib) - -(n-1/@attrib)
+Relativize: self::-(n-2/@attrib) - -(n-1/@attrib)
+
+Xpath     : ./@name
+Relativize: self::@name
+
+Xpath     : @name
+Relativize: self::@name
+
+Xpath     : name(..)
+Relativize: self::name(..)
+
+Xpath     : name(.)
+Relativize: self::name(.)
+
+Xpath     : name()
+Relativize: self::name()
+
+Xpath     : name(*)
+Relativize: self::name(*)
+
+Xpath     : name(a/@at1)
+Relativize: self::name(a/@at1)
+
+Xpath     : name(ancestor::*[1])
+Relativize: self::name(ancestor::*[1])
+
+Xpath     : name(ancestor::*[2])
+Relativize: self::name(ancestor::*[2])
+
+Xpath     : name(ancestor::*[3])
+Relativize: self::name(ancestor::*[3])
+
+Xpath     : name(/descendant::near-north)
+Relativize: self::name(/descendant::near-north)
+
+Xpath     : name(descendant::near-north/descendant::far-west)
+Relativize: self::name(descendant::near-north/descendant::far-west)
+
+Xpath     : name(descendant::near-north/descendant::far-west/descendant-or-self::far-west)
+Relativize: self::name(descendant::near-north/descendant::far-west/descendant-or-self::far-west)
+
+Xpath     : name(/descendant::near-north/descendant-or-self::near-north)
+Relativize: self::name(/descendant::near-north/descendant-or-self::near-north)
+
+Xpath     : name(descendant::near-north/descendant-or-self::near-north)
+Relativize: self::name(descendant::near-north/descendant-or-self::near-north)
+
+Xpath     : name(descendant::near-north/descendant-or-self::near-north/child::far-west)
+Relativize: self::name(descendant::near-north/descendant-or-self::near-north/child::far-west)
+
+Xpath     : name(descendant::near-north/descendant-or-self::near-north/descendant-or-self::near-north)
+Relativize: self::name(descendant::near-north/descendant-or-self::near-north/descendant-or-self::near-north)
+
+Xpath     : name(descendant::node()/descendant::far-west)
+Relativize: self::name(descendant::node()/descendant::far-west)
+
+Xpath     : name(descendant::node()/descendant::node()/descendant-or-self::far-west)
+Relativize: self::name(descendant::node()/descendant::node()/descendant-or-self::far-west)
+
+Xpath     : name(/descendant::node()/descendant-or-self::near-north)
+Relativize: self::name(/descendant::node()/descendant-or-self::near-north)
+
+Xpath     : name(descendant::node()/descendant-or-self::near-north)
+Relativize: self::name(descendant::node()/descendant-or-self::near-north)
+
+Xpath     : name(descendant::node()/descendant-or-self::node()/child::far-west)
+Relativize: self::name(descendant::node()/descendant-or-self::node()/child::far-west)
+
+Xpath     : name(descendant::node()/descendant-or-self::node()/descendant-or-self::near-north)
+Relativize: self::name(descendant::node()/descendant-or-self::node()/descendant-or-self::near-north)
+
+Xpath     : name(/descendant-or-self::node()/child::near-north)
+Relativize: self::name(/descendant-or-self::node()/child::near-north)
+
+Xpath     : name(descendant-or-self::node()/child::near-north)
+Relativize: self::name(descendant-or-self::node()/child::near-north)
+
+Xpath     : name(descendant-or-self::node()/child::node()/child::far-west)
+Relativize: self::name(descendant-or-self::node()/child::node()/child::far-west)
+
+Xpath     : name(descendant-or-self::node()/child::node()/descendant-or-self::near-north)
+Relativize: self::name(descendant-or-self::node()/child::node()/descendant-or-self::near-north)
+
+Xpath     : name(descendant-or-self::node()/descendant::near-north)
+Relativize: self::name(descendant-or-self::node()/descendant::near-north)
+
+Xpath     : name(descendant-or-self::node()/descendant::node()/child::far-west)
+Relativize: self::name(descendant-or-self::node()/descendant::node()/child::far-west)
+
+Xpath     : name(descendant-or-self::node()/descendant::node()/descendant-or-self::near-north)
+Relativize: self::name(descendant-or-self::node()/descendant::node()/descendant-or-self::near-north)
+
+Xpath     : name(descendant-or-self::node()/descendant-or-self::node()/child::near-north)
+Relativize: self::name(descendant-or-self::node()/descendant-or-self::node()/child::near-north)
+
+Xpath     : name(descendant-or-self::node()/descendant-or-self::node()/descendant-or-self::north)
+Relativize: self::name(descendant-or-self::node()/descendant-or-self::node()/descendant-or-self::north)
+
+Xpath     : name(/descendant-or-self::node()/descendant-or-self::north)
+Relativize: self::name(/descendant-or-self::node()/descendant-or-self::north)
+
+Xpath     : name(descendant-or-self::node()/descendant-or-self::north)
+Relativize: self::name(descendant-or-self::node()/descendant-or-self::north)
+
+Xpath     : name(/descendant-or-self::north)
+Relativize: self::name(/descendant-or-self::north)
+
+Xpath     : name(/descendant-or-self::north/child::near-north)
+Relativize: self::name(/descendant-or-self::north/child::near-north)
+
+Xpath     : name(descendant-or-self::north/child::near-north)
+Relativize: self::name(descendant-or-self::north/child::near-north)
+
+Xpath     : name(descendant-or-self::north/child::near-north/child::far-west)
+Relativize: self::name(descendant-or-self::north/child::near-north/child::far-west)
+
+Xpath     : name(descendant-or-self::north/child::near-north/descendant-or-self::near-north)
+Relativize: self::name(descendant-or-self::north/child::near-north/descendant-or-self::near-north)
+
+Xpath     : name(descendant-or-self::north/descendant::near-north)
+Relativize: self::name(descendant-or-self::north/descendant::near-north)
+
+Xpath     : name(descendant-or-self::north/descendant::near-north/child::far-west)
+Relativize: self::name(descendant-or-self::north/descendant::near-north/child::far-west)
+
+Xpath     : name(descendant-or-self::north/descendant::near-north/descendant-or-self::near-north)
+Relativize: self::name(descendant-or-self::north/descendant::near-north/descendant-or-self::near-north)
+
+Xpath     : name(/descendant-or-self::north/descendant-or-self::north)
+Relativize: self::name(/descendant-or-self::north/descendant-or-self::north)
+
+Xpath     : name(descendant-or-self::north/descendant-or-self::north)
+Relativize: self::name(descendant-or-self::north/descendant-or-self::north)
+
+Xpath     : name(descendant-or-self::north/descendant-or-self::north/child::near-north)
+Relativize: self::name(descendant-or-self::north/descendant-or-self::north/child::near-north)
+
+Xpath     : name(descendant-or-self::north/descendant-or-self::north/descendant-or-self::north)
+Relativize: self::name(descendant-or-self::north/descendant-or-self::north/descendant-or-self::north)
+
+Xpath     : name(following::*[last()])
+Relativize: self::name(following::*[last()])
+
+Xpath     : name(following-sibling::*[last()])
+Relativize: self::name(following-sibling::*[last()])
+
+Xpath     : name(namespace::*[1])
+Relativize: self::name(namespace::*[1])
+
+Xpath     : name(namespace::*[name(.)!='xml'])
+Relativize: self::name(namespace::*[name(.)!='xml'])
+
+Xpath     : name(preceding::*[last()])
+Relativize: self::name(preceding::*[last()])
+
+Xpath     : name(preceding-sibling::*[last()])
+Relativize: self::name(preceding-sibling::*[last()])
+
+Xpath     : name(self::node()/descendant::near-north)
+Relativize: self::name(self::node()/descendant::near-north)
+
+Xpath     : name(self::node()/descendant::near-north/child::far-west)
+Relativize: self::name(self::node()/descendant::near-north/child::far-west)
+
+Xpath     : name(self::node()/descendant::near-north/descendant-or-self::far-west)
+Relativize: self::name(self::node()/descendant::near-north/descendant-or-self::far-west)
+
+Xpath     : name(self::node()/descendant::node()/child::far-west)
+Relativize: self::name(self::node()/descendant::node()/child::far-west)
+
+Xpath     : name(self::node()/descendant::node()/descendant-or-self::far-west)
+Relativize: self::name(self::node()/descendant::node()/descendant-or-self::far-west)
+
+Xpath     : name(self::node()/descendant-or-self::node()/child::near-north)
+Relativize: self::name(self::node()/descendant-or-self::node()/child::near-north)
+
+Xpath     : name(self::node()/descendant-or-self::node()/descendant-or-self::north)
+Relativize: self::name(self::node()/descendant-or-self::node()/descendant-or-self::north)
+
+Xpath     : name(self::node()/descendant-or-self::north)
+Relativize: self::name(self::node()/descendant-or-self::north)
+
+Xpath     : name(self::node()/descendant-or-self::north/child::near-north)
+Relativize: self::name(self::node()/descendant-or-self::north/child::near-north)
+
+Xpath     : name(self::node()/descendant-or-self::north/descendant-or-self::north)
+Relativize: self::name(self::node()/descendant-or-self::north/descendant-or-self::north)
+
+Xpath     : namespace::*
+Relativize: self::namespace::*
+
+Xpath     : namespace::* | attribute::*
+Relativize: self::namespace::* | attribute::*
+
+Xpath     : namespace::bdd
+Relativize: self::namespace::bdd
+
+Xpath     : namespace::node()
+Relativize: self::namespace::node()
+
+Xpath     : namespace::ped
+Relativize: self::namespace::ped
+
+Xpath     : namespace-uri(.)
+Relativize: self::namespace-uri(.)
+
+Xpath     : namespace-uri()
+Relativize: self::namespace-uri()
+
+Xpath     : namespace-uri(*)
+Relativize: self::namespace-uri(*)
+
+Xpath     : namespace-uri(a/@at1)
+Relativize: self::namespace-uri(a/@at1)
+
+Xpath     : namespace-uri(bogus)
+Relativize: self::namespace-uri(bogus)
+
+Xpath     : namespace-uri(namespace::*[name(.)!='xml'])
+Relativize: self::namespace-uri(namespace::*[name(.)!='xml'])
+
+Xpath     : namespace-uri(namespace::*[string()='http://www.w3.org/1999/XMLSchema-instance'])
+Relativize: self::namespace-uri(namespace::*[string()='http://www.w3.org/1999/XMLSchema-instance'])
+
+Xpath     : namespace-uri(namespace::*[string()='test'])
+Relativize: self::namespace-uri(namespace::*[string()='test'])
+
+Xpath     : namespace-uri(x)
+Relativize: self::namespace-uri(x)
+
+Xpath     : @net
+Relativize: self::@net
+
+Xpath     : @*|node()
+Relativize: self::@* | self::node()
+
+Xpath     : node()|@*
+Relativize: self::node() | self::@*
+
+Xpath     : @*|node()|comment()|processing-instruction()
+Relativize: self::@* | self::node() | self::comment() | self::processing-instruction()
+
+Xpath     : @*|node()|text()
+Relativize: self::@* | self::node() | self::text()
+
+Xpath     : normalize-space(.)
+Relativize: self::normalize-space(.)
+
+Xpath     : normalize-space()
+Relativize: self::normalize-space()
+
+Xpath     : normalize-space(a)
+Relativize: self::normalize-space(a)
+
+Xpath     : normalize-space(text())
+Relativize: self::normalize-space(text())
+
+Xpath     : normalize-space(url)
+Relativize: self::normalize-space(url)
+
+Xpath     : not('')
+Relativize: self::not('')
+
+Xpath     : not('0')
+Relativize: self::not('0')
+
+Xpath     : not(false())
+Relativize: self::not(false())
+
+Xpath     : not(false() = false())
+Relativize: self::not(false() = false())
+
+Xpath     : *[not(@test)][last()]
+Relativize: *self::[not(@test)][last()]
+
+Xpath     : *[not(@test)][last()=position()]
+Relativize: *self::[not(@test)][last()=position()]
+
+Xpath     : not(true())
+Relativize: self::not(true())
+
+Xpath     : not(true() = false())
+Relativize: self::not(true() = false())
+
+Xpath     : @num
+Relativize: self::@num
+
+Xpath     : 'number'
+Relativize: self::'number'
+
+Xpath     : number('')
+Relativize: self::number('')
+
+Xpath     : number()
+Relativize: self::number()
+
+Xpath     : number(0.0001 * 4)
+Relativize: self::number(0.0001 * 4)
+
+Xpath     : number(0.109375 * 16)
+Relativize: self::number(0.109375 * 16)
+
+Xpath     : number(1.75)
+Relativize: self::number(1.75)
+
+Xpath     : (number(1.75) = (0.109375 * 16))
+Relativize: (self::number(1.75) = (0.109375 * 16))
+
+Xpath     : (number(1.75) = (7 div 4))
+Relativize: (self::number(1.75) = (7 div 4))
+
+Xpath     : number(2)
+Relativize: self::number(2)
+
+Xpath     : number('3')
+Relativize: self::number('3')
+
+Xpath     : number(4 div 10000)
+Relativize: self::number(4 div 10000)
+
+Xpath     : number(7 div 4)
+Relativize: self::number(7 div 4)
+
+Xpath     : number('abc')
+Relativize: self::number('abc')
+
+Xpath     : number(false())=0
+Relativize: self::number(false())=0
+
+Xpath     : number(foo)
+Relativize: self::number(foo)
+
+Xpath     : number(k)
+Relativize: self::number(k)
+
+Xpath     : (number(k) = (0.0001 * 4))
+Relativize: (self::number(k) = (0.0001 * 4))
+
+Xpath     : (number(k) = (4 div 10000))
+Relativize: (self::number(k) = (4 div 10000))
+
+Xpath     : number(n1)
+Relativize: self::number(n1)
+
+Xpath     : number(string(1.0))=1
+Relativize: self::number(string(1.0))=1
+
+Xpath     : number(true())=1
+Relativize: self::number(true())=1
+
+Xpath     : number('xxx')=0
+Relativize: self::number('xxx')=0
+
+Xpath     : number('xxx') - 10
+Relativize: self::number('xxx') - 10
+
+Xpath     : number('xxx') div 3
+Relativize: self::number('xxx') div 3
+
+Xpath     : number('xxx') mod 3
+Relativize: self::number('xxx') mod 3
+
+Xpath     : number('xxx')=number('xxx')
+Relativize: self::number('xxx')=number('xxx')
+
+Xpath     : 'okay'
+Relativize: self::'okay'
+
+Xpath     : @ordering
+Relativize: self::@ordering
+
+Xpath     : */p
+Relativize: *a[name() = "b"]
+
+Xpath     : 'parent::*'
+Relativize: self::'parent::*'
+
+Xpath     : @*/parent::*
+Relativize: self::@*/parent::*
+
+Xpath     : @person
+Relativize: self::@person
+
+Xpath     : @pos
+Relativize: self::@pos
+
+Xpath     : *[position()=1]
+Relativize: *self::[position()=1]
+
+Xpath     : *[position()=3]
+Relativize: *self::[position()=3]
+
+Xpath     : *[position()=4]
+Relativize: *self::[position()=4]
+
+Xpath     : 'preceding::*'
+Relativize: self::'preceding::*'
+
+Xpath     : @*/preceding::*
+Relativize: self::@*/preceding::*
+
+Xpath     : 'preceding-sibling::*'
+Relativize: self::'preceding-sibling::*'
+
+Xpath     : @*/preceding-sibling::node()
+Relativize: self::@*/preceding-sibling::node()
+
+Xpath     : 'pvar1 default data'
+Relativize: self::'pvar1 default data'
+
+Xpath     : 'pvar2 default data'
+Relativize: self::'pvar2 default data'
+
+Xpath     : '"eos'
+Relativize: self::'"eos'
+
+Xpath     : 'red'
+Relativize: self::'red'
+
+Xpath     : @repeat
+Relativize: self::@repeat
+
+Xpath     : 'root'
+Relativize: self::'root'
+
+Xpath     : round(0.0)
+Relativize: self::round(0.0)
+
+Xpath     : round(-1.1)=-1
+Relativize: self::round(-1.1)=-1
+
+Xpath     : round(1.1)=1
+Relativize: self::round(1.1)=1
+
+Xpath     : round(1.24)
+Relativize: self::round(1.24)
+
+Xpath     : round(-1.5)
+Relativize: self::round(-1.5)
+
+Xpath     : round(1.5)=2
+Relativize: self::round(1.5)=2
+
+Xpath     : round(-1.9)=-2
+Relativize: self::round(-1.9)=-2
+
+Xpath     : round(1.9)=2
+Relativize: self::round(1.9)=2
+
+Xpath     : round(2.5)
+Relativize: self::round(2.5)
+
+Xpath     : round(-2.5)=-2
+Relativize: self::round(-2.5)=-2
+
+Xpath     : round(2.999999)
+Relativize: self::round(2.999999)
+
+Xpath     : round(n0)
+Relativize: self::round(n0)
+
+Xpath     : round(n1)
+Relativize: self::round(n1)
+
+Xpath     : round(n2)
+Relativize: self::round(n2)
+
+Xpath     : round(number('xxx'))
+Relativize: self::round(number('xxx'))
+
+Xpath     : @s
+Relativize: self::@s
+
+Xpath     : @*/self::node()
+Relativize: self::@*/self::node()
+
+Xpath     : @seq
+Relativize: self::@seq
+
+Xpath     : 'set in var29side, should have highest precedence'
+Relativize: self::'set in var29side, should have highest precedence'
+
+Xpath     : 'should be wrapped'
+Relativize: self::'should be wrapped'
+
+Xpath     : @side
+Relativize: self::@side
+
+Xpath     : @size
+Relativize: self::@size
+
+Xpath     : @spot
+Relativize: self::@spot
+
+Xpath     : starts-with('','')
+Relativize: self::starts-with('','')
+
+Xpath     : starts-with('ab', 'abc')
+Relativize: self::starts-with('ab', 'abc')
+
+Xpath     : starts-with('abc', '')
+Relativize: self::starts-with('abc', '')
+
+Xpath     : starts-with('abc', 'bc')
+Relativize: self::starts-with('abc', 'bc')
+
+Xpath     : starts-with(doc/@attr, 'slam')
+Relativize: self::starts-with(doc/@attr, 'slam')
+
+Xpath     : starts-with(doc/@attr, 'wich')
+Relativize: self::starts-with(doc/@attr, 'wich')
+
+Xpath     : starts-with(doc, 'ENCY')
+Relativize: self::starts-with(doc, 'ENCY')
+
+Xpath     : starts-with(doc, 'test')
+Relativize: self::starts-with(doc, 'test')
+
+Xpath     : starts-with('ENCYCLOPEDIA', 'en')
+Relativize: self::starts-with('ENCYCLOPEDIA', 'en')
+
+Xpath     : starts-with('ENCYCLOPEDIA', 'EN')
+Relativize: self::starts-with('ENCYCLOPEDIA', 'EN')
+
+Xpath     : starts-with('ENCYCLOPEDIA', 'ENCY')
+Relativize: self::starts-with('ENCYCLOPEDIA', 'ENCY')
+
+Xpath     : *[starts-with(name(.),'f')]
+Relativize: *self::[starts-with(name(.),'f')]
+
+Xpath     : starts-with('true()', 'tr')
+Relativize: self::starts-with('true()', 'tr')
+
+Xpath     : @state
+Relativize: self::@state
+
+Xpath     : 'string'
+Relativize: self::'string'
+
+Xpath     : string('')
+Relativize: self::string('')
+
+Xpath     : string()
+Relativize: self::string()
+
+Xpath     : string(0)
+Relativize: self::string(0)
+
+Xpath     : string(-1 * number(.))
+Relativize: self::string(-1 * number(.))
+
+Xpath     : string(2)
+Relativize: self::string(2)
+
+Xpath     : string(av//*)
+Relativize: self::string(av//*)
+
+Xpath     : string(doc)
+Relativize: self::string(doc)
+
+Xpath     : string(foo)
+Relativize: self::string(foo)
+
+Xpath     : string('!From m!')
+Relativize: self::string('!From m!')
+
+Xpath     : string('!From n!')
+Relativize: self::string('!From n!')
+
+Xpath     : string('!From o!')
+Relativize: self::string('!From o!')
+
+Xpath     : string('!From p!')
+Relativize: self::string('!From p!')
+
+Xpath     : string('!From ss2!')
+Relativize: self::string('!From ss2!')
+
+Xpath     : string('!From ss3!')
+Relativize: self::string('!From ss3!')
+
+Xpath     : string('!From ss4!')
+Relativize: self::string('!From ss4!')
+
+Xpath     : string('!From ss5!')
+Relativize: self::string('!From ss5!')
+
+Xpath     : string-length ()
+Relativize: self::string-length ()
+
+Xpath     : string-length(.)
+Relativize: self::string-length(.)
+
+Xpath     : string-length()
+Relativize: self::string-length()
+
+Xpath     : string-length(doc)
+Relativize: self::string-length(doc)
+
+Xpath     : string-length(doc/a)
+Relativize: self::string-length(doc/a)
+
+Xpath     : string-length(normalize-space(.))
+Relativize: self::string-length(normalize-space(.))
+
+Xpath     : string-length('This is a test')
+Relativize: self::string-length('This is a test')
+
+Xpath     : string(number(.))
+Relativize: self::string(number(.))
+
+Xpath     : string('test')
+Relativize: self::string('test')
+
+Xpath     : 'stylesheet-var'
+Relativize: self::'stylesheet-var'
+
+Xpath     : 'subsheet, should be overridden by main sheet'
+Relativize: self::'subsheet, should be overridden by main sheet'
+
+Xpath     : substring('1999/04/01', 1, 0)
+Relativize: self::substring('1999/04/01', 1, 0)
+
+Xpath     : substring('1999/04/01', 1, 4)
+Relativize: self::substring('1999/04/01', 1, 4)
+
+Xpath     : substring('abcdefghi',2,4)
+Relativize: self::substring('abcdefghi',2,4)
+
+Xpath     : substring('abcdefghijk',0 div 0, 5)
+Relativize: self::substring('abcdefghijk',0 div 0, 5)
+
+Xpath     : substring('abcdefghijk',4, 6)
+Relativize: self::substring('abcdefghijk',4, 6)
+
+Xpath     : substring-after(.,'-')
+Relativize: self::substring-after(.,'-')
+
+Xpath     : substring-after('1999/04/01', '/')
+Relativize: self::substring-after('1999/04/01', '/')
+
+Xpath     : substring-after('1999/04/01', '1')
+Relativize: self::substring-after('1999/04/01', '1')
+
+Xpath     : substring-after('abcdefghijk','l')
+Relativize: self::substring-after('abcdefghijk','l')
+
+Xpath     : substring-after(doc, '/')
+Relativize: self::substring-after(doc, '/')
+
+Xpath     : substring-after(doc/@attr, 'd')
+Relativize: self::substring-after(doc/@attr, 'd')
+
+Xpath     : substring-after(doc/@attr, 'D')
+Relativize: self::substring-after(doc/@attr, 'D')
+
+Xpath     : substring-after(doc/@attr, 'z')
+Relativize: self::substring-after(doc/@attr, 'z')
+
+Xpath     : substring-after('ENCYCLOPEDIA', '/')
+Relativize: self::substring-after('ENCYCLOPEDIA', '/')
+
+Xpath     : substring-after('ENCYCLOPEDIA', 'C')
+Relativize: self::substring-after('ENCYCLOPEDIA', 'C')
+
+Xpath     : substring-after(foo, '/')
+Relativize: self::substring-after(foo, '/')
+
+Xpath     : substring-before('1999/04/01', '/')
+Relativize: self::substring-before('1999/04/01', '/')
+
+Xpath     : substring-before('a','z')
+Relativize: self::substring-before('a','z')
+
+Xpath     : substring-before(doc, '/')
+Relativize: self::substring-before(doc, '/')
+
+Xpath     : substring-before(doc/@attr, 'd')
+Relativize: self::substring-before(doc/@attr, 'd')
+
+Xpath     : substring-before(doc/@attr, 'D')
+Relativize: self::substring-before(doc/@attr, 'D')
+
+Xpath     : substring-before(doc/@attr, 'z')
+Relativize: self::substring-before(doc/@attr, 'z')
+
+Xpath     : substring-before('ENCYCLOPEDIA', '/')
+Relativize: self::substring-before('ENCYCLOPEDIA', '/')
+
+Xpath     : substring-before('ENCYCLOPEDIA', 'c')
+Relativize: self::substring-before('ENCYCLOPEDIA', 'c')
+
+Xpath     : substring-before('ENCYCLOPEDIA', 'C')
+Relativize: self::substring-before('ENCYCLOPEDIA', 'C')
+
+Xpath     : substring-before(foo, '/')
+Relativize: self::substring-before(foo, '/')
+
+Xpath     : substring(doc, 1, 4)
+Relativize: self::substring(doc, 1, 4)
+
+Xpath     : substring(doc/@attr, 1, 3)
+Relativize: self::substring(doc/@attr, 1, 3)
+
+Xpath     : substring(doc/@attr, 2.5, 3.6)
+Relativize: self::substring(doc/@attr, 2.5, 3.6)
+
+Xpath     : substring(doc/@attr, 4)
+Relativize: self::substring(doc/@attr, 4)
+
+Xpath     : substring('ENCYCLOPEDIA', 8)
+Relativize: self::substring('ENCYCLOPEDIA', 8)
+
+Xpath     : substring('ENCYCLOPEDIA', 8, 3)
+Relativize: self::substring('ENCYCLOPEDIA', 8, 3)
+
+Xpath     : substring(foo, 2, 2)
+Relativize: self::substring(foo, 2, 2)
+
+Xpath     : substring(@key,2,1)
+Relativize: self::substring(@key,2,1)
+
+Xpath     : substring('x',2,1)
+Relativize: self::substring('x',2,1)
+
+Xpath     : sum(a-set/a)
+Relativize: self::sum(a-set/a)
+
+Xpath     : sum(e)
+Relativize: self::sum(e)
+
+Xpath     : sum(n)
+Relativize: self::sum(n)
+
+Xpath     : sum(n/@attrib)
+Relativize: self::sum(n/@attrib)
+
+Xpath     : sum(x)
+Relativize: self::sum(x)
+
+Xpath     : 'TableofContents'
+Relativize: self::'TableofContents'
+
+Xpath     : 'templ'
+Relativize: self::'templ'
+
+Xpath     : 'test'
+Relativize: self::'test'
+
+Xpath     : @test
+Relativize: self::@test
+
+Xpath     : *[@test][1]/num
+Relativize: *self::[@test][1]/num
+
+Xpath     : *[@test][3]/num
+Relativize: *self::[@test][3]/num
+
+Xpath     : *[@test][4]/num
+Relativize: *self::[@test][4]/num
+
+Xpath     : *[@test and position()=1]
+Relativize: *self::[@test and position()=1]
+
+Xpath     : *[@test and position()=4]
+Relativize: *self::[@test and position()=4]
+
+Xpath     : *[@test and position()=7]
+Relativize: *self::[@test and position()=7]
+
+Xpath     : *[@test and position()=8]
+Relativize: *self::[@test and position()=8]
+
+Xpath     : 'Testing '
+Relativize: self::'Testing '
+
+Xpath     : *[@test][position()=1]/num
+Relativize: *self::[@test][position()=1]/num
+
+Xpath     : *[@test][position()=3]/num
+Relativize: *self::[@test][position()=3]/num
+
+Xpath     : *[@test][position()=4]/num
+Relativize: *self::[@test][position()=4]/num
+
+Xpath     : *[@test='true']
+Relativize: *self::[@test='true']
+
+Xpath     : 'test value set in final'
+Relativize: self::'test value set in final'
+
+Xpath     : 'test value set in impfinal'
+Relativize: self::'test value set in impfinal'
+
+Xpath     : 'test value set in impmid'
+Relativize: self::'test value set in impmid'
+
+Xpath     : 'test value set in mid'
+Relativize: self::'test value set in mid'
+
+Xpath     : 'test value set in var27side'
+Relativize: self::'test value set in var27side'
+
+Xpath     : ' #text'
+Relativize: self::' #text'
+
+Xpath     : ./@theattrib
+Relativize: self::@theattrib
+
+Xpath     : 'the same'
+Relativize: self::'the same'
+
+Xpath     : 'this'
+Relativize: self::'this'
+
+Xpath     : 'titi'
+Relativize: self::'titi'
+
+Xpath     : @title
+Relativize: self::@title
+
+Xpath     : 'Tommy'
+Relativize: self::'Tommy'
+
+Xpath     : 'top'
+Relativize: self::'top'
+
+Xpath     : translate("BAR","abc","ABC")
+Relativize: self::translate("BAR","abc","ABC")
+
+Xpath     : translate("BAR","Rab","TxX")
+Relativize: self::translate("BAR","Rab","TxX")
+
+Xpath     : translate("bar","RAB","xyz")
+Relativize: self::translate("bar","RAB","xyz")
+
+Xpath     : translate("ddaaadddd","abcd","ABCxy")
+Relativize: self::translate("ddaaadddd","abcd","ABCxy")
+
+Xpath     : translate("zzaaazzz","abcz","ABC")
+Relativize: self::translate("zzaaazzz","abcz","ABC")
+
+Xpath     : translate(a,"abc","ABC")
+Relativize: self::translate(a,"abc","ABC")
+
+Xpath     : translate(a/@attrib,"lo","IT")
+Relativize: self::translate(a/@attrib,"lo","IT")
+
+Xpath     : translate(.,'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+Relativize: self::translate(.,'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+Xpath     : translate(b,"ABC","abc")
+Relativize: self::translate(b,"ABC","abc")
+
+Xpath     : translate(b/@attrib,"lo","it")
+Relativize: self::translate(b/@attrib,"lo","it")
+
+Xpath     : translate(b/@attrib,"LO","it")
+Relativize: self::translate(b/@attrib,"LO","it")
+
+Xpath     : true()
+Relativize: self::true()
+
+Xpath     : true()='0'
+Relativize: self::true()='0'
+
+Xpath     : true()=2
+Relativize: self::true()=2
+
+Xpath     : true() and false()
+Relativize: self::true() and false()
+
+Xpath     : true() and true()
+Relativize: self::true() and true()
+
+Xpath     : true()!=false()
+Relativize: self::true()!=false()
+
+Xpath     : true() or 1 div 0
+Relativize: self::true() or 1 div 0
+
+Xpath     : true() or false()
+Relativize: self::true() or false()
+
+Xpath     : true() or true()
+Relativize: self::true() or true()
+
+Xpath     : 'US'
+Relativize: self::'US'
+
+Xpath     : @val
+Relativize: self::@val
+
+Xpath     : @value
+Relativize: self::@value
+
+Xpath     : 'value set in var30mid, should have highest precedence'
+Relativize: self::'value set in var30mid, should have highest precedence'
+
+Xpath     : @width
+Relativize: self::@width
+
+Xpath     : 'Wizard'
+Relativize: self::'Wizard'
+
+Xpath     : //@x
+Relativize: descendant-or-self::@x
+
+Xpath     : ' x 4'
+Relativize: self::' x 4'
+
+Xpath     : 'Xalan_URL_found'
+Relativize: self::'Xalan_URL_found'
+
+Xpath     : @xml:att1
+Relativize: self::@xml:att1
+
+Xpath     : @xx
+Relativize: self::@xx
+
+Xpath     : @x|@z
+Relativize: self::@x | self::@z
+
+Xpath     : @z
+Relativize: self::@z
+
+Xpath     : 'z w x'
+Relativize: self::'z w x'
