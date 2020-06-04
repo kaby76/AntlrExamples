@@ -2,7 +2,7 @@
   "profiles": {
     "xpath": {
       "commandName": "Project",
-      "commandLineArgs": "$(SolutionDir)exp2.txt"
+      "commandLineArgs": "$(SolutionDir)expressions.txt"
     }
   }
 }
