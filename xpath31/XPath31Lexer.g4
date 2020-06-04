@@ -1,7 +1,6 @@
 // XPath v3.1
 // Author--Ken Domino
-// 
-// https://www.w3.org/TR/2017/REC-xpath-31-20170321/
+// Date--4 June 2020
 
 lexer grammar XPath31Lexer;
 
