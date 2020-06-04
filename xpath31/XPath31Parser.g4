@@ -6,9 +6,9 @@
 // https://github.com/exquery/xpath3-parser/blob/master/src/main/antlr4/org/exquery/xpath/parser/XPath3.g4
 // https://github.com/antlr/grammars-v4/blob/master/xpath/xpath.g4
 
-parser grammar xpath_fullParser;
+parser grammar XPath31Parser;
 
-options { tokenVocab=xpath_fullLexer; }
+options { tokenVocab=XPath31Lexer; }
 
 
 xpath : expr EOF ;

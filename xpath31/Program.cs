@@ -8,9 +8,9 @@ namespace xpath
         static void Try(string ffn)
 	{
 	    var str = new AntlrFileStream(ffn);
-            var lexer = new xpath_fullLexer(str);
+            var lexer = new XPath31Lexer(str);
             var tokens = new CommonTokenStream(lexer);
-            var parser = new xpath_fullParser(tokens);
+            var parser = new XPath31Parser(tokens);
             var listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
             var tree = parser.xpath();

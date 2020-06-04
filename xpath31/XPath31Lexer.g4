@@ -6,10 +6,9 @@
 // https://github.com/exquery/xpath3-parser/blob/master/src/main/antlr4/org/exquery/xpath/parser/XPath3.g4
 // https://github.com/antlr/grammars-v4/blob/master/xpath/xpath.g4
 
-lexer grammar xpath_fullLexer;
+lexer grammar XPath31Lexer;
 
 options { superClass = XpathBase; }
-
 
 // KEYWORDS
 
