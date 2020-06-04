@@ -10,7 +10,6 @@ parser grammar XPath31Parser;
 
 options { tokenVocab=XPath31Lexer; }
 
-
 xpath : expr EOF ;
 paramlist : param ( COMMA param)* ;
 param : DOLLAR eqname typedeclaration? ;

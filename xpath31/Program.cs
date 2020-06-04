@@ -6,24 +6,30 @@ namespace xpath
     public class Program
     {
         static void Try(string ffn)
-	{
-	    var str = new AntlrFileStream(ffn);
-            var lexer = new XPath31Lexer(str);
-            var tokens = new CommonTokenStream(lexer);
-            var parser = new XPath31Parser(tokens);
-            var listener = new ErrorListener<IToken>(parser, lexer, tokens);
-            parser.AddErrorListener(listener);
-            var tree = parser.xpath();
-            if (listener.had_error)
+        {
+            System.IO.StreamReader file = new System.IO.StreamReader(ffn);
+            string line;
+            while ((line = file.ReadLine()) != null)
             {
-                System.Console.WriteLine("error in parse.");
+                System.Console.WriteLine(line);
+                var str = new AntlrInputStream(line);
+                var lexer = new XPath31Lexer(str);
+                var tokens = new CommonTokenStream(lexer);
+                var parser = new XPath31Parser(tokens);
+                var listener = new ErrorListener<IToken>(parser, lexer, tokens);
+                parser.AddErrorListener(listener);
+                var tree = parser.xpath();
+                if (listener.had_error)
+                {
+                    System.Console.WriteLine("error in parse.");
+                }
+                else
+                {
+                    System.Console.WriteLine("parse completed.");
+                }
+                System.Console.WriteLine(tokens.OutputTokens());
+                System.Console.WriteLine(tree.OutputTree(tokens));
             }
-            else
-            {
-                System.Console.WriteLine("parse completed.");
-            }
-	    System.Console.WriteLine(tokens.OutputTokens());
-	    System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static void Main(string[] args)

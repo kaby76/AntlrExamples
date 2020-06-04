@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "xpath": {
+      "commandName": "Project",
+      "commandLineArgs": "$(SolutionDir)expressions.txt"
+    }
+  }
+}

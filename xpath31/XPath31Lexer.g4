@@ -9,6 +9,7 @@
 lexer grammar XPath31Lexer;
 
 options { superClass = XpathBase; }
+channels { OFF_CHANNEL }
 
 // SYMBOLS
 
@@ -174,5 +175,5 @@ fragment NTChar : '\u0009' | '\u000a' | '\u000d'
   | '\ue000'..'\ufffd'
   | '\u{10000}'..'\u{10ffff}'
  ;
-Whitespace :  ('\u0020' | '\u0008' | '\u000d' | '\u000a')+ ->skip ;
+Whitespace :  ('\u0020' | '\u0008' | '\u000d' | '\u000a')+ -> channel (OFF_CHANNEL) ;
 
