@@ -1,12 +1,19 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>xpath</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="xpath_fullLexer.g4" />
+    <None Remove="xpath_fullParser.g4" />
+  </ItemGroup>
   
   <ItemGroup>
-    <Antlr4 Include="xpath_full.g4">
+    <Antlr4 Include="xpath_fullLexer.g4">
+      <Package>xpath</Package>
+    </Antlr4>
+    <Antlr4 Include="xpath_fullParser.g4">
       <Package>xpath</Package>
     </Antlr4>
   </ItemGroup>
