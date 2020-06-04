@@ -110,35 +110,30 @@ KW_UNION : 'union' ;
 // This isn't a complete list of tokens in the language.
 // Keywords and symbols are terminals.
 
-IntegerLiteral : Digits ;
-DecimalLiteral : ('.' Digits) | (Digits '.' [0-9]*) ;
-DoubleLiteral : (('.' Digits) | (Digits ('.' [0-9]*)?)) [eE] [+-]? Digits ;
-StringLiteral : ('"' (EscapeQuot | ~[^"])*? '"') | ('\'' (EscapeApos | ~['])*? '\'') ;
+IntegerLiteral : FragDigits ;
+DecimalLiteral : ('.' FragDigits) | (FragDigits '.' [0-9]*) ;
+DoubleLiteral : (('.' FragDigits) | (FragDigits ('.' [0-9]*)?)) [eE] [+-]? FragDigits ;
+StringLiteral : ('"' (FragEscapeQuot | ~[^"])*? '"') | ('\'' (FragEscapeApos | ~['])*? '\'') ;
 URIQualifiedName : BracedURILiteral NCName ;
 BracedURILiteral : 'Q' '{' [^{}]* '}' ;
 // Error in spec: EscapeQuot and EscapeApos are not terminals!
-fragment EscapeQuot : '""' ; 
-fragment EscapeApos : '\'';
+fragment FragEscapeQuot : '""' ; 
+fragment FragEscapeApos : '\'';
 // Error in spec: Comment isn't really a terminal, but an off-channel object.
 Comment : '(:' (Comment | CommentContents)*? ':)' -> channel(OFF_CHANNEL) ;
-QName  : FragmentQName ;
+QName  : FragQName ;
 NCName : FragmentNCName ;
 // Error in spec: Char is not a terminal!
-fragment Char : FragmentChar ;
-
-// Other fragments
-
-fragment Digits : [0-9]+ ;
+fragment Char : FragChar ;
+fragment FragDigits : [0-9]+ ;
 fragment CommentContents : Char ;
-
 // https://www.w3.org/TR/REC-xml-names/#NT-QName
-
-fragment FragmentQName : FragmentPrefixedName | FragmentUnprefixedName ;
-fragment FragmentPrefixedName : FragmentPrefix ':' FragmentLocalPart ;
-fragment FragmentUnprefixedName : FragmentLocalPart ;
-fragment FragmentPrefix : FragmentNCName ;
-fragment FragmentLocalPart : FragmentNCName ;
-fragment FragmentNCNameStartChar
+fragment FragQName : FragPrefixedName | FragUnprefixedName ;
+fragment FragPrefixedName : FragPrefix ':' FragLocalPart ;
+fragment FragUnprefixedName : FragLocalPart ;
+fragment FragPrefix : FragmentNCName ;
+fragment FragLocalPart : FragmentNCName ;
+fragment FragNCNameStartChar
   :  'A'..'Z'
   |  '_'
   | 'a'..'z'
@@ -155,44 +150,19 @@ fragment FragmentNCNameStartChar
   | '\uFDF0'..'\uFFFD'
   | '\u{10000}'..'\u{EFFFF}'
   ;
-fragment FragmentNCNameChar
-  :  FragmentNCNameStartChar | '-' | '.' | '0'..'9'
+fragment FragNCNameChar
+  :  FragNCNameStartChar | '-' | '.' | '0'..'9'
   |  '\u00B7' | '\u0300'..'\u036F'
   |  '\u203F'..'\u2040'
   ;
-fragment FragmentNCName  :  FragmentNCNameStartChar FragmentNCNameChar*  ;
+fragment FragmentNCName  :  FragNCNameStartChar FragNCNameChar*  ;
 
 // https://www.w3.org/TR/REC-xml/#NT-Char
 
-fragment FragmentChar : '\u0009' | '\u000a' | '\u000d'
+fragment FragChar : '\u0009' | '\u000a' | '\u000d'
   | '\u0020'..'\ud7ff'
   | '\ue000'..'\ufffd'
   | '\u{10000}'..'\u{10ffff}'
  ;
-
-fragment Name  :  NameStartChar NameChar*  ;
-fragment NameStartChar
-  :  ':'
-  | 'A'..'Z'
-  |  '_'
-  | 'a'..'z'
-  | '\u00C0'..'\u00D6'
-  | '\u00D8'..'\u00F6'
-  | '\u00F8'..'\u02FF'
-  | '\u0370'..'\u037D'
-  | '\u037F'..'\u1FFF'
-  | '\u200C'..'\u200D'
-  | '\u2070'..'\u218F'
-  | '\u2C00'..'\u2FEF'
-  | '\u3001'..'\uD7FF'
-  | '\uF900'..'\uFDCF'
-  | '\uFDF0'..'\uFFFD'
-  | '\u{10000}'..'\u{EFFFF}'
-  ;
-fragment NameChar
-  :  NameStartChar | '-' | '.' | '0'..'9'
-  |  '\u00B7' | '\u0300'..'\u036F'
-  |  '\u203F'..'\u2040'
-  ;
 
 Whitespace :  ('\u0020' | '\u0009' | '\u000d' | '\u000a')+ -> channel(OFF_CHANNEL) ;

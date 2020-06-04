@@ -1331,3 +1331,30 @@ true()=2
 width * depth
 z[1]
 zoneone
+("2000-01-01" cast as xs:date?)
+xs:date("2000-01-01")
+(($floatvalue * 0.2E-5) cast as xs:decimal?)
+xs:decimal($floatvalue * 0.2E-5)
+("P21D" cast as xs:dayTimeDuration?)
+xs:dayTimeDuration("P21D")
+17 cast as Q{}apple
+Q{}apple(17)
+17 cast as apple
+apple(17)
+$myaddress treat as element(*, USAddress)
+child::div1 / child::para / string() ! concat("id-", .)
+$emp ! (@first, @middle, @last)
+$docs ! ( //employee)
+avg( //employee / salary ! translate(., '$', '') ! number(.))
+fn:string-join((1 to $n)!"*")
+$values!(.*.) => fn:sum()
+string-join(ancestor::*!name(), '/')
+tokenize((normalize-unicode(upper-case($string))),"\s+")
+$string => upper-case() => normalize-unicode() => tokenize("\s+")
+some $x in $expr1 satisfies $x = 47
+//product[id = 47]
+if (doc-available('abc.xml')) then doc('abc.xml') else ()
+$N[@x castable as xs:date][xs:date(@x) gt xs:date("2000-01-01")]
+$N[if (@x castable as xs:date) then xs:date(@x) gt xs:date("2000-01-01") else false()]
+$myaddress treat as function(node()) as xs:string*
+$myaddress treat as (function(node()) as xs:string)*
