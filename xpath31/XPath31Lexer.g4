@@ -10,7 +10,7 @@ lexer grammar XPath31Lexer;
 
 options { superClass = XpathBase; }
 
-// KEYWORDS
+// SYMBOLS
 
 AT : '@' ;
 BANG : '!' ;
@@ -47,6 +47,8 @@ SC : '*:' ;
 SLASH : '/' ;
 SS : '//' ;
 STAR : '*' ;
+
+// KEYWORDS
 
 KW_ANCESTOR : 'ancestor' ;
 KW_ANCESTOR_OR_SELF : 'ancestor-or-self' ;
@@ -109,6 +111,7 @@ KW_TREAT : 'treat' ;
 KW_UNION : 'union' ;
 
 // A.2.1. TEMINAL SYMBOLS
+// (Note, this isn't a complete list of tokens in the language!)
 
 IntegerLiteral :Digits ;
 DecimalLiteral : ('.' Digits) | (Digits '.' [0-9]*) ;
