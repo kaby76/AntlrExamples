@@ -122,6 +122,7 @@ anyarraytest : KW_ARRAY OP STAR CP ;
 typedarraytest : KW_ARRAY OP sequencetype CP ;
 parenthesizeditemtype : OP itemtype CP ;
 
+// Error in the spec. EQName also includes acceptable keywords.
 eqname : QName | URIQualifiedName
  | KW_RETURN
  | KW_FOR

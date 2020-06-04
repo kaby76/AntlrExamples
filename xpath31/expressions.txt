@@ -1,3 +1,17 @@
+/bookstore/book/title
+/bookstore/book[1]/title
+/bookstore/book/price[text()]
+/bookstore/book[price>35]/price
+/bookstore/book[price>35]/title
+//h1[not(@id)]
+//button[text()="Submit"]
+//button[contains(text(),"Go")]
+//product[@price > 2.50]
+//ul[*]
+//ul[li]
+//a[@name or @href]
+//a | //div
 /a/b/c
 ((div)[1]//span)[1]
 //label[normalize-space(.)='Phone']/parent::lightning-input/parent::slot/parent::slot/parent::span/parent::div/parent::force-record-layout-item/parent::slot/parent::force-record-layout-row/parent::slot/parent::div/parent::div/parent::div/parent::force-record-layout-section/parent::slot/parent::force-record-layout-block/parent::forcegenerated-detailpanel_contact___012b0000000jhhvia4___full___view___recordlayout2/parent::records-lwc-record-layout/parent::slot/parent::records-record-layout-event-broker/parent::div/parent::div/following-sibling::force-form-footer//button
+/a (: comment :) /b

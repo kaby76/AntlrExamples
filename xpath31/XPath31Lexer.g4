@@ -8,7 +8,6 @@
 
 lexer grammar XPath31Lexer;
 
-options { superClass = XpathBase; }
 channels { OFF_CHANNEL }
 
 // SYMBOLS
@@ -48,6 +47,7 @@ SC : '*:' ;
 SLASH : '/' ;
 SS : '//' ;
 STAR : '*' ;
+
 
 // KEYWORDS
 
@@ -112,7 +112,9 @@ KW_TREAT : 'treat' ;
 KW_UNION : 'union' ;
 
 // A.2.1. TEMINAL SYMBOLS
-// (Note, this isn't a complete list of tokens in the language!)
+// Note, another error in the XPath spec!
+// This isn't a complete list of tokens in the language!
+// Keywords and symbols are terminals.
 
 IntegerLiteral :Digits ;
 DecimalLiteral : ('.' Digits) | (Digits '.' [0-9]*) ;
@@ -120,17 +122,21 @@ DoubleLiteral : (('.' Digits) | (Digits ('.' [0-9]*)?)) [eE] [+-]? Digits ;
 StringLiteral : ('"' (EscapeQuot | ~[^"])* '"') | ('\'' (EscapeApos | ~['])* '\'') ;
 URIQualifiedName : BracedURILiteral Name ;
 BracedURILiteral : 'Q' '{' [^{}]* '}' ;
-EscapeQuot : '""' ; 
-EscapeApos : '\'';
-Comment : '(:' (CommentContents | Comment)* ':)' ;
+// Error in spec: EscapeQuot and EscapeApos are not terminals!
+fragment EscapeQuot : '""' ; 
+fragment EscapeApos : '\'';
+// Error in spec: Comment isn't really a terminal, but an off-channel object.
+Comment : '(:' (Comment | CommentContents)*? ':)' -> channel(OFF_CHANNEL) ;
 QName  :  NTQName ;
 NCName : NTNCName ;
-Char : NTChar ;
+// Error in spec: Char is not a terminal!
+fragment Char : NTChar ;
 
-// Fragments
+
+// Other fragments
 
 fragment Digits : [0-9]+ ;
-fragment CommentContents : Char+ { NoNestingCommentCheck() }? ;
+fragment CommentContents : Char ;
 
 // https://www.w3.org/TR/REC-xml-names/#NT-QName
 
@@ -175,5 +181,5 @@ fragment NTChar : '\u0009' | '\u000a' | '\u000d'
   | '\ue000'..'\ufffd'
   | '\u{10000}'..'\u{10ffff}'
  ;
-Whitespace :  ('\u0020' | '\u0008' | '\u000d' | '\u000a')+ -> channel (OFF_CHANNEL) ;
+Whitespace :  ('\u0020' | '\u0009' | '\u000d' | '\u000a')+ -> channel(OFF_CHANNEL) ;
 

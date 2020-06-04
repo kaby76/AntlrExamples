@@ -22,13 +22,13 @@ namespace xpath
                 if (listener.had_error)
                 {
                     System.Console.WriteLine("error in parse.");
+                    System.Console.WriteLine(tokens.OutputTokens());
+                    System.Console.WriteLine(tree.OutputTree(tokens));
                 }
                 else
                 {
                     System.Console.WriteLine("parse completed.");
                 }
-                System.Console.WriteLine(tokens.OutputTokens());
-                System.Console.WriteLine(tree.OutputTree(tokens));
             }
         }
 
