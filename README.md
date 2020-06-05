@@ -11,3 +11,13 @@ Mike Lischke.
 * [Parsing Antlr grammars with Antlr](https://github.com/kaby76/AntlrExamples/tree/master/Antlr). This program parses Antlr4 grammar files using Antlr.
 
 * [Parsing context-free languages in the Antlr lexer](https://github.com/kaby76/AntlrExamples/tree/master/lexer-as-parser). This program demos the use of the well-known expression grammar in the lexer. The rules can't have left recursion, and they all need to be marked with the _fragment_ keyword, but it works.
+
+* [XPath version 3.1](https://github.com/kaby76/AntlrExamples/tree/master/xpath31). This C# program contains the latest grammar
+for XPath, along with 1000+ test cases.
+
+* [Simple arithmetic example targeting C++ using CMake](https://github.com/kaby76/AntlrExamples/tree/master/CMakeProject1). This program
+is unique for a CMake configured Antlr C++ program. This is a concrete example of the somewhat incomplete [instructions](https://github.com/antlr/antlr4/tree/master/runtime/Cpp/cmake) given in the Antlr website.
+
+* [Tomaszewski's example](https://github.com/kaby76/AntlrExamples/tree/master/Tomaszewski). I was combing the web and came
+across [an interesting article by Tomaszewki](https://pdfs.semanticscholar.org/a8dd/2ef009df7601cdbc90332765a56a24c7821c.pdf), of a CFG grammar that doesn't recognize strings like "ww", but a CFG that
+recognizes string not in the language.
