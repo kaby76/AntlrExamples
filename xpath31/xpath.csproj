@@ -4,14 +4,12 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>xpath</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="XPath31.g4" />
+  </ItemGroup>
   
   <ItemGroup>
-    <Antlr4 Include="XPath31Lexer.g4">
-      <Package>xpath</Package>
-    </Antlr4>
-    <Antlr4 Include="XPath31Parser.g4">
-      <Package>xpath</Package>
-    </Antlr4>
+    <Antlr4 Include="XPath31.g4" />
   </ItemGroup>
 
   <ItemGroup>
