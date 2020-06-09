@@ -11,6 +11,7 @@ namespace xpath
             string line;
             while ((line = file.ReadLine()) != null)
             {
+                System.Console.WriteLine("===== Expression =====");
                 System.Console.WriteLine(line);
                 var str = new AntlrInputStream(line);
                 var lexer = new XPath31Lexer(str);
@@ -24,10 +25,17 @@ namespace xpath
                     System.Console.WriteLine("error in parse.");
                     System.Console.WriteLine(tokens.OutputTokens());
                     System.Console.WriteLine(tree.OutputTree(tokens));
+                    return;
                 }
                 else
                 {
                     System.Console.WriteLine("parse completed.");
+                }
+                string xpath = "//exprsingle";
+                var names = Antlr4.Runtime.Tree.Xpath.XPath.FindAll(tree, xpath, parser);
+                foreach (var n in names)
+                {
+                    System.Console.WriteLine("match " + n.GetText());
                 }
             }
         }
