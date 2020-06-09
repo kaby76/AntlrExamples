@@ -10,7 +10,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flex", "Flex\Flex.csproj", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Java", "Java\Java.csproj", "{F524114D-1827-4D53-9538-1C6D25C75BB1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JavaFixed", "JavaFixed\Java.csproj", "{CED4231D-4F81-49B4-B0A3-13CB3C9E424C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Java", "JavaFixed\Java.csproj", "{CED4231D-4F81-49B4-B0A3-13CB3C9E424C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JavaParr", "JavaParr\JavaParr.csproj", "{02C96D6B-52E0-4715-ABAC-5FADD374F570}"
 EndProject
@@ -21,6 +21,12 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "xpath", "xpath31\xpath.csproj", "{B81B769B-C0E3-4FAD-A09D-862954493F15}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tomaszewski", "Tomaszewski\Tomaszewski.csproj", "{0015E4FC-4411-4445-B460-FC48DD8AFFB2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F7AC29FD-491C-4C85-ADA4-78A801F8C0A1}"
+	ProjectSection(SolutionItems) = preProject
+		appveyor.yml = appveyor.yml
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

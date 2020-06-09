@@ -1,5 +1,7 @@
 # Antlr Version 4 Examples
 
+[![Build status](https://ci.appveyor.com/api/projects/status/th2hyup4n8t5blwa?svg=true)](https://ci.appveyor.com/project/kaby76/antlrexamples)
+
 * [A parser for Mysql](https://github.com/kaby76/AntlrExamples/tree/master/mysql) -- This excellent example of the power of Antlr 4 is from the Oracle Workbench library
 at https://github.com/mysql/mysql-workbench/tree/8.0/library/parsers/grammars, and written by
 Mike Lischke.
