@@ -10,7 +10,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flex", "Flex\Flex.csproj", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Java", "Java\Java.csproj", "{F524114D-1827-4D53-9538-1C6D25C75BB1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Java", "JavaFixed\Java.csproj", "{CED4231D-4F81-49B4-B0A3-13CB3C9E424C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JavaFixed", "JavaFixed\Java.csproj", "{CED4231D-4F81-49B4-B0A3-13CB3C9E424C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JavaParr", "JavaParr\JavaParr.csproj", "{02C96D6B-52E0-4715-ABAC-5FADD374F570}"
 EndProject
