@@ -7,18 +7,23 @@
 // I have gone through this grammar very, very carefully to make sure
 // that it is essentially identical to the spec, that it implements
 // the lexical and parsing structures as stated in the spec.
-// All others that I have found on the web (e.g., github.com) do not
+// All others that I have found on the web (i.e., github.com) do not
 // faithfully implement the spec, or are incomplete. This implementation
 // is complete.
 //
-// I have verified this grammar against thousands of test expressions.
-// All online xpath "parsers" only seem to require data in xml format. This
-// is a pure, no bullshit parser.
+// I have verified this grammar against thousands of test expressions,
+// which also differentiates this implementation for all others.
 //
-// A side note on the implementation of this grammar. I copied the grammar
-// from the spec then employed Antlrvsix to refactor the grammar. The parser
-// and lexer are split, but they could be combined as there is no super classing
-// of the parser nor lexer.
+// Note, for testing using online xpath parsers xpath expressions,
+// all require a data set. This is a pure, no bullshit parser. I am
+// working on an xpath engine in C#.
+//
+// A note on the implementation of this grammar. I copied the grammar directly
+// from the spec then employed Antlrvsix to refactor the grammar. I have not
+// optimized it for speed, but that obviously could be done. The parser
+// and lexer are combined because there is no super classing, no modes,
+// no special lexer channels. If you want these, again Antlrvsix is the
+// only tool that can do that quickly for you.
 //
 // Note on alternatives:
 // https://github.com/exquery/xpath3-parser/blob/master/src/main/antlr4/org/exquery/xpath/parser/XPath3.g4
@@ -26,111 +31,134 @@
 // * the lexical structure of the comment token;
 // * the lexical structure of the QName token;
 // * the lexical structure of the NCName token.
+// For example, it says very, very clearly in the spec: "A.2.1 Terminal Symbols ... [122]   	QName".
+// QName is a TOKEN. QName is a LEXICAL SYMBOL. QName is produced by the lexer, not the parser.
 //
 // https://github.com/antlr/grammars-v4/blob/master/xpath/xpath.g4
 // This grammar is for version 1.
 
 grammar XPath31;
 
+// [1]
 xpath : expr EOF ;
 paramlist : param ( COMMA param)* ;
 param : DOLLAR eqname typedeclaration? ;
 functionbody : enclosedexpr ;
+// [5]
 enclosedexpr : OC expr? CC ;
 expr : exprsingle ( COMMA exprsingle)* ;
 exprsingle : forexpr | letexpr | quantifiedexpr | ifexpr | orexpr ;
 forexpr : simpleforclause KW_RETURN exprsingle ;
 simpleforclause : KW_FOR simpleforbinding ( COMMA simpleforbinding)* ;
+// [10]
 simpleforbinding : DOLLAR varname KW_IN exprsingle ;
 letexpr :    simpleletclause KW_RETURN exprsingle ;
 simpleletclause : KW_LET simpleletbinding ( COMMA simpleletbinding)* ;
 simpleletbinding : DOLLAR varname CEQ exprsingle ;
 quantifiedexpr :    ( KW_SOME | KW_EVERY) DOLLAR varname KW_IN exprsingle ( COMMA DOLLAR varname KW_IN exprsingle)* KW_SATISFIES exprsingle ;
+// [15]
 ifexpr : KW_IF OP expr CP KW_THEN exprsingle KW_ELSE exprsingle ;
 orexpr : andexpr ( KW_OR andexpr )* ;
 andexpr : comparisonexpr ( KW_AND comparisonexpr )* ;
 comparisonexpr : stringconcatexpr ( (valuecomp | generalcomp | nodecomp) stringconcatexpr )? ;
 stringconcatexpr : rangeexpr ( PP rangeexpr )* ;
+// [20]
 rangeexpr : additiveexpr ( KW_TO additiveexpr )? ;
 additiveexpr : multiplicativeexpr ( ( PLUS | MINUS) multiplicativeexpr )* ;
 multiplicativeexpr : unionexpr ( ( STAR | KW_DIV | KW_IDIV | KW_MOD) unionexpr )* ;
 unionexpr : intersectexceptexpr ( ( KW_UNION | P) intersectexceptexpr )* ;
 intersectexceptexpr : instanceofexpr ( ( KW_INTERSECT | KW_EXCEPT) instanceofexpr )* ;
+// [25]
 instanceofexpr : treatexpr ( KW_INSTANCE KW_OF sequencetype )? ;
 treatexpr : castableexpr ( KW_TREAT KW_AS sequencetype )? ;
 castableexpr : castexpr ( KW_CASTABLE KW_AS singletype )? ;
 castexpr : arrowexpr ( KW_CAST KW_AS singletype )? ;
 arrowexpr : unaryexpr ( EG arrowfunctionspecifier argumentlist )* ;
+// [30]
 unaryexpr : ( MINUS | PLUS)* valueexpr ;
 valueexpr : simplemapexpr ;
 generalcomp : EQ | NE | LT | LE | GT | GE ;
 valuecomp : KW_EQ | KW_NE | KW_LT | KW_LE | KW_GT | KW_GE ;
 nodecomp : KW_IS | LL | GG ;
+// [35]
 simplemapexpr : pathexpr ( BANG pathexpr)* ;
 pathexpr : ( SLASH relativepathexpr?) | ( SS relativepathexpr) | relativepathexpr ;
 relativepathexpr : stepexpr (( SLASH | SS) stepexpr)* ;
 stepexpr : postfixexpr | axisstep ;
 axisstep : (reversestep | forwardstep) predicatelist ;
+// [40]
 forwardstep : (forwardaxis nodetest) | abbrevforwardstep ;
 forwardaxis : ( KW_CHILD COLONCOLON) | ( KW_DESCENDANT COLONCOLON) | ( KW_ATTRIBUTE COLONCOLON) | ( KW_SELF COLONCOLON) | ( KW_DESCENDANT_OR_SELF COLONCOLON) | ( KW_FOLLOWING_SIBLING COLONCOLON) | ( KW_FOLLOWING COLONCOLON) | ( KW_NAMESPACE COLONCOLON) ;
 abbrevforwardstep : AT? nodetest ;
 reversestep : (reverseaxis nodetest) | abbrevreversestep ;
 reverseaxis : ( KW_PARENT COLONCOLON) | ( KW_ANCESTOR COLONCOLON) | ( KW_PRECEDING_SIBLING COLONCOLON) | ( KW_PRECEDING COLONCOLON) | ( KW_ANCESTOR_OR_SELF COLONCOLON) ;
+// [45]
 abbrevreversestep : DD ;
 nodetest : kindtest | nametest ;
 nametest : eqname | wildcard ;
 wildcard : STAR | (NCName CS) | ( SC NCName) | (BracedURILiteral STAR) ;
 postfixexpr : primaryexpr (predicate | argumentlist | lookup)* ;
+// [50]
 argumentlist : OP (argument ( COMMA argument)*)? CP ;
 predicatelist : predicate* ;
 predicate : OB expr CB ;
 lookup : QM keyspecifier ;
 keyspecifier : NCName | IntegerLiteral | parenthesizedexpr | STAR ;
+// [55]
 arrowfunctionspecifier : eqname | varref | parenthesizedexpr ;
 primaryexpr : literal | varref | parenthesizedexpr | contextitemexpr | functioncall | functionitemexpr | mapconstructor | arrayconstructor | unarylookup ;
 literal : numericliteral | StringLiteral ;
 numericliteral : IntegerLiteral | DecimalLiteral | DoubleLiteral ;
 varref : DOLLAR varname ;
+// [60]
 varname : eqname ;
 parenthesizedexpr : OP expr? CP ;
 contextitemexpr : D ;
 functioncall : eqname argumentlist ;
 argument : exprsingle | argumentplaceholder ;
+// [65]
 argumentplaceholder : QM ;
 functionitemexpr : namedfunctionref | inlinefunctionexpr ;
 namedfunctionref : eqname POUND IntegerLiteral /* xgc: reserved-function-names */;
 inlinefunctionexpr : KW_FUNCTION OP paramlist? CP ( KW_AS sequencetype)? functionbody ;
 mapconstructor : KW_MAP OC (mapconstructorentry ( COMMA mapconstructorentry)*)? CC ;
+// [70]
 mapconstructorentry : mapkeyexpr COLON mapvalueexpr ;
 mapkeyexpr : exprsingle ;
 mapvalueexpr : exprsingle ;
 arrayconstructor : squarearrayconstructor | curlyarrayconstructor ;
 squarearrayconstructor : OB (exprsingle ( COMMA exprsingle)*)? CB ;
+// [75]
 curlyarrayconstructor : KW_ARRAY enclosedexpr ;
 unarylookup : QM keyspecifier ;
 singletype : simpletypename QM? ;
 typedeclaration : KW_AS sequencetype ;
 sequencetype : ( KW_EMPTY_SEQUENCE OP CP) | (itemtype occurrenceindicator?) ;
+// [80]
 occurrenceindicator : QM | STAR | PLUS ;
 itemtype : kindtest | ( KW_ITEM OP CP) | functiontest | maptest | arraytest | atomicoruniontype | parenthesizeditemtype ;
 atomicoruniontype : eqname ;
 kindtest : documenttest | elementtest | attributetest | schemaelementtest | schemaattributetest | pitest | commenttest | texttest | namespacenodetest | anykindtest ;
 anykindtest : KW_NODE OP CP ;
+// [85]
 documenttest : KW_DOCUMENT_NODE OP (elementtest | schemaelementtest)? CP ;
 texttest : KW_TEXT OP CP ;
 commenttest : KW_COMMENT OP CP ;
 namespacenodetest : KW_NAMESPACE_NODE OP CP ;
 pitest : KW_PROCESSING_INSTRUCTION OP (NCName | StringLiteral)? CP ;
+// [90]
 attributetest : KW_ATTRIBUTE OP (attribnameorwildcard ( COMMA typename)?)? CP ;
 attribnameorwildcard : attributename | STAR ;
 schemaattributetest : KW_SCHEMA_ATTRIBUTE OP attributedeclaration CP ;
 attributedeclaration : attributename ;
 elementtest : KW_ELEMENT OP (elementnameorwildcard ( COMMA typename QM?)?)? CP ;
+// [95]
 elementnameorwildcard : elementname | STAR ;
 schemaelementtest : KW_SCHEMA_ELEMENT OP elementdeclaration CP ;
 elementdeclaration : elementname ;
 attributename : eqname ;
 elementname : eqname ;
+// [100]
 simpletypename : typename ;
 typename : eqname ;
 functiontest : anyfunctiontest | typedfunctiontest ;
