@@ -166,3 +166,9 @@ Tomaszewski/TomaszewskiListener.cs
 xpath31/XPath31Lexer.interp
 xpath31/XPath31Visitor.cs
 Expressions/
+Matlab/matlab.interp
+Matlab/matlab.tokens
+Matlab/matlabBaseListener.cs
+Matlab/matlabBaseVisitor.cs
+Matlab/matlabListener.cs
+Matlab/matlabVisitor.cs
