@@ -12,5 +12,13 @@ rm -f ANTLRv4Parser.cs
 rm -f ANTLRv4Visitor.cs
 rm -f ANTLRv4Lexer.interp
 rm -f ANTLRv4Lexer.tokens
+rm -f ANTLRv4Parser.interp
+rm -f ANTLRv4Parser.tokens
 rm -f ANTLRv4.interp
 rm -f ANTLRv4.tokens
+rm -f ANTLRv4ParserBaseListener.cs
+rm -f ANTLRv4ParserBaseVisitor.cs
+rm -f ANTLRv4ParserListener.cs
+rm -f ANTLRv4ParserVisitor.cs
+
+rm -f /c/Debug/*.cs /c/Debug/*.interp /c/Debug/*.tokens
