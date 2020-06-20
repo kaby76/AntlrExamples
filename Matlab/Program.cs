@@ -32,6 +32,30 @@ namespace Matlab
             System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
+        static void TryOctave(string input)
+        {
+            var str = new AntlrInputStream(input);
+            var lexer = new OctLexer(str);
+            var tokens = new CommonTokenStream(lexer);
+            lexer.RealTokenStream = tokens;
+            var parser = new OctParser(tokens);
+            lexer.Parser = parser;
+            var listener = new ErrorListener<IToken>(parser, lexer, tokens);
+            parser.AddErrorListener(listener);
+            var tree = parser.input_aug();
+            if (listener.had_error)
+            {
+                System.Console.WriteLine("error in parse.");
+            }
+            else
+            {
+                System.Console.WriteLine("parse completed.");
+            }
+
+            System.Console.WriteLine(tokens.OutputTokens());
+            System.Console.WriteLine(tree.OutputTree(tokens));
+        }
+
         static void Main(string[] args)
         {
             string input;
@@ -51,6 +75,7 @@ f = 'x' + ' + y';
                 // x' + y'; not legal.
 
                 Try(input);
+                TryOctave(input);
             }
             else
             {

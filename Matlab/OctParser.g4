@@ -6,8 +6,9 @@ parser grammar OctParser;
 
 options { tokenVocab=OctLexer; }
 
-input  : simple_list CR
-  | simple_list EOF
+input_aug : input EOF ;
+
+input  : (simple_list CR)*
   ;
 simple_list  : opt_sep_no_nl
   | simple_list1 opt_sep_no_nl
@@ -70,7 +71,7 @@ cell_or_matrix_row  :
   | COMMA arg_list
   | COMMA arg_list COMMA
   ;
-fcn_handle  : AT FCN_HANDLE
+fcn_handle  : AT NAME
   ;
 anon_fcn_handle  : AT param_list stmt_begin expr_no_assign
   ;
@@ -274,8 +275,8 @@ push_script_symtab  :
   ;
 begin_file  : push_script_symtab INPUT_FILE
   ;
-file  : begin_file opt_nl opt_list END_OF_INPUT
-  | begin_file opt_nl classdef parsing_local_fcns opt_sep opt_fcn_list END_OF_INPUT
+file  : begin_file opt_nl opt_list EOF
+  | begin_file opt_nl classdef parsing_local_fcns opt_sep opt_fcn_list EOF
   ;
 function_beg  : push_fcn_symtab FCN
   ;
@@ -284,7 +285,7 @@ fcn_name  : identifier
   | SET DOT identifier
   ;
 function_end  : END
-  | END_OF_INPUT
+  | EOF
   ;
 function  : function_beg stash_comment fcn_name opt_param_list opt_sep opt_list function_end
   | function_beg stash_comment return_list EQ fcn_name opt_param_list opt_sep opt_list function_end

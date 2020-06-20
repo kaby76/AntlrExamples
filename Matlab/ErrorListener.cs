@@ -28,6 +28,8 @@ namespace Matlab
             int col, string msg, RecognitionException e)
         {
             had_error = true;
+            base.SyntaxError(output, recognizer, offendingSymbol, line, col, msg, e);
+            return;
             if (_first_time)
             {
                 try
