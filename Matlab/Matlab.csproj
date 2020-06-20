@@ -7,6 +7,8 @@
   <ItemGroup>
     <None Remove="matlabLexer.g4" />
     <None Remove="matlabParser.g4" />
+    <None Remove="OctLexer.g4" />
+    <None Remove="OctParser.g4" />
   </ItemGroup>
   
   <ItemGroup>
@@ -14,6 +16,12 @@
       <Package>Matlab</Package>
     </Antlr4>
     <Antlr4 Include="matlabParser.g4">
+      <Package>Matlab</Package>
+    </Antlr4>
+    <Antlr4 Include="OctLexer.g4">
+      <Package>Matlab</Package>
+    </Antlr4>
+    <Antlr4 Include="OctParser.g4">
       <Package>Matlab</Package>
     </Antlr4>
   </ItemGroup>

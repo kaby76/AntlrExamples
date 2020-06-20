@@ -1,4 +1,7 @@
 ﻿// Template generated code from Antlr4BuildTasks.Template v 7.3
+
+using System.IO;
+
 namespace Matlab
 {
     using Antlr4.Runtime;
@@ -23,15 +26,29 @@ namespace Matlab
             {
                 System.Console.WriteLine("parse completed.");
             }
+
             System.Console.WriteLine(tokens.OutputTokens());
             System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static void Main(string[] args)
         {
-            Try(@"a = 'A string with ''apostrophes''';
-a = [ 1 2 3 ];
-b = a';");
+            string input;
+            if (args.Length == 0)
+            {
+                input = @"a = 'A string with ''apostrophes''';
+			            a = [ 1 2 3 ];
+			            b = a';";
+                Try(input);
+            }
+            else
+            {
+                foreach (var i in args)
+                {
+                    input = File.OpenText(i).ReadToEnd();
+                    Try(input);
+                }
+            }
         }
     }
 }
