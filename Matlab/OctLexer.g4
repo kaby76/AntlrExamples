@@ -49,7 +49,6 @@ EXPR_EQ : '==' ;
 EXPR_NE : '~=' ;
 TRANSPOSE : 'transpose' ;
 NCTRANSPOSE : '.\'' ;
-SQ : '\'' { CanBeTranspose() }? ;
 STRING_LITERAL : '\'' ( ~ '\'' | '\'\'' ) * '\'' ;
 NAME : [a-zA-Z] [a-zA-Z0-9_]* ;
 CONSTANT : NUMBER (E SIGN? NUMBER)? ;

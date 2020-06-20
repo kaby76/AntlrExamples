@@ -13,11 +13,12 @@ namespace Matlab
             var str = new AntlrInputStream(input);
             var lexer = new matlabLexer(str);
             var tokens = new CommonTokenStream(lexer);
+            lexer.RealTokenStream = tokens;
             var parser = new matlabParser(tokens);
             lexer.Parser = parser;
             var listener = new ErrorListener<IToken>(parser, lexer, tokens);
             parser.AddErrorListener(listener);
-            var tree = parser.translation_unit();
+            var tree = parser.input();
             if (listener.had_error)
             {
                 System.Console.WriteLine("error in parse.");
@@ -36,9 +37,19 @@ namespace Matlab
             string input;
             if (args.Length == 0)
             {
-                input = @"a = 'A string with ''apostrophes''';
-			            a = [ 1 2 3 ];
-			            b = a';";
+                input = @"a;
+a + b;
+'a' + 'b';
+a = 'A string with ''apostrophes''';
+b = [ 1 2 3 ];
+c = a';
+d = a' + a';
+e = a' + b' + c';
+f = 'x' + ' + y';
+";
+                // a b; not legal.
+                // x' + y'; not legal.
+
                 Try(input);
             }
             else

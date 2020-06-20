@@ -35,6 +35,8 @@ parser grammar matlabParser;
 
 options { tokenVocab=matlabLexer; }
 
+input : translation_unit EOF;
+
 primary_expression
    : IDENTIFIER
    | CONSTANT
