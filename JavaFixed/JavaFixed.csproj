@@ -14,7 +14,6 @@
     </Antlr4>
     <Antlr4 Include="Java9Parser.g4">
       <Package>Java</Package>
-      <GAtn>true</GAtn>
     </Antlr4>
   </ItemGroup>
 
