@@ -71,9 +71,10 @@ c = a';
 d = a' + a';
 e = a' + b' + c';
 f = 'x' + ' + y';
+x' + y';
 ";
                 // a b; not legal.
-                // x' + y'; not legal.
+                // x' + y'; legal.
 
                 Try(input);
                 TryOctave(input);
