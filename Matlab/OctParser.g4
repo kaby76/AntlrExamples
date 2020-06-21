@@ -8,95 +8,42 @@ options { tokenVocab=OctLexer; }
 
 input_aug : input+ EOF ;
 
-input  : simple_list CR
-  ;
-simple_list  : opt_sep_no_nl
-  | simple_list1 opt_sep_no_nl
-  ;
-simple_list1  : statement
-  | simple_list1 sep_no_nl statement
-  ;
-opt_list  :
-  | list
-  ;
-list  : list1 opt_sep
-  ;
-list1  : statement
-  | list1 sep statement
-  ;
-opt_fcn_list  :
-  | fcn_list
-  ;
-fcn_list  : fcn_list1 opt_sep
-  ;
-fcn_list1  : function
-  | fcn_list1 opt_sep function
-  ;
-statement  : expression
-  | command
-  | word_list_cmd
-  ;
-word_list_cmd  : identifier word_list
-  ;
-word_list  : string
-  | word_list string
-  ;
-identifier  : NAME
-  ;
-superclass_identifier  : SUPERCLASSREF
-  ;
-meta_identifier  : METAQUERY
-  ;
-string  : DQ_STRING
-  | SQ_STRING
-  ;
-constant  : NUM
-  | IMAG_NUM
-  | string
-  ;
-matrix  : LB matrix_rows RB
-  ;
-matrix_rows  : cell_or_matrix_row
-  | matrix_rows SEMI cell_or_matrix_row
-  ;
-cell  : LC cell_rows RC
-  ;
-cell_rows  : cell_or_matrix_row
-  | cell_rows SEMI cell_or_matrix_row
-  ;
-cell_or_matrix_row  :
-  | COMMA
-  | arg_list
-  | arg_list COMMA
-  | COMMA arg_list
-  | COMMA arg_list COMMA
-  ;
-fcn_handle  : AT NAME
-  ;
-anon_fcn_handle  : AT param_list stmt_begin expr_no_assign
-  ;
-primary_expr  : identifier
-  | constant
-  | fcn_handle
-  | matrix
-  | cell
+input  : simple_list CR ;
+simple_list  : opt_sep_no_nl | simple_list1 opt_sep_no_nl ;
+simple_list1  : statement | simple_list1 sep_no_nl statement ;
+opt_list  : | list ;
+list  : list1 opt_sep ;
+list1  : statement | list1 sep statement ;
+opt_fcn_list  : | fcn_list ;
+fcn_list  : fcn_list1 opt_sep ;
+fcn_list1  : function | fcn_list1 opt_sep function ;
+statement  : expression | command | word_list_cmd ;
+word_list_cmd  : identifier word_list ;
+word_list  : string | word_list string ;
+identifier  : NAME ;
+superclass_identifier  : SUPERCLASSREF ;
+meta_identifier  : METAQUERY ;
+string  : DQ_STRING | SQ_STRING ;
+constant  : NUM | IMAG_NUM | string ;
+matrix  : LB matrix_rows RB ;
+matrix_rows  : cell_or_matrix_row | matrix_rows SEMI cell_or_matrix_row ;
+cell  : LC cell_rows RC ;
+cell_rows  : cell_or_matrix_row | cell_rows SEMI cell_or_matrix_row ;
+cell_or_matrix_row  : | COMMA | arg_list | arg_list COMMA | COMMA arg_list | COMMA arg_list COMMA ;
+fcn_handle  : AT NAME ;
+anon_fcn_handle  : AT param_list stmt_begin expr_no_assign ;
+primary_expr  : identifier | constant | fcn_handle | matrix | cell
 //  | meta_identifier
 //  | superclass_identifier
-  | LP expression RP
-  ;
-magic_colon  : COLON
-  ;
-magic_tilde  : EXPR_NOT
-  ;
-arg_list  : expression
-  | magic_colon
-  | magic_tilde
-  | arg_list COMMA? magic_colon // I suspect the Yacc grammar isn't what they use because ',' is optional.
+  | LP expression RP ;
+magic_colon  : COLON ;
+magic_tilde  : EXPR_NOT ;
+arg_list  : expression | magic_colon
+  | magic_tilde | arg_list COMMA? magic_colon // I suspect the Yacc grammar isn't what they use because ',' is optional.
   | arg_list COMMA? magic_tilde // I suspect the Yacc grammar isn't what they use because ',' is optional.
   | arg_list COMMA? expression  // I suspect the Yacc grammar isn't what they use because ',' is optional.
   ;
-indirect_ref_op  : DOT
-  ;
+indirect_ref_op  : DOT ;
 oper_expr  : primary_expr
   | oper_expr PLUS_PLUS
   | oper_expr MINUS_MINUS
@@ -157,8 +104,7 @@ simple_expr  : oper_expr
   | simple_expr EXPR_AND_AND simple_expr
   | simple_expr EXPR_OR_OR simple_expr
   ;
-assign_lhs  : simple_expr
-  ;
+assign_lhs  : simple_expr ;
 assign_expr  : assign_lhs EQ expression
   | assign_lhs ADD_EQ expression
   | assign_lhs SUB_EQ expression
@@ -173,12 +119,8 @@ assign_expr  : assign_lhs EQ expression
   | assign_lhs AND_EQ expression
   | assign_lhs OR_EQ expression
   ;
-expr_no_assign  : simple_expr
-  | anon_fcn_handle
-  ;
-expression  : expr_no_assign
-  | assign_expr
-  ;
+expr_no_assign  : simple_expr | anon_fcn_handle ;
+expression  : expr_no_assign | assign_expr ;
 command  : declaration
   | select_command
   | loop_command
@@ -187,46 +129,22 @@ command  : declaration
   | function
 //  | file
   ;
-declaration  : GLOBAL decl1
-  | PERSISTENT decl1
+declaration  : GLOBAL decl1 | PERSISTENT decl1
   ;
-decl1  : decl2
-  | decl1 decl2
-  ;
-decl_param_init  :
-  ;
-decl2  : identifier
-  | identifier EQ decl_param_init expression
-  ;
-select_command  : if_command
-  | switch_command
-  ;
-if_command  : IF stash_comment if_cmd_list END
-  ;
-if_cmd_list  : if_cmd_list1
-  | if_cmd_list1 else_clause
-  ;
-if_cmd_list1  : expression stmt_begin opt_sep opt_list
-  | if_cmd_list1 elseif_clause
-  ;
-elseif_clause  : ELSEIF stash_comment opt_sep expression stmt_begin opt_sep opt_list
-  ;
-else_clause  : ELSE stash_comment opt_sep opt_list
-  ;
-switch_command  : SWITCH stash_comment expression opt_sep case_list END
-  ;
-case_list  :
-  | default_case
-  | case_list1
-  | case_list1 default_case
-  ;
-case_list1  : switch_case
-  | case_list1 switch_case
-  ;
-switch_case  : CASE stash_comment opt_sep expression stmt_begin opt_sep opt_list
-  ;
-default_case  : OTHERWISE stash_comment opt_sep opt_list
-  ;
+decl1  : decl2 | decl1 decl2 ;
+decl_param_init  : ;
+decl2  : identifier | identifier EQ decl_param_init expression ;
+select_command  : if_command | switch_command ;
+if_command  : IF stash_comment if_cmd_list END ;
+if_cmd_list  : if_cmd_list1 | if_cmd_list1 else_clause ;
+if_cmd_list1  : expression stmt_begin opt_sep opt_list | if_cmd_list1 elseif_clause ;
+elseif_clause  : ELSEIF stash_comment opt_sep expression stmt_begin opt_sep opt_list ;
+else_clause  : ELSE stash_comment opt_sep opt_list ;
+switch_command  : SWITCH stash_comment expression opt_sep case_list END ;
+case_list  : | default_case | case_list1 | case_list1 default_case ;
+case_list1  : switch_case | case_list1 switch_case ;
+switch_case  : CASE stash_comment opt_sep expression stmt_begin opt_sep opt_list ;
+default_case  : OTHERWISE stash_comment opt_sep opt_list ;
 loop_command  : WHILE stash_comment expression stmt_begin opt_sep opt_list END
   | DO stash_comment opt_sep opt_list UNTIL expression
   | FOR stash_comment assign_lhs EQ expression stmt_begin opt_sep opt_list END
@@ -234,85 +152,41 @@ loop_command  : WHILE stash_comment expression stmt_begin opt_sep opt_list END
   | PARFOR stash_comment assign_lhs EQ expression stmt_begin opt_sep opt_list END
   | PARFOR stash_comment LP assign_lhs EQ expression COMMA expression RP opt_sep opt_list END
   ;
-jump_command  : BREAK
-  | CONTINUE
-  | FUNC_RET
-  ;
+jump_command  : BREAK | CONTINUE | FUNC_RET ;
 except_command  : UNWIND stash_comment opt_sep opt_list CLEANUP stash_comment opt_sep opt_list END
   | TRY stash_comment opt_sep opt_list CATCH stash_comment opt_sep opt_list END
   | TRY stash_comment opt_sep opt_list END
   ;
-push_fcn_symtab  :
-  ;
-param_list_beg  : LP
-  ;
-param_list_end  : RP
-  ;
-opt_param_list  :
-  | param_list
-  ;
-param_list  : param_list_beg param_list1 param_list_end
-  ;
-param_list1  :
-  | param_list2
-  ;
-param_list2  : param_list_elt
-  | param_list2 COMMA param_list_elt
-  ;
-param_list_elt  : decl2
-  | magic_tilde
-  ;
-return_list  : LB RB
-  | identifier
-  | LB return_list1 RB
-  ;
-return_list1  : identifier
-  | return_list1 COMMA identifier
-  ;
-parsing_local_fcns  :
-  ;
-push_script_symtab  :
-  ;
-begin_file  : push_script_symtab INPUT_FILE
-  ;
-file  : begin_file opt_nl opt_list EOF
-  | begin_file opt_nl classdef parsing_local_fcns opt_sep opt_fcn_list EOF
-  ;
-function_beg  : push_fcn_symtab FCN
-  ;
-fcn_name  : identifier
-  | GET DOT identifier
-  | SET DOT identifier
-  ;
-function_end  : END
-  | EOF
-  ;
+push_fcn_symtab  : ;
+param_list_beg  : LP ;
+param_list_end  : RP ;
+opt_param_list  : | param_list ;
+param_list  : param_list_beg param_list1 param_list_end ;
+param_list1  : | param_list2 ;
+param_list2  : param_list_elt | param_list2 COMMA param_list_elt ;
+param_list_elt  : decl2 | magic_tilde ;
+return_list  : LB RB | identifier | LB return_list1 RB ;
+return_list1  : identifier | return_list1 COMMA identifier ;
+parsing_local_fcns  : ;
+push_script_symtab  : ;
+begin_file  : push_script_symtab INPUT_FILE ;
+file  : begin_file opt_nl opt_list EOF | begin_file opt_nl classdef parsing_local_fcns opt_sep opt_fcn_list EOF ;
+function_beg  : push_fcn_symtab FCN ;
+fcn_name  : ( | GET DOT | SET DOT) identifier ;
+function_end  : END | EOF ;
 function  : function_beg stash_comment fcn_name opt_param_list opt_sep opt_list function_end
   | function_beg stash_comment return_list EQ fcn_name opt_param_list opt_sep opt_list function_end
   ;
-classdef_beg  : CLASSDEF
-  ;
+classdef_beg  : CLASSDEF ;
 classdef  : classdef_beg stash_comment opt_attr_list identifier opt_superclass_list opt_sep class_body opt_sep END
   | classdef_beg stash_comment opt_attr_list identifier opt_superclass_list opt_sep END
   ;
-opt_attr_list  :
-  | LP attr_list RP
-  ;
-attr_list  : attr
-  | attr_list COMMA attr
-  ;
-attr  : identifier
-  | identifier EQ decl_param_init expression
-  | EXPR_NOT identifier
-  ;
-opt_superclass_list  :
-  | superclass_list
-  ;
-superclass_list  : EXPR_LT superclass
-  | superclass_list EXPR_AND superclass
-  ;
-superclass  : NAME // FQ_IDENT
-  ;
+opt_attr_list  : | LP attr_list RP ;
+attr_list  : attr | attr_list COMMA attr ;
+attr  : identifier | identifier EQ decl_param_init expression | EXPR_NOT identifier ;
+opt_superclass_list  : | superclass_list ;
+superclass_list  : EXPR_LT superclass | superclass_list EXPR_AND superclass ;
+superclass  : NAME ; // FQ_IDENT
 class_body  : properties_block
   | methods_block
   | events_block
@@ -325,68 +199,30 @@ class_body  : properties_block
 properties_block  : PROPERTIES stash_comment opt_attr_list opt_sep property_list opt_sep END
   | PROPERTIES stash_comment opt_attr_list opt_sep END
   ;
-property_list  : class_property
-  | property_list sep class_property
-  ;
-class_property  : identifier
-  | identifier EQ decl_param_init expression
-  ;
+property_list  : class_property | property_list sep class_property ;
+class_property  : identifier | identifier EQ decl_param_init expression ;
 methods_block  : METHODS stash_comment opt_attr_list opt_sep methods_list opt_sep END
   | METHODS stash_comment opt_attr_list opt_sep END
   ;
-method_decl1  : identifier
-  | identifier param_list
-  ;
-method_decl  : stash_comment method_decl1
-  | stash_comment return_list EQ method_decl1
-  ;
-method  : method_decl
-  | function
-  ;
-methods_list  : method
-  | methods_list opt_sep method
-  ;
+method_decl1  : identifier | identifier param_list ;
+method_decl  : stash_comment method_decl1 | stash_comment return_list EQ method_decl1 ;
+method  : method_decl | function ;
+methods_list  : method | methods_list opt_sep method ;
 events_block  : EVENTS stash_comment opt_attr_list opt_sep events_list opt_sep END
   | EVENTS stash_comment opt_attr_list opt_sep END
   ;
-events_list  : class_event
-  | events_list opt_sep class_event
-  ;
-class_event  : identifier
-  ;
+events_list  : class_event | events_list opt_sep class_event ;
+class_event  : identifier ;
 enum_block  : ENUMERATION stash_comment opt_attr_list opt_sep enum_list opt_sep END
   | ENUMERATION stash_comment opt_attr_list opt_sep END
   ;
-enum_list  : class_enum
-  | enum_list opt_sep class_enum
-  ;
-class_enum  : identifier LP expression RP
-  ;
-stmt_begin  :
-  ;
-stash_comment  :
-  ;
-sep_no_nl  : COMMA
-  | SEMI
-  | sep_no_nl COMMA
-  | sep_no_nl SEMI
-  ;
-opt_sep_no_nl  :
-  | sep_no_nl
-  ;
-opt_nl  :
-  | nl
-  ;
-nl  : CR
-  | nl CR
-  ;
-sep  : COMMA
-  | SEMI
-  | CR
-  | sep COMMA
-  | sep SEMI
-  | sep CR
-  ;
-opt_sep  :
-  | sep
-  ;
+enum_list  : class_enum | enum_list opt_sep class_enum ;
+class_enum  : identifier LP expression RP ;
+stmt_begin  : ;
+stash_comment  : ;
+sep_no_nl  : COMMA | SEMI | sep_no_nl COMMA | sep_no_nl SEMI ;
+opt_sep_no_nl  : | sep_no_nl ;
+opt_nl  : | nl ;
+nl  : CR | nl CR ;
+sep  : COMMA | SEMI | CR | sep COMMA | sep SEMI | sep CR ;
+opt_sep  : | sep ;
