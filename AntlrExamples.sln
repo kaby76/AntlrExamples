@@ -10,7 +10,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flex", "Flex\Flex.csproj", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Java", "Java\Java.csproj", "{F524114D-1827-4D53-9538-1C6D25C75BB1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JavaFixed", "JavaFixed\Java.csproj", "{CED4231D-4F81-49B4-B0A3-13CB3C9E424C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Java", "JavaFixed\Java.csproj", "{CED4231D-4F81-49B4-B0A3-13CB3C9E424C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JavaParr", "JavaParr\JavaParr.csproj", "{02C96D6B-52E0-4715-ABAC-5FADD374F570}"
 EndProject
@@ -27,6 +27,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		appveyor.yml = appveyor.yml
 		README.md = README.md
 	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Matlab", "Matlab\Matlab.csproj", "{0CC4E990-B94A-4FB4-8B35-B75CC5E3C1BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -74,6 +76,10 @@ Global
 		{0015E4FC-4411-4445-B460-FC48DD8AFFB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0015E4FC-4411-4445-B460-FC48DD8AFFB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0015E4FC-4411-4445-B460-FC48DD8AFFB2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CC4E990-B94A-4FB4-8B35-B75CC5E3C1BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CC4E990-B94A-4FB4-8B35-B75CC5E3C1BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CC4E990-B94A-4FB4-8B35-B75CC5E3C1BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CC4E990-B94A-4FB4-8B35-B75CC5E3C1BE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
