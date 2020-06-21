@@ -61,11 +61,12 @@ namespace Matlab
             string input;
             if (args.Length == 0)
             {
-                input = @"a;
+                input = @"[ 1 2 3];
+b = [ 1 2 3 ];
+a;
 a + b;
 'a' + 'b';
 a = 'A string with ''apostrophes''';
-b = [ 1 2 3 ];
 c = a';
 d = a' + a';
 e = a' + b' + c';

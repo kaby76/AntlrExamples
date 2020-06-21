@@ -6,9 +6,9 @@ parser grammar OctParser;
 
 options { tokenVocab=OctLexer; }
 
-input_aug : input EOF ;
+input_aug : input+ EOF ;
 
-input  : (simple_list CR)*
+input  : simple_list CR
   ;
 simple_list  : opt_sep_no_nl
   | simple_list1 opt_sep_no_nl
@@ -80,8 +80,8 @@ primary_expr  : identifier
   | fcn_handle
   | matrix
   | cell
-  | meta_identifier
-  | superclass_identifier
+//  | meta_identifier
+//  | superclass_identifier
   | LP expression RP
   ;
 magic_colon  : COLON
@@ -91,9 +91,9 @@ magic_tilde  : EXPR_NOT
 arg_list  : expression
   | magic_colon
   | magic_tilde
-  | arg_list COMMA magic_colon
-  | arg_list COMMA magic_tilde
-  | arg_list COMMA expression
+  | arg_list COMMA? magic_colon // I suspect the Yacc grammar isn't what they use because ',' is optional.
+  | arg_list COMMA? magic_tilde // I suspect the Yacc grammar isn't what they use because ',' is optional.
+  | arg_list COMMA? expression  // I suspect the Yacc grammar isn't what they use because ',' is optional.
   ;
 indirect_ref_op  : DOT
   ;
@@ -106,7 +106,7 @@ oper_expr  : primary_expr
   | oper_expr LC arg_list RC
   | oper_expr HERMITIAN
   | oper_expr TRANSPOSE
-  | oper_expr indirect_ref_op STRUCT_ELT
+  | oper_expr indirect_ref_op NAME // STRUCT_ELT
   | oper_expr indirect_ref_op LP expression RP
   | PLUS_PLUS oper_expr
   | MINUS_MINUS oper_expr
@@ -133,7 +133,7 @@ power_expr  : primary_expr
   | power_expr LP arg_list RP
   | power_expr LC RC
   | power_expr LC arg_list RC
-  | power_expr indirect_ref_op STRUCT_ELT
+  | power_expr indirect_ref_op NAME // STRUCT_ELT
   | power_expr indirect_ref_op LP expression RP
   | PLUS_PLUS power_expr
   | MINUS_MINUS power_expr
@@ -185,7 +185,7 @@ command  : declaration
   | jump_command
   | except_command
   | function
-  | file
+//  | file
   ;
 declaration  : GLOBAL decl1
   | PERSISTENT decl1
@@ -311,7 +311,7 @@ opt_superclass_list  :
 superclass_list  : EXPR_LT superclass
   | superclass_list EXPR_AND superclass
   ;
-superclass  : FQ_IDENT
+superclass  : NAME // FQ_IDENT
   ;
 class_body  : properties_block
   | methods_block

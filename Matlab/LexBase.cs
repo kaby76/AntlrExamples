@@ -27,7 +27,6 @@ namespace Matlab
 
         public bool CheckQuote(string what_rule)
         {
-            int magic = 20;
             var lexer_state = this.State;
             var parser_state = Parser.State;
             var ts = this.RealTokenStream;

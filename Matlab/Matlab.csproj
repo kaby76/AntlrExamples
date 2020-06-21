@@ -17,7 +17,6 @@
     </Antlr4>
     <Antlr4 Include="matlabParser.g4">
       <Package>Matlab</Package>
-      <GAtn>true</GAtn>
     </Antlr4>
     <Antlr4 Include="OctLexer.g4">
       <Package>Matlab</Package>
