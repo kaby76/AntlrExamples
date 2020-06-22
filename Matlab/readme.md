@@ -13,7 +13,8 @@ The solution here (as opposed to what was suggested in
 the StackOverflow answer)
 uses two semantic predicates that look at parser state at the end of the rule.
 Semantic predicates at the beginning of the rule
-will perform inefficiently.
+will perform inefficiently. Note, there is no keyword "transpose" allowed in Matlab,
+but the grammar erroneously defines one.
 
 This example also provides a grammar I imported from the Octave 5.2 sources. The grammar illustrates
 the kinds of problems one faces when converting a Bison grammar to Antlr: the lexer is in Flex,
