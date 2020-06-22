@@ -23,3 +23,7 @@ is unique for a CMake configured Antlr C++ program. This is a concrete example o
 * [Tomaszewski's example](https://github.com/kaby76/AntlrExamples/tree/master/Tomaszewski). I was combing the web and came
 across [an interesting article by Tomaszewki](https://pdfs.semanticscholar.org/a8dd/2ef009df7601cdbc90332765a56a24c7821c.pdf), of a CFG grammar that doesn't recognize strings like "ww", but a CFG that
 recognizes string not in the language--an interesting play on what a recognizer could do.
+
+* [Matlab](https://github.com/kaby76/AntlrExamples/tree/master/Matlab). This is an example of the Matlab grammar
+with semantic predicates to correct a tokenization problem with the transpose operator. I've also included
+the grammar for Octave which I derived by importing the Bison grammar in from the source for Octave.
