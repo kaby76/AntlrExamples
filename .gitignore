@@ -194,3 +194,5 @@ Matlab/OctParserListener.cs
 Matlab/OctParserVisitor.cs
 Matlab/bin/
 Matlab/obj/
+AntlrEmbeddedCSharp/obj/
+AntlrEmbeddedCSharp/bin/

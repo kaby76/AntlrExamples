@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Antlr": {
+      "commandName": "Project",
+      "commandLineArgs": "c:/users/kenne/documents/antlrexamples/AntlrEmbeddedCSharp/fun2.g4"
+    }
+  }
+}

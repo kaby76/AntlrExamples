@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>Antlr</RootNamespace>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Antlr4 Include="ANTLRv4Parser.g4">
+      <Package>Antlr</Package>
+      <AntOutDir>$(OutputPath)</AntOutDir>
+    </Antlr4>
+    <Antlr4 Include="ANTLRv4Lexer.g4">
+      <Package>Antlr</Package>
+      <AntOutDir>$(OutputPath)</AntOutDir>
+    </Antlr4>
+    <Antlr4 Include="CSharpParser.g4">
+      <Package>Antlr</Package>
+      <AntOutDir>$(OutputPath)</AntOutDir>
+    </Antlr4>
+    <Antlr4 Include="CSharpLexer.g4">
+      <Package>Antlr</Package>
+      <AntOutDir>$(OutputPath)</AntOutDir>
+    </Antlr4>
+    <Antlr4 Include="CSharpPreprocessorParser.g4">
+      <Package>Antlr</Package>
+      <AntOutDir>$(OutputPath)</AntOutDir>
+    </Antlr4>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.8.0" />
+    <PackageReference Include="Antlr4BuildTasks" Version="7.5" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>3021;1701;1702</NoWarn>
+  </PropertyGroup>
+
+</Project>
