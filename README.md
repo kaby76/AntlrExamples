@@ -27,3 +27,6 @@ recognizes string not in the language--an interesting play on what a recognizer 
 * [Matlab](https://github.com/kaby76/AntlrExamples/tree/master/Matlab). This is an example of the Matlab grammar
 with semantic predicates to correct a tokenization problem with the transpose operator. I've also included
 the grammar for Octave which I derived by importing the Bison grammar in from the source for Octave.
+
+* [Antlr grammars with C# action blocks](https://github.com/kaby76/AntlrExamples/tree/master/AntlrTargetCSharp).
+This is an example of parsing an Antlr targeting C# in action blocks.
