@@ -64,9 +64,9 @@ comparisonexpr : stringconcatexpr ( (valuecomp | generalcomp | nodecomp) stringc
 stringconcatexpr : rangeexpr ( PP rangeexpr )* ;
 // [20]
 rangeexpr : additiveexpr ( KW_TO additiveexpr )? ;
-additiveexpr : multiplicativeexpr ( ( PLUS | MINUS) multiplicativeexpr )* ;
-multiplicativeexpr : unionexpr ( ( STAR | KW_DIV | KW_IDIV | KW_MOD) unionexpr )* ;
-unionexpr : intersectexceptexpr ( ( KW_UNION | P) intersectexceptexpr )* ;
+additiveexpr : multiplicativeexpr ( (PLUS | MINUS) multiplicativeexpr )* ;
+multiplicativeexpr : unionexpr ( (STAR | KW_DIV | KW_IDIV | KW_MOD) unionexpr )* ;
+unionexpr : intersectexceptexpr ( (KW_UNION | P) intersectexceptexpr )* ;
 intersectexceptexpr : instanceofexpr ( ( KW_INTERSECT | KW_EXCEPT) instanceofexpr )* ;
 // [25]
 instanceofexpr : treatexpr ( KW_INSTANCE KW_OF sequencetype )? ;
@@ -164,74 +164,76 @@ typename : eqname ;
 functiontest : anyfunctiontest | typedfunctiontest ;
 anyfunctiontest : KW_FUNCTION OP STAR CP ;
 typedfunctiontest : KW_FUNCTION OP (sequencetype ( COMMA sequencetype)*)? CP KW_AS sequencetype ;
+// [105]
 maptest : anymaptest | typedmaptest ;
 anymaptest : KW_MAP OP STAR CP ;
 typedmaptest : KW_MAP OP atomicoruniontype COMMA sequencetype CP ;
 arraytest : anyarraytest | typedarraytest ;
 anyarraytest : KW_ARRAY OP STAR CP ;
+// [110]
 typedarraytest : KW_ARRAY OP sequencetype CP ;
 parenthesizeditemtype : OP itemtype CP ;
 
 // Error in the spec. EQName also includes acceptable keywords.
 eqname : QName | URIQualifiedName
- | KW_RETURN
- | KW_FOR
- | KW_IN
- | KW_LET
- | KW_SOME
- | KW_EVERY
- | KW_SATISFIES
- | KW_IF
- | KW_THEN
- | KW_ELSE
- | KW_OR
- | KW_AND
- | KW_DIV
- | KW_IDIV
- | KW_MOD
- | KW_UNION
- | KW_INTERSECT
- | KW_EXCEPT
- | KW_INSTANCE
- | KW_OF
- | KW_TREAT
- | KW_AS
- | KW_CASTABLE
- | KW_CAST
- | KW_EQ
- | KW_NE
- | KW_LT
- | KW_LE
- | KW_GT
- | KW_GE
- | KW_IS
- | KW_CHILD
- | KW_DESCENDANT
- | KW_ATTRIBUTE
- | KW_SELF
- | KW_DESCENDANT_OR_SELF
- | KW_FOLLOWING_SIBLING
- | KW_FOLLOWING
- | KW_NAMESPACE
- | KW_PARENT
  | KW_ANCESTOR
- | KW_PRECEDING_SIBLING
- | KW_PRECEDING
  | KW_ANCESTOR_OR_SELF
- | KW_FUNCTION
- | KW_MAP
- | KW_ARRAY
- | KW_EMPTY_SEQUENCE
- | KW_ITEM
- | KW_NODE
- | KW_DOCUMENT_NODE
- | KW_TEXT
- | KW_COMMENT
- | KW_NAMESPACE_NODE
- | KW_PROCESSING_INSTRUCTION
- | KW_SCHEMA_ATTRIBUTE
- | KW_ELEMENT
- | KW_SCHEMA_ELEMENT
+ | KW_AND
+ // | KW_ARRAY
+ | KW_AS
+ // | KW_ATTRIBUTE
+ | KW_CAST
+ | KW_CASTABLE
+ | KW_CHILD
+ // | KW_COMMENT
+ | KW_DESCENDANT
+ | KW_DESCENDANT_OR_SELF
+ | KW_DIV
+ // | KW_DOCUMENT_NODE
+ // | KW_ELEMENT
+ | KW_ELSE
+ // | KW_EMPTY_SEQUENCE
+ | KW_EQ
+ | KW_EVERY
+ | KW_EXCEPT
+ | KW_FOLLOWING
+ | KW_FOLLOWING_SIBLING
+ | KW_FOR
+ // | KW_FUNCTION
+ | KW_GE
+ | KW_GT
+ | KW_IDIV
+ // | KW_IF
+ | KW_IN
+ | KW_INSTANCE
+ | KW_INTERSECT
+ | KW_IS
+ // | KW_ITEM
+ | KW_LE
+ | KW_LET
+ | KW_LT
+ // | KW_MAP
+ | KW_MOD
+ | KW_NAMESPACE
+ // | KW_NAMESPACE_NODE
+ | KW_NE
+ // | KW_NODE
+ | KW_OF
+ | KW_OR
+ | KW_PARENT
+ | KW_PRECEDING
+ | KW_PRECEDING_SIBLING
+ // | KW_PROCESSING_INSTRUCTION
+ | KW_RETURN
+ | KW_SATISFIES
+ // | KW_SCHEMA_ATTRIBUTE
+ // | KW_SCHEMA_ELEMENT
+ | KW_SELF
+ | KW_SOME
+ // | KW_TEXT
+ | KW_THEN
+ | KW_TREAT
+ | KW_UNION
  ;
 
 AT : '@' ;
