@@ -8,9 +8,5 @@ build_script:
   - cmd: date /t
   - cmd: time /t
   - cmd: tzutil /g
-  - cmd: curl -fsS -o antlr-4.8-complete.jar "https://www.antlr.org/download/antlr-4.8-complete.jar"
-  - cmd: set Antlr4ToolPath=C:\projects\AntlrExamples\antlr-4.8-complete.jar
-  - cmd: set JAVA_EXEC=C:\Progra~1\Java\jdk1.8.0\bin\java.exe
-  - cmd: set
   - cmd: dotnet restore AntlrExamples.sln
   - cmd: dotnet build AntlrExamples.sln
