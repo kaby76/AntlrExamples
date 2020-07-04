@@ -1,3 +1,6 @@
+//*[text()]
+text
+//*[text()='RBRACE']
 ' #text'
 ' 6 ' div 2
 ' 6 '*div
@@ -1358,3 +1361,4 @@ $N[@x castable as xs:date][xs:date(@x) gt xs:date("2000-01-01")]
 $N[if (@x castable as xs:date) then xs:date(@x) gt xs:date("2000-01-01") else false()]
 $myaddress treat as function(node()) as xs:string*
 $myaddress treat as (function(node()) as xs:string)*
+//label[normalize-space(.)='Phone']/parent::lightning-input/parent::slot/parent::slot/parent::span/parent::div/parent::force-record-layout-item/parent::slot/parent::force-record-layout-row/parent::slot/parent::div/parent::div/parent::div/parent::force-record-layout-section/parent::slot/parent::force-record-layout-block/parent::forcegenerated-detailpanel_contact___012b0000000jhhvia4___full___view___recordlayout2/parent::records-lwc-record-layout/parent::slot/parent::records-record-layout-event-broker/parent::div/parent::div/following-sibling::force-form-footer//button

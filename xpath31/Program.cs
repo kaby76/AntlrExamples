@@ -29,6 +29,8 @@ namespace xpath
                 }
                 else
                 {
+                    System.Console.WriteLine(tokens.OutputTokens());
+                    System.Console.WriteLine(tree.OutputTree(tokens));
                     System.Console.WriteLine("parse completed.");
                 }
                 string xpath = "//exprsingle";

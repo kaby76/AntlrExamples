@@ -2,40 +2,8 @@
 // Author--Ken Domino
 // Date--4 June 2020
 // 
-// This is a faithful implementation of the XPath version 3.1 gramar
+// This is a faithful implementation of the XPath version 3.1 grammar
 // from the spec at https://www.w3.org/TR/2017/REC-xpath-31-20170321/
-// I have gone through this grammar very, very carefully to make sure
-// that it is essentially identical to the spec, that it implements
-// the lexical and parsing structures as stated in the spec.
-// All others that I have found on the web (i.e., github.com) do not
-// faithfully implement the spec, or are incomplete. This implementation
-// is complete.
-//
-// I have verified this grammar against thousands of test expressions,
-// which also differentiates this implementation for all others.
-//
-// Note, for testing using online xpath parsers xpath expressions,
-// all require a data set. This is a pure, no bullshit parser. I am
-// working on an xpath engine in C#.
-//
-// A note on the implementation of this grammar. I copied the grammar directly
-// from the spec then employed Antlrvsix to refactor the grammar. I have not
-// optimized it for speed, but that obviously could be done. The parser
-// and lexer are combined because there is no super classing, no modes,
-// no special lexer channels. If you want these, again Antlrvsix is the
-// only tool that can do that quickly for you.
-//
-// Note on alternatives:
-// https://github.com/exquery/xpath3-parser/blob/master/src/main/antlr4/org/exquery/xpath/parser/XPath3.g4
-// This grammar does not implement correctly:
-// * the lexical structure of the comment token;
-// * the lexical structure of the QName token;
-// * the lexical structure of the NCName token.
-// For example, it says very, very clearly in the spec: "A.2.1 Terminal Symbols ... [122]   	QName".
-// QName is a TOKEN. QName is a LEXICAL SYMBOL. QName is produced by the lexer, not the parser.
-//
-// https://github.com/antlr/grammars-v4/blob/master/xpath/xpath.g4
-// This grammar is for version 1.
 
 grammar XPath31;
 
@@ -114,7 +82,27 @@ varref : DOLLAR varname ;
 varname : eqname ;
 parenthesizedexpr : OP expr? CP ;
 contextitemexpr : D ;
-functioncall : eqname argumentlist ;
+functioncall : 
+                      { !(
+                           InputStream.LA(1)==KW_ARRAY
+                        || InputStream.LA(1)==KW_ATTRIBUTE
+                        || InputStream.LA(1)==KW_COMMENT
+                        || InputStream.LA(1)==KW_DOCUMENT_NODE
+                        || InputStream.LA(1)==KW_ELEMENT
+                        || InputStream.LA(1)==KW_EMPTY_SEQUENCE
+                        || InputStream.LA(1)==KW_FUNCTION
+                        || InputStream.LA(1)==KW_IF
+                        || InputStream.LA(1)==KW_ITEM
+                        || InputStream.LA(1)==KW_MAP
+                        || InputStream.LA(1)==KW_NAMESPACE_NODE
+                        || InputStream.LA(1)==KW_NODE
+                        || InputStream.LA(1)==KW_PROCESSING_INSTRUCTION
+                        || InputStream.LA(1)==KW_SCHEMA_ATTRIBUTE
+                        || InputStream.LA(1)==KW_SCHEMA_ELEMENT
+                        || InputStream.LA(1)==KW_TEXT
+                        ) }?
+                        eqname 
+                        argumentlist ;
 argument : exprsingle | argumentplaceholder ;
 // [65]
 argumentplaceholder : QM ;
@@ -179,62 +167,65 @@ eqname : QName | URIQualifiedName
  | KW_ANCESTOR
  | KW_ANCESTOR_OR_SELF
  | KW_AND
- // | KW_ARRAY
+ | KW_ARRAY
  | KW_AS
- // | KW_ATTRIBUTE
+ | KW_ATTRIBUTE
  | KW_CAST
  | KW_CASTABLE
  | KW_CHILD
- // | KW_COMMENT
+ | KW_COMMENT
  | KW_DESCENDANT
  | KW_DESCENDANT_OR_SELF
  | KW_DIV
- // | KW_DOCUMENT_NODE
- // | KW_ELEMENT
+ | KW_DOCUMENT_NODE
+ | KW_ELEMENT
  | KW_ELSE
- // | KW_EMPTY_SEQUENCE
+ | KW_EMPTY_SEQUENCE
  | KW_EQ
  | KW_EVERY
  | KW_EXCEPT
  | KW_FOLLOWING
  | KW_FOLLOWING_SIBLING
  | KW_FOR
- // | KW_FUNCTION
+ | KW_FUNCTION
  | KW_GE
  | KW_GT
  | KW_IDIV
- // | KW_IF
+ | KW_IF
  | KW_IN
  | KW_INSTANCE
  | KW_INTERSECT
  | KW_IS
- // | KW_ITEM
+ | KW_ITEM
  | KW_LE
  | KW_LET
  | KW_LT
- // | KW_MAP
+ | KW_MAP
  | KW_MOD
  | KW_NAMESPACE
- // | KW_NAMESPACE_NODE
+ | KW_NAMESPACE_NODE
  | KW_NE
- // | KW_NODE
+ | KW_NODE
  | KW_OF
  | KW_OR
  | KW_PARENT
  | KW_PRECEDING
  | KW_PRECEDING_SIBLING
- // | KW_PROCESSING_INSTRUCTION
+ | KW_PROCESSING_INSTRUCTION
  | KW_RETURN
  | KW_SATISFIES
- // | KW_SCHEMA_ATTRIBUTE
- // | KW_SCHEMA_ELEMENT
+ | KW_SCHEMA_ATTRIBUTE
+ | KW_SCHEMA_ELEMENT
  | KW_SELF
  | KW_SOME
- // | KW_TEXT
+ | KW_TEXT
  | KW_THEN
  | KW_TREAT
  | KW_UNION
  ;
+
+auxilary : (expr ('\n' | '\r')+ )+ EOF;
+
 
 AT : '@' ;
 BANG : '!' ;
