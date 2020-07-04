@@ -224,7 +224,7 @@ eqname : QName | URIQualifiedName
  | KW_UNION
  ;
 
-auxilary : (expr ('\n' | '\r')+ )+ EOF;
+auxilary : (expr NL+ )+ EOF;
 
 
 AT : '@' ;
@@ -384,4 +384,6 @@ fragment FragChar : '\u0009' | '\u000a' | '\u000d'
   | '\u{10000}'..'\u{10ffff}'
  ;
 
-Whitespace :  ('\u0020' | '\u0009' | '\u000d' | '\u000a')+ -> skip ;
+NL : ('\u000d' | '\u000a')+;
+
+Whitespace :  ('\u0020' | '\u0009')+ -> skip ;
