@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>pl1</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="pl1_parser.g4" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Antlr4 Include="pl1_parser.g4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.8.0" />
+    <PackageReference Include="Antlr4BuildTasks" Version="8.0" />
+    <PackageReference Include="System.CodeDom" Version="4.7.0" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>3021;1701;1702</NoWarn>
+  </PropertyGroup>
+
+</Project>
