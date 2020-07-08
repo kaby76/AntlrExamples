@@ -7,29 +7,54 @@ namespace pl1
 
     public class Program
     {
-        static void Try(string fn)
+        static void Main(string[] args)
         {
-            var input = ReadAllInput(fn);
-            System.Console.WriteLine("Input:");
-            System.Console.WriteLine(input);
-            var str = new AntlrInputStream(input);
-            var lexer = new pl1_parserLexer(str);
-            var tokens = new CommonTokenStream(lexer);
-            var parser = new pl1_parserParser(tokens);
-            var listener = new ErrorListener<IToken>(parser, lexer, tokens);
-            parser.AddErrorListener(listener);
-            lexer.AddErrorListener(new ErrorListener<int>(parser, lexer, tokens));
-            var tree = parser.pl1pgm();
-            if (listener.had_error)
+
+            bool show_tree = false;
+            bool show_tokens = false;
+            bool show_input = false;
+            for (int i = 0; i < args.Length; ++i)
             {
-                System.Console.WriteLine("error in parse.");
+                switch (args[i])
+                {
+                    case "-tree":
+                        show_tree = true;
+                        break;
+                    case "-tokens":
+                        show_tokens = true;
+                        break;
+                    case "-input":
+                        show_input = true;
+                        break;
+                }
             }
-            else
+            for (int i = 0; i < args.Length; ++i)
             {
-                System.Console.WriteLine("parse completed.");
+                if (args[i].StartsWith('-')) continue;
+                var fn = args[i];
+                var input = ReadAllInput(fn);
+                if (show_input)
+                {
+                    System.Console.WriteLine("Input:");
+                    System.Console.WriteLine(input);
+                }
+                var str = new AntlrInputStream(input);
+                var lexer = new pl1_parserLexer(str);
+                var tokens = new CommonTokenStream(lexer);
+                var parser = new pl1_parserParser(tokens);
+                var listener = new ErrorListener<IToken>(parser, lexer, tokens);
+                parser.AddErrorListener(listener);
+                lexer.AddErrorListener(new ErrorListener<int>(parser, lexer, tokens));
+                var tree = parser.pl1pgm();
+                if (listener.had_error)
+                    System.Console.WriteLine("error in parse.");
+                else
+                    System.Console.WriteLine("parse completed.");
+                if (show_tokens)
+                    System.Console.WriteLine(tokens.OutputTokens(lexer));
+                if (show_tree)
+                    System.Console.WriteLine(tree.OutputTree(tokens));
             }
-            System.Console.WriteLine(tokens.OutputTokens(lexer));
-            System.Console.WriteLine(tree.OutputTree(tokens));
         }
 
         static string ReadAllInput(string fn)
@@ -44,11 +69,6 @@ namespace pl1
                     sb.AppendLine();
             }
             return sb.ToString();
-        }
-
-        static void Main(string[] args)
-        {
-            Try(args[0]);
         }
     }
 }
