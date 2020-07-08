@@ -28,7 +28,7 @@ namespace pl1
             int col, string msg, RecognitionException e)
         {
             had_error = true;
-            if (_first_time)
+            if (false && _first_time)
             {
                 try
                 {
