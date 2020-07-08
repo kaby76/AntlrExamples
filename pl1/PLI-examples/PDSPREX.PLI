@@ -1,0 +1,143 @@
+*PROCESS NM;
+ PDSPREX:  PROCEDURE OPTIONS(MAIN) REORDER;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* EXAMPLE OF USE OF PDSPROC ROUTINE.                                */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PDSPROC  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  YES  BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO   BIT(1) INIT('0'B) STATIC;
+ DECLARE  (I, J) FIXED BINARY;
+ DECLARE  (ADDR, LENGTH, PLIRETV, UNSPEC)  BUILTIN;
+ DECLARE  ERRMSG1  BASED(ERRPTR(1)) CHAR(32760) VARYING;
+ DECLARE  ERRMSG2  BASED(ERRPTR(2)) CHAR(32760) VARYING;
+
+ DECLARE
+   1  PARM(2),
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMNAME     CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6),
+      2  REC         CHAR(32760) VARYING;
+
+ DECLARE
+   1  DIRECTORY  BASED(BLDLPTR(1)),
+      2  NUMBER_ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT REFER(NUMBER_ENTRIES)),
+         3  MEMBER_NAME  CHAR(8),
+         3  TTR          CHAR(3),
+         3  C_FIELD,
+            4  ALIAS           BIT(1),
+            4  NUM_TTRN        BIT(2),
+            4  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+
+ DECLARE
+    1  STOW_ENTRY,
+       3  STOW_MEMBER_NAME  CHAR(8),
+       3  STOW_TTR          CHAR(3),
+       3  STOW_C_FIELD,
+          4  STOW_ALIAS          BIT(1),
+          4  STOW_NUM_TTRN       BIT(2),
+          4  STOW_USER_HALFWORDS BIT(5),
+       3  STOW_USER_DATA    CHAR(62);
+
+ DECLARE
+    1  STOW_CHANGE_DELETE,
+       3  OLD_MEMBER_NAME  CHAR(8),
+       3  NEW_MEMBER_NAME  CHAR(8);
+
+ OPEN_FOR_INPUT(1) = YES;
+ DDNAME(1) = 'IN';
+ CALL PDSFUNC('OPEN', 1);
+ CALL PDSFUNC('BLDL', 1);
+
+ OPEN_FOR_INPUT(2) = NO;
+ DDNAME(2) = 'OUT';
+ CALL PDSFUNC('OPEN', 2);
+
+ DO I = 1 TO NUMBER_ENTRIES;
+     FINDTTR(1) = TTR(I);
+     CALL PDSFUNC('FINDTTR', 1);
+     STOW_MEMBER_NAME = MEMBER_NAME(I);
+     STOW_C_FIELD = C_FIELD(I);
+     PUT SKIP EDIT(STOW_MEMBER_NAME) (A);
+     DO J = 1 BY 1 WHILE(ªEND_OF_FILE(1));
+         REC(2) = '';
+         BLK_REC:
+         DO WHILE(LENGTH(REC(2)) < 6160);
+             CALL INPUTER;
+             IF END_OF_FILE(1)
+                 THEN LEAVE BLK_REC;
+             REC(2) = REC(2) || REC(1);
+             END BLK_REC;
+         CALL PDSFUNC('WRITE', 2);
+         IF J = 1
+             THEN DO;
+                  CALL PDSFUNC('NOTE', 2);
+                  STOW_TTR = FINDTTR(2);
+                  END;
+         END;
+     BLDLPTR(2) = ADDR(STOW_ENTRY);
+     CALL PDSFUNC('STOW', 2);
+     END;
+ CALL PDSFUNC('CLOSE', 1);
+ CALL PDSFUNC('CLOSE', 2);
+1PDSFUNC:  PROCEDURE(FUNCTION, PARM#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE FIRST PARAMETER IS THE FUNCTION TO */
+ /* BE PERFORMED BY PDSPROC AND THE SECOND DETERMINES WHICH PDS IS    */
+ /* BEING REFERED TO.  DDNAME OLD IS NUMBER 1, DDNAME NEW IS NUMBER 2.*/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DCL FUNCTION CHAR(10);
+ DCL PARM# FIXED BINARY;
+
+ CALL PDSPROC(FUNCTION, PARM(PARM#));
+ IF PLIRETV ª= 0
+     THEN DO;
+          IF PARM# = 1
+              THEN PUT SKIP EDIT(ERRMSG1) (A);
+              ELSE PUT SKIP EDIT(ERRMSG2) (A);
+          PUT SKIP EDIT('RETURN CODE =', PLIRETV) (A, F(9));
+          SIGNAL ERROR;
+          END;
+ END PDSFUNC;
+1INPUTER:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CALL PDSFUNC('READ', 1);
+ IF END_OF_FILE(1)
+     THEN REC(1) = '';
+
+ END INPUTER;
+
+ END PDSPREX;
+

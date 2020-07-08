@@ -1,0 +1,64 @@
+*PROCESS NM;
+1STRPTR:  PROCEDURE(STR) RETURNS(PTR) OPTIONS(REENTRANT) REORDER;
+ DECLARE  IDSTRPT  CHAR(34) VARYING STATIC EXTERNAL
+    INIT('STRPTR V1.1  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE ACCEPTS A CHARACTER STRING AS INPUT (<=8 CHAR) AND */
+ /* RETURNS A FULLWORD VALUE (EITHER PTR OR FIXED BINARY(31)).        */
+ /* THE CHARACTER STRING SHOULD BE COMPOSED OF THE HEXIDECIMAL DIGITS */
+ /* 0-F.  EDITING IS PERFORMED UPON THE CHARACTER STRING TO INSURE    */
+ /* THAT THE INPUT IS IN THE PROPER FORM FOR CONVERSION.  THE OUTPUT  */
+ /* IS THE PTR ADDRESS OF WHICH THE CHARACTER STRING REPRESENTED.     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  STR     CHAR(*);
+ DECLARE  CONSTR  CHAR(8) INIT('00000000');
+ DECLARE  POS     FIXED BINARY(31);
+ DECLARE  RETPTR  PTR;
+ DECLARE  BITPTR(8)  BIT(4) BASED(ADDR(RETPTR));
+ DECLARE  VERIFY  ENTRY RETURNS(FIXED BINARY(31));
+ DECLARE  (ADDR, LENGTH, SUBSTR)  BUILTIN;
+1/* RIGHT JUSTIFY FIRST */
+ DO WHILE(SUBSTR(STR, LENGTH(STR), 1) = ' ');
+     STR = '0' || STR;
+     END;
+
+ /* INVALID CHARACTERS ARE ZEROS */
+ POS = VERIFY(STR, '0123456789ABCDEF');
+ DO WHILE(POS ª= 0);
+     SUBSTR(STR, POS, 1) = '0';
+     POS = VERIFY(STR, '0123456789ABCDEF');
+     END;
+
+ SUBSTR(CONSTR, 8-LENGTH(STR)+1) = STR;
+
+ /* CONVERT TO PTR */
+ DO POS = 1 TO 8;
+     SELECT(SUBSTR(CONSTR, POS, 1));
+         WHEN('0') BITPTR(POS) = '0000'B;
+         WHEN('1') BITPTR(POS) = '0001'B;
+         WHEN('2') BITPTR(POS) = '0010'B;
+         WHEN('3') BITPTR(POS) = '0011'B;
+         WHEN('4') BITPTR(POS) = '0100'B;
+         WHEN('5') BITPTR(POS) = '0101'B;
+         WHEN('6') BITPTR(POS) = '0110'B;
+         WHEN('7') BITPTR(POS) = '0111'B;
+         WHEN('8') BITPTR(POS) = '1000'B;
+         WHEN('9') BITPTR(POS) = '1001'B;
+         WHEN('A') BITPTR(POS) = '1010'B;
+         WHEN('B') BITPTR(POS) = '1011'B;
+         WHEN('C') BITPTR(POS) = '1100'B;
+         WHEN('D') BITPTR(POS) = '1101'B;
+         WHEN('E') BITPTR(POS) = '1110'B;
+         WHEN('F') BITPTR(POS) = '1111'B;
+         END;
+     END;
+
+ RETURN(RETPTR);
+
+ END STRPTR;
+

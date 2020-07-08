@@ -1,0 +1,584 @@
+*PROCESS NM;
+ CTCLEAN:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(36) VARYING STATIC EXTERNAL
+     INIT('CATCLEAN V1.1  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(8) VARYING STATIC EXTERNAL INIT('ISA(40K)');
+ /*********************************************************************/
+ /*                                                                   */
+ /* THE IDEA OF THIS PROGRAM IS TO CREATE UNCATLG STATEMENTS FOR A    */
+ /* SYSCTLG WHICH CONTAINS ENTRIES FOR DATASETS WHICH DO NOT EXIST.   */
+ /* PARM REQUIRED BY PROGRAM CONSISTS OF DEVICE TYPE = VOLSER, AS,    */
+ /* PARM='3350=SYSDAB,3350=PRIV04' REPRESENTING THE SYSCTLG(S) TO BE  */
+ /* USED.  AT LEAST ONE CATALOG IS REQUIRED.                          */
+ /*                                                                   */
+ /* DDNAMES REQUIRED BY PROGRAM:                                      */
+ /* ANY DD (S)   VOLUME ALLOCATE FOR IEHLIST FOR THE SYSCTLG, SHOULD  */
+ /*              PRECEDE THE OTHER DDCARDS IN THE JOB STREAM          */
+ /* IEHCNTL      TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* IEHSIN       TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* IEHSOUT      TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* IEHSWK01     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* IEHSWK02     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* IEHSWK03     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* VTOCIN       TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* VTOCOUT      TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* VTOCWK01     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* VTOCWK02     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* VTOCWK03     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* SORTMSG      SORT MESSAGES, SYSOUT                                */
+ /* MSGS         PROGRAM MESSAGES, SYSOUT                             */
+ /* DUPL         PROGRAM WARNING LISTING OF DATASETS WHICH MAY NOT    */
+ /*              BE PROCESSED CORRECTLY                               */
+ /* UNCAT        PROGRAM OUTPUT DATA CONSISTING OF UNCATLG STATEMENTS */
+ /* OTHVOL       PROGRAM OUTPUT DATA CONSISTING OF XXCATLG STATEMENTS */
+ /*              WHICH MAY BE EDITED TO UNCATLG IF DESIRED            */
+ /* NOTCAT       PROGRAM OUTPUT DATA CONSISTING OF SCRATCH STATEMENTS */
+ /* RECAT        PROGRAM OUTPUT DATA CONSISTING OF CATLG STATEMENTS   */
+ /*              FOR RECOVERY PURPOSES                                */
+ /* NEWCAT       PROGRAM OUTPUT DATA CONSISTING OF CATLG STATEMENTS   */
+ /*              FOR A NEW CATALOG. DATA CONTAINS ONLY ENTRIES FOR    */
+ /*              THOSE DATASETS WHICH WERE CATALOGED AND REPRESENTED  */
+ /*              BY A DISKNN DDCARD.                                  */
+ /* DDNAMES OPTIONALLY NECESSARY TO PROGRAM:                          */
+ /* DISK1 - NNN  UP TO A MAXIMUM OF 200 3330/3350 DISK DRIVES MAY BE  */
+ /*              ALLOCATED TO HAVE THEIR VTOC DATA READ.              */
+ /*              (THIS IS EASY TO INCREASE).  AT MINIMUM DISK1 IS     */
+ /*              REQUIRED.                                            */
+ /* DDNAMES      INPUT FILE WHICH CAN SPECIFY ALTERNATE DDNAME TO     */
+ /*              USE INSTEAD OF DISKNN DDNAMES                        */
+ /*                                                                   */
+ /*********************************************************************/
+1DECLARE  PARM    CHAR(100) VARYING;
+
+ /* FILE DECLARATIONS */
+ DECLARE  (VTOCIN, VTOCOUT)
+                    FILE RECORD ENV(FB RECSIZE(50) BLKSIZE(6200));
+ DECLARE  DDNAMES   FILE INPUT  STREAM;
+ DECLARE  IEHCNTL   FILE RECORD ENV(F RECSIZE(80) BLKSIZE(80));
+ DECLARE  IEHSOUT   FILE RECORD ENV(FB RECSIZE(121));
+ DECLARE  MSGS      FILE OUTPUT STREAM PRINT;
+ DECLARE  DUPL      FILE OUTPUT STREAM PRINT;
+ DECLARE  UNCAT     FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  RECAT     FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  NOTCAT    FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  OTHVOL    FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  NEWCAT    FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+
+ /* SUBROUTINE DECLARATIONS */
+ DECLARE  QCKSORT   ENTRY((*) CHAR(*), FIXED BINARY, FIXED BINARY);
+ DECLARE  GETVTOC   ENTRY(CHAR(8), CHAR(140)) OPTIONS(ASM, INTER);
+ DECLARE  LINK      ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (ADDR, INDEX, ONSOURCE, PLIDUMP, PLIRETV, SUBSTR)  BUILTIN;
+
+ /* FIXED BINARY DECLARATIONS */
+ DECLARE  DDNUM   FIXED BINARY;
+ DECLARE  NNN     FIXED BINARY;
+ DECLARE  POS     FIXED BINARY;
+
+ /* CHARACTER DECLARATIONS */
+ DECLARE  DISK3380  CHAR(8) STATIC INIT('3010200E');
+ DECLARE  DISK3350  CHAR(8) STATIC INIT('3050200B');
+ DECLARE  DISK3330  CHAR(8) STATIC INIT('3050200D');
+ DECLARE  INPT      CHAR(32);
+ DECLARE  PASSAREA  CHAR(8);
+ DECLARE  PARM_SEL  CHAR(11);
+ DECLARE  CARD      CHAR(80);
+ DECLARE  VDEV      CHAR(6) VARYING;
+ DECLARE  VDSN      CHAR(44) VARYING;
+
+ /* BIT STRING DECLARATIONS */
+ DECLARE  MORE_IEHSOUT  BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_VTOCOUT  BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_DDNAMES  BIT(1) INIT('1'B) STATIC;
+ DECLARE  SKIP_IEHSOUT  BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO            BIT(1) INIT('0'B) STATIC;
+ DECLARE  YES           BIT(1) INIT('1'B) STATIC;
+1DECLARE
+     1  VTOCREC,
+        2  DSNAME  CHAR(44),
+        2  VOLSER  CHAR(6);
+
+ DECLARE
+     1  IEHSOUT_REC,
+        2  CONTROL_CHAR  CHAR(1),
+        2  DSN           CHAR(50),
+        2  VOLUME        CHAR(6),
+        2  FILLER1       CHAR(4),
+        2  SEQ_NO        CHAR(6),
+        2  FILLER2       CHAR(4),
+        2  DEVTYPE       CHAR(6),
+        2  FILLER3       CHAR(44);
+
+ DECLARE  IEHLIST_PARM  CHAR(10) VARYING STATIC INIT('LINECNT=99');
+
+ DECLARE
+     1  DDNAME_LIST  STATIC,
+        2  LIST_LEN FIXED BINARY(15) INIT(48),
+        2  FILLER1  FIXED BINARY(31) INIT(0),
+        2  FILLER2  FIXED BINARY(31) INIT(0),
+        2  FILLER3  FIXED BINARY(31) INIT(0),
+        2  FILLER4  FIXED BINARY(31) INIT(0),
+        2  FILLER5  FIXED BINARY(31) INIT(0),
+        2  FILLER6  FIXED BINARY(31) INIT(0),
+        2  FILLER7  FIXED BINARY(31) INIT(0),
+        2  FILLER8  FIXED BINARY(31) INIT(0),
+        2  SYSIN_DD  CHAR(8) INIT('IEHCNTL'),
+        2  SYSPR_DD  CHAR(8) INIT('IEHSIN');
+
+ DECLARE
+     1  SORT_PARM           STATIC,
+        2  BYTE_COUNT       FIXED BINARY  INIT(32),
+        2  BEGIN_SORT_STMT  PTR,
+        2  END_SORT_STMT    PTR,
+        2  BEGIN_REC_STMT   PTR,
+        2  END_REC_STMT     PTR,
+        2  ADDR_E15         FIXED BINARY(31)  INIT(0),
+        2  ADDR_E35         FIXED BINARY(31)  INIT(0),
+        2  STORAGE          FIXED BINARY(31)  INIT(262144),
+        2  SORT_PREF        CHAR(4)           INIT('VTOC'),
+        2  VTOCSORT  CHAR(24) INIT(' SORT FIELDS=(1,50,CH,A)'),
+        2  VTOCRECD  CHAR(24) INIT(' RECORD LENGTH=50,TYPE=F'),
+        2  IEHSORT   CHAR(24) INIT(' SORT FIELDS=(2,45,CH,A)'),
+        2  IEHRECD   CHAR(25) INIT(' RECORD LENGTH=121,TYPE=F'),
+        2  IEHEND    CHAR(1)  INIT(' ');
+1/* TABLE FOR VOLUME SERIAL NUMBERS */
+ DECLARE  VOLSERS(200)  CHAR(6);
+
+ /* POSSIBLE DDNAME POSITIONS WITH THEIR DEFAULTS */
+ DECLARE  DDNAME(200) CHAR(8) STATIC INIT('DISK1', 'DISK2',  'DISK3',
+ 'DISK4',  'DISK5',  'DISK6',  'DISK7',  'DISK8',  'DISK9',  'DISK10',
+ 'DISK11', 'DISK12', 'DISK13', 'DISK14', 'DISK15', 'DISK16', 'DISK17',
+ 'DISK18', 'DISK19', 'DISK20', 'DISK21', 'DISK22', 'DISK23', 'DISK24',
+ 'DISK25', 'DISK26', 'DISK27', 'DISK28', 'DISK29', 'DISK30', 'DISK31',
+ 'DISK32', 'DISK33', 'DISK34', 'DISK35', 'DISK36', 'DISK37', 'DISK38',
+ 'DISK39', 'DISK40', 'DISK41', 'DISK42', 'DISK43', 'DISK44', 'DISK45',
+ 'DISK46', 'DISK47', 'DISK48', 'DISK49', 'DISK50', 'DISK51', 'DISK52',
+ 'DISK53', 'DISK54', 'DISK55', 'DISK56', 'DISK57', 'DISK58', 'DISK59',
+ 'DISK60', 'DISK61', 'DISK62', 'DISK63', 'DISK64', 'DISK65', 'DISK66',
+ 'DISK67', 'DISK68', 'DISK69', 'DISK70', 'DISK71', 'DISK72', 'DISK73',
+ 'DISK74', 'DISK75', 'DISK76', 'DISK77', 'DISK78', 'DISK79', 'DISK80',
+ 'DISK81', 'DISK82', 'DISK83', 'DISK84', 'DISK85', 'DISK86', 'DISK87',
+ 'DISK88', 'DISK89', 'DISK90', 'DISK91', 'DISK92', 'DISK93', 'DISK94',
+ 'DISK95', 'DISK96', 'DISK97', 'DISK98', 'DISK99',
+ 'DISK100', 'DISK101', 'DISK102', 'DISK103', 'DISK104', 'DISK105',
+ 'DISK106', 'DISK107', 'DISK108', 'DISK109', 'DISK110', 'DISK111',
+ 'DISK112', 'DISK113', 'DISK114', 'DISK115', 'DISK116', 'DISK117',
+ 'DISK118', 'DISK119', 'DISK120', 'DISK121', 'DISK122', 'DISK123',
+ 'DISK124', 'DISK125', 'DISK126', 'DISK127', 'DISK128', 'DISK129',
+ 'DISK130', 'DISK131', 'DISK132', 'DISK133', 'DISK134', 'DISK135',
+ 'DISK136', 'DISK137', 'DISK138', 'DISK139', 'DISK140', 'DISK141',
+ 'DISK142', 'DISK143', 'DISK144', 'DISK145', 'DISK146', 'DISK147',
+ 'DISK148', 'DISK149', 'DISK150', 'DISK151', 'DISK152', 'DISK153',
+ 'DISK154', 'DISK155', 'DISK156', 'DISK157', 'DISK158', 'DISK159',
+ 'DISK160', 'DISK161', 'DISK162', 'DISK163', 'DISK164', 'DISK165',
+ 'DISK166', 'DISK167', 'DISK168', 'DISK169', 'DISK170', 'DISK171',
+ 'DISK172', 'DISK173', 'DISK174', 'DISK175', 'DISK176', 'DISK177',
+ 'DISK178', 'DISK179', 'DISK180', 'DISK181', 'DISK182', 'DISK183',
+ 'DISK184', 'DISK185', 'DISK186', 'DISK187', 'DISK188', 'DISK189',
+ 'DISK190', 'DISK191', 'DISK192', 'DISK193', 'DISK194', 'DISK195',
+ 'DISK196', 'DISK197', 'DISK198', 'DISK199', 'DISK200');
+1DECLARE  BUFFER  CHAR(140) STATIC INIT(' ');
+ /*                    FORMAT 1 DSCB                                 */
+ DECLARE
+     1 IECSDSL1 BASED(ADDR(BUFFER)),    /* START OF THE FORMAT 1 DSCB*/
+         2 DS1DSNAM    CHAR(44),        /* DATA SET NAME             */
+         2 DS1FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS1DSSN     CHAR(6),         /* DATA SET SERIAL NUMBER    */
+         2 DS1VOLSQ    CHAR(2),         /* VOLUME SEQUENCE NUMBER    */
+         2 DS1CREDT    CHAR(3),         /* CREATION DATE             */
+         2 DS1EXPDT    CHAR(3),         /* EXPIRATION DATE           */
+         2 DS1NOEPV    CHAR(1),         /* NUMBER OF EXTENTS ON VOL  */
+         2 DS1NOBDB    CHAR(1),         /* NUMBER OF BYTES USED IN
+                                           LAST DIRECTORY BLOCK      */
+         2 FILLER1     CHAR(1),         /* RESERVED                  */
+         2 DS1SYSCD    CHAR(13),        /* SYSTEM CODE               */
+         2 DS1REFD     CHAR(3),         /* DATE LAST                 */
+                                        /* REFERENCED OR ZERO        */
+                                        /* IF NOT MAINTAINED         */
+         2 FILLER2     CHAR(4),         /* RESERVED                  */
+         2 DS1DSORG,                    /* DATA SET ORGANIZATION     */
+          3 DS1DSRG1,                   /* FIRST BYTE OF DS1DSORG    */
+           4 DS1DSGIS BIT(1),           /* IS - INDEXED
+                                           SEQUENTIAL ORGANIZATION   */
+           4 DS1DSGPS BIT(1),           /* PS - PHYSICAL
+                                           SEQUENTIAL ORGANIZATION   */
+           4 DS1DSGDA BIT(1),           /* DA - DIRECT
+                                                      ORGANIZATION   */
+           4 DS1DSGCX BIT(1),           /* CX - BTAM OR QTAM LINE
+                                            GROUP                    */
+           4 F1  BIT(1),                /* RESERVED                  */
+           4 F2  BIT(1),                /* RESERVES                  */
+           4 DS1DSGPO BIT(1),           /* PO - PARTITIONED
+                                            ORGANIZATION             */
+           4 DS1DSGU BIT(1),            /* U - UNMOVABLE, THE
+                                            DATA CONTAINS LOCATION
+                                            DEPENDENT INFORMATION    */
+          3 DS1DSRG2,                   /* SECOND BYTE OF DS1DSORG   */
+           4 DS1DSGGS BIT(1),           /* GS - GRAPHICS
+                                            ORGANIZATION             */
+           4 DS1DSGTX BIT(1),           /* TX - TCAM LINE GROUP      */
+           4 DS1DSGTQ BIT(1),           /* TQ - TCAM MESSAGE QUEUE   */
+           4 F3  BIT(1),                /* RESERVED                  */
+           4 DS1ACBM BIT(1),            /* ACCESS METHOD CONTROL
+                                            BLOCK                    */
+           4 DS1DSGTR BIT(1),           /* TR - TCAM 3705            */
+           4 F4 BIT(2),                 /*  RESERVED                 */
+1        2 DS1RECFM    CHAR(1),         /* RECORD FORMAT             */
+         2 DS1OPTCD    CHAR(1),         /* OPTION CODE               */
+         2 DS1BLKL     CHAR(2),         /* BLOCK LENGTH              */
+         2 DS1LRECL    CHAR(2),         /* RECORD LENGTH             */
+         2 DS1KEYL     CHAR(1),         /* KEY LENGTH                */
+         2 DS1RKP      CHAR(2),         /* RELATIVE KEY POSITION     */
+         2 DS1DSIND,                    /* DATA SET INDICATORS       */
+          3 DS1IND80    BIT(1),         /* LAST VOLUME ON            */
+                                        /* WHICH A DATA SET          */
+                                        /* RESIDES.                  */
+          3 DS1IND40    BIT(1),         /* DATA SET IS RACF          */
+                                        /* DEFINED                   */
+          3 DS1IND20    BIT(1),         /* BLOCK LENGTH IS A         */
+                                        /* MULTIPLE OF 8 BYTE        */
+          3 DS1IND10    BIT(1),         /* PASSWORD IS               */
+                                        /* REQUIRED TO READ          */
+                                        /* OR WRITE OR BOTH-         */
+                                        /* SEE DS1IND04              */
+          3 DS1IND08    BIT(1),         /* RESERVED.                 */
+          3 DS1IND04    BIT(1),         /* IF DS1IND10 IS 1          */
+                                        /* THEN IF DS1IND04          */
+                                        /* IS . . .                  */
+                                        /* 1 - PASSWORD IS           */
+                                        /* REQUIRED TO WRITE         */
+                                        /* BUT NOT TO READ           */
+                                        /* 0 - PASSWORD IS           */
+                                        /* REQUIRED TO WRITE         */
+                                        /* AND TO READ               */
+          3 DS1IND02    BIT(1),         /* DATASET HAS BEEN          */
+                                        /* OPENED FOR OTHER          */
+                                        /* THAN INPUT SINCE          */
+                                        /* LAST BACKUP COPY          */
+                                        /* WAS MADE.                 */
+          3 DS1IND01    BIT(1),         /* RESERVED                  */
+         2 DS1SCALO    CHAR(4),         /* SECONDARY ALLOCATION      */
+         2 DS1LSTAR    CHAR(3),         /* LAST USED TRACK AND LAST
+                                           BLOCK ON TRACK            */
+         2 DS1TRBAL    CHAR(2),         /* BYTES REMAINING ON LAST
+                                           TRACK USED                */
+         2 FILLER3     CHAR(2),         /* RESERVED                  */
+1        2 DS1EXNTS,                    /* THREE EXTENT FIELDS       */
+           3 DS1EXT1     CHAR(10),      /* FIRST EXTENT DESCRIP.
+                                           FIRST BYTE
+                                             EXTENT TYPE INDICATOR
+                                           SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER
+                                           THIRD - SIXTH BYTES
+                                             LOWER LIMIT
+                                           SEVENTH - TENTH BYTES
+                                             UPPER LIMIT            */
+           3 DS1EXT2     CHAR(10),      /* SECOND EXTENT DESCRIP.    */
+           3 DS1EXT3     CHAR(10),      /* THIRD EXTENT DESCRIP.     */
+         2 DS1PTRDS    CHAR(5),         /* POSSIBLE PTR TO A FORMAT
+                                           2 OR 3 DSCB               */
+         2 DS1END      CHAR(0);         /* END OF THE FORMAT 1 DSCB  */
+
+
+
+
+
+ /*                    FORMAT 3 DSCB                                 */
+ DECLARE
+     1 IECSDSL3 BASED(ADDR(BUFFER)),    /* START OF THE FORMAT 3 DSCB*/
+         2 FILLER1     CHAR(4),         /* KEY IDENTIFIER            */
+         2 DS3EXTNT(4) CHAR(10),        /* FOUR EXTENT DESCRIPTIONS
+                                           FIRST BYTE
+                                             EXTENT TYPE INDICATOR
+                                           SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER
+                                           THIRD - SIXTH BYTES
+                                             LOWER LIMIT
+                                           SEVENTH - TENTH BYTES
+                                             UPPER LIMIT             */
+         2 DS3FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS3ADEXT(9) CHAR(10),        /* NINE ADDITIONAL EXTENT
+                                           DESCRIPTIONS              */
+         2 DS3PTRDS    CHAR(5),         /* RESERVED                  */
+         2 DS3END      CHAR(0);         /* END OF THE FORMAT 3 DSCB  */
+1ON ENDFILE(DDNAMES) MORE_DDNAMES = NO;
+ ON UNDEFINEDFILE(DDNAMES) GOTO READVTOCS;
+
+ DO WHILE(PARM ª= '');
+     POS = INDEX(PARM, ',');
+     IF POS = 0
+         THEN DO;
+              PARM_SEL = PARM;
+              PARM = '';
+              END;
+         ELSE DO;
+              PARM_SEL = SUBSTR(PARM, 1, POS-1);
+              PARM = SUBSTR(PARM, POS+1);
+              END;
+     CARD = ' LISTCTLG VOL=' || PARM_SEL;
+     WRITE FILE(IEHCNTL) FROM(CARD);
+     END;
+ CLOSE FILE(IEHCNTL);
+
+ CALL LINK('IEHLIST ', IEHLIST_PARM, DDNAME_LIST);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT FILE(MSGS) SKIP(3)
+              EDIT('***** ERROR ON IEHLIST, RETURN CODE=', PLIRETV)
+              (A, F(4));
+          SIGNAL ERROR;
+          END;
+
+ /* CONVERSIONS EXPECTED FROM DDNAMES FILE */
+ ON CONVERSION BEGIN;
+     INPT = ONSOURCE;
+     ONSOURCE = (16) '0';
+     END;
+
+ /* GET ALTERNATE DDNAMES IF ANY */
+ GET FILE(DDNAMES) LIST(NNN);
+ DDNUM = 1;
+ DO WHILE(MORE_DDNAMES & DDNUM <= 200);
+     IF NNN = 0
+         THEN DO;
+              DDNAME(DDNUM) = INPT;
+              DDNUM = DDNUM + 1;
+              END;
+     GET FILE(DDNAMES) LIST(NNN);
+     END;
+
+ ON CONVERSION SYSTEM;
+1READVTOCS:  /* READ IN THE FORMAT 1 DSCBS FOR DISK1 - DISKNN */
+ DO DDNUM = 1 TO 200;
+
+     PASSAREA = DDNAME(DDNUM);
+     CALL GETVTOC(PASSAREA, BUFFER);
+
+     SELECT(PASSAREA);
+         WHEN('EOF');
+         WHEN('OPENFAIL') LEAVE READVTOCS;
+         WHEN('NOTDA') PUT FILE(MSGS) SKIP(3) EDIT('***** DDNAME ',
+             DDNAME(DDNUM), ' IS NOT DIRECT ACCESS! *****') (A);
+         WHEN('DUMP') DO;
+              PUT FILE(MSGS) SKIP(3) DATA(BUFFER);
+              CALL PLIDUMP;
+              SIGNAL ERROR;
+              END;
+         OTHERWISE VOLSER = PASSAREA;
+         END;
+
+     VOLSERS(DDNUM) = VOLSER;
+
+     READ_BLOCK:  /* READ UNTIL GETVTOC CHANGES PASSAREA */
+     DO WHILE(PASSAREA = VOLSER);
+         IF DS1FMTID = '1'
+             THEN DO;
+                  DSNAME = DS1DSNAM;
+                  WRITE FILE(VTOCIN) FROM(VTOCREC);
+                  END;
+         CALL GETVTOC(PASSAREA, BUFFER);
+         END READ_BLOCK;
+
+     IF PASSAREA ª= 'EOF'
+         THEN DO;
+              PUT FILE(MSGS) SKIP(3) DATA(PASSAREA);
+              PUT FILE(MSGS) SKIP(3) DATA(BUFFER);
+              CALL PLIDUMP;
+              SIGNAL ERROR;
+              END;
+
+     END READVTOCS;
+1CLOSE FILE(VTOCIN);
+ DDNUM = DDNUM - 1;
+ CALL QCKSORT(VOLSERS, 1, DDNUM);
+
+ BEGIN_SORT_STMT = ADDR(VTOCSORT);
+ END_SORT_STMT   = ADDR(VTOCRECD);
+ BEGIN_REC_STMT  = ADDR(VTOCRECD);
+ END_REC_STMT    = ADDR(IEHSORT);
+
+ CALL LINK('SORT    ', SORT_PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT FILE(MSGS) SKIP(3)
+              EDIT('***** ERROR ON VTOC SORT, RETURN CODE=', PLIRETV)
+              (A, F(4));
+          SIGNAL ERROR;
+          END;
+
+ SORT_PREF = 'IEHS';
+ BEGIN_SORT_STMT = ADDR(IEHSORT);
+ END_SORT_STMT   = ADDR(IEHRECD);
+ BEGIN_REC_STMT  = ADDR(IEHRECD);
+ END_REC_STMT    = ADDR(IEHEND);
+
+ CALL LINK('SORT    ', SORT_PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT FILE(MSGS) SKIP(3)
+              EDIT('***** ERROR ON IEH SORT, RETURN CODE=', PLIRETV)
+              (A, F(4));
+          SIGNAL ERROR;
+          END;
+
+ BEGIN_BLOCK:  BEGIN;
+ ON ENDFILE(IEHSOUT) MORE_IEHSOUT = NO;
+ ON ENDFILE(VTOCOUT) MORE_VTOCOUT = NO;
+
+ READ FILE(VTOCOUT) INTO(VTOCREC);
+ CALL READ_IEHSOUT;
+1MATCH:  /* MATCH OUTPUT FROM IEHLIST AND FROM VTOCS */
+ DO WHILE(MORE_VTOCOUT & MORE_IEHSOUT);
+     COMPARE:  SELECT;
+         /* DATA SET IS CATALOGED BUT NOT ON A DISKNN VOLUME */
+         WHEN(DSN < DSNAME) CALL CATALOG_ONLY;
+         /* DATA SET IS NOT CATALOGED BUT ON A DISKNN VOLUME */
+         WHEN(DSN > DSNAME) DO;
+             DO WHILE(MORE_VTOCOUT  &  DSN > DSNAME);
+                 CALL VTOC_ONLY;
+                 END;
+             SKIP_IEHSOUT = YES;
+             END;
+         /* DATA SET IS CATALOGED AND ON AT LEAST ONE DISKNN VOLUME */
+         OTHERWISE CHECK_VOL:
+             IF VOLUME = VOLSER
+                 THEN DO;
+                      VDSN = SUBSTR(DSN, 1, INDEX(DSN, ' ')-1);
+                      SELECT(DEVTYPE);
+                          WHEN(DISK3380) VDEV = '3380';
+                          WHEN(DISK3350) VDEV = '3350';
+                          WHEN(DISK3330) VDEV = '3330';
+                          OTHERWISE VDEV = '????';
+                          END;
+                      CARD = ' CATLG DSNAME=' || VDSN || ',VOL=' ||
+                          VDEV || '=' || VOLUME;
+                      WRITE FILE(NEWCAT) FROM(CARD);
+                      READ FILE(VTOCOUT) INTO(VTOCREC);
+                      END;
+                 ELSE DO;
+                       PUT FILE(DUPL) SKIP EDIT('DSN=', DSN, ' ON: ',
+                           VOLSER, '  CATLGED ON: ', VOLUME) (A);
+                      CALL VTOC_ONLY;
+                      IF DSN = DSNAME
+                          THEN GOTO CHECK_VOL;
+                          ELSE CALL CATALOG_ONLY;
+                      END;
+         END COMPARE;
+     IF SKIP_IEHSOUT
+         THEN SKIP_IEHSOUT = NO;
+         ELSE CALL READ_IEHSOUT;
+     END MATCH;
+
+ /* ANY REMAINING CATALOG ENTRIES CANNOT BE ON A DISKNN VOLUME */
+ DO WHILE(MORE_IEHSOUT);
+     CALL CATALOG_ONLY;
+     CALL READ_IEHSOUT;
+     END;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1READ_IEHSOUT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* READ THE SORTED IEHLIST OUTPUT AND SKIP ANY HEADERS OR TITLE      */
+ /* LINES.                                                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ READ FILE(IEHSOUT) INTO(IEHSOUT_REC);
+
+ DO WHILE(MORE_IEHSOUT & (SUBSTR(DSN, 1, 1) = ' ' |
+          SUBSTR(DSN, 1, 6) = 'DATE:'));
+     READ FILE(IEHSOUT) INTO(IEHSOUT_REC);
+     END;
+
+ END READ_IEHSOUT;
+1CATALOG_ONLY:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS THE DATA TO THE PROPER FILES WHEN ONLY A CATALOG ENTRY    */
+ /* IS REPRESENTED AND NO VTOC INFORMATION.                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ VDSN = SUBSTR(DSN, 1, INDEX(DSN, ' ')-1);
+ SELECT(DEVTYPE);
+     WHEN(DISK3380) VDEV = '3380';
+     WHEN(DISK3350) VDEV = '3350';
+     WHEN(DISK3330) VDEV = '3330';
+     OTHERWISE VDEV = '????';
+     END;
+
+ IF SUBJECT_VOLUME
+    THEN DO;
+         CARD = ' UNCATLG DSNAME=' || VDSN;
+         WRITE FILE(UNCAT) FROM(CARD);
+         CARD = ' CATLG DSNAME=' || VDSN || ',VOL=' ||
+             VDEV || '=' || VOLUME;
+         WRITE FILE(RECAT) FROM(CARD);
+         END;
+    ELSE DO;
+         CARD = ' XXCATLG DSNAME=' || VDSN || ' ,VOL=' ||
+             VDEV || '=' || VOLUME;
+         WRITE FILE(OTHVOL) FROM(CARD);
+         END;
+
+ END CATALOG_ONLY;
+1VTOC_ONLY:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS THE DATA TO THE PROPER FILES WHEN ONLY A VTOC ENTRY IS    */
+ /* REPRESENTED AND NO CATALOG INFORMATION.                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ VDSN = SUBSTR(DSNAME, 1, INDEX(DSNAME, ' ')-1);
+ CARD = ' SCRATCH DSNAME=' || VDSN || ',VOL=????=' || VOLSER ||
+     ',PURGE';
+
+ WRITE FILE(NOTCAT) FROM(CARD);
+ READ FILE(VTOCOUT) INTO(VTOCREC);
+
+ END VTOC_ONLY;
+1SUBJECT_VOLUME:  PROCEDURE RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* SEARCHES VOLUME SERIAL TABLE TO SEE IF THE VOLUME IS ONE WE HAD   */
+ /* A DISKNN DDCARD FOR.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FOUND  BIT(1)  INIT('0'B);
+ DECLARE  (HIGH, LOW, POS)  FIXED BINARY(15);
+
+ HIGH = DDNUM;
+ LOW  = 1;
+
+ BINARY_SEARCH:
+ DO WHILE (HIGH >= LOW & ªFOUND);
+     POS = (LOW + HIGH) / 2;
+     IF VOLUME = VOLSERS(POS)
+         THEN FOUND = YES;
+         ELSE IF VOLUME > VOLSERS(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+
+ RETURN(FOUND);
+
+ END SUBJECT_VOLUME;
+
+ END BEGIN_BLOCK;
+
+ END CTCLEAN;
+

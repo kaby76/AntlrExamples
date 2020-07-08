@@ -1,0 +1,41 @@
+*PROCESS NM;
+ STRTEST:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('STRTEST V1.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM IS USED TO TEST ASM WRITTEN STRING FUNCTIONS.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ DECLARE  LINDEX  ENTRY(CHAR(*) VARYING, CHAR(*) VARYING)
+     RETURNS(FIXED BINARY(31));
+ DECLARE  SYSIN  FILE INPUT STREAM;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ DECLARE  NO  BIT(1) STATIC INIT('0'B);
+ DECLARE  MORE_SYSIN  BIT(1) INIT('1'B);
+
+ DECLARE  POS  FIXED BINARY(31);
+
+ DECLARE  STR  CHAR(48) VARYING;
+ DECLARE  LST  CHAR(48) VARYING;
+
+ ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ GET LIST(STR);
+ PUT SKIP DATA(STR);
+ GET LIST(LST);
+ DO WHILE(MORE_SYSIN);
+     PUT SKIP DATA(LST);
+     POS = LINDEX(STR, LST);
+     PUT SKIP DATA(POS);
+     PUT SKIP(2) DATA(STR);
+     GET LIST(LST);
+     END;
+
+ END STRTEST;
+

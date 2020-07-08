@@ -1,0 +1,173 @@
+*PROCESS NM;
+ DIVIUP:  PROCEDURE(PARM) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(34) VARYING STATIC EXTERNAL
+     INIT('DIVIUP V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(4K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* FILL IN A MESSAGE TEXT FOR A CLIST BASED UPON DIVISION CODE       */
+ /* PASSED AS A PARAMETER.  PROGRAM USES BINARY SEARCH TO FIND        */
+ /* APPROPRIATE MESSAGE.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ /* ENTRY IDENTIFIERS */
+ DECLARE  ISPLINK  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (HBOUND, SUBSTR)  BUILTIN;
+
+ /* DYNAMIC IDENTIFIERS */
+ DECLARE  LOW    FIXED BINARY(31) INIT(1);
+ DECLARE  HIGH   FIXED BINARY(31) INIT(HBOUND(TABLE, 1));
+ DECLARE  POS    FIXED BINARY(31);
+ DECLARE  TEXT   CHAR(72)         INIT('CONTACT THE NCC.');
+ DECLARE  KEY    CHAR(4)          INIT(SUBSTR(PARM, 1, 3));
+ DECLARE  FOUND  BIT(1)           INIT('0'B);
+
+ /* STATIC IDENTIFIERS */
+ DECLARE  L_TEXT   FIXED BINARY(31) STATIC INIT(72);
+ DECLARE  VDEFINE  CHAR(8)          STATIC INIT('VDEFINE');
+ DECLARE  N_TEXT   CHAR(8)          STATIC INIT('TEXT');
+ DECLARE  CHAR     CHAR(4)          STATIC INIT('CHAR');
+ DECLARE  VPUT     CHAR(4)          STATIC INIT('VPUT');
+ DECLARE  YES      BIT(1)           STATIC INIT('1'B);
+
+ DECLARE  TABLE(115) CHAR(72) STATIC INIT(
+ '110 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '111 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '112 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '113 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '117 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '118 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '119 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '120 CONTACT AL HOGAN AT 444-2300.                             ',
+ '199 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '301 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '302 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '302 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '303 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '303 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '305 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '306 CONTACT HARLOW ANDERSON AT (208) 236-8200 (EXT 345).      ',
+ '308 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '310 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '311 CONTACT NAN STENZEL AT 242-4712.                          ',
+ '317 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '321 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '323 CONTACT ROY CUMMINGS AT (304) 755-3351 (EXT 483).         ',
+ '324 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '325 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '329 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '330 CONTACT HERB BRYANT  AT 222-6498.                         ',
+ '330 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '331 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '332 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '333 CONTACT D. MURPHY AT (307) 875-2580 (EXT 454).            ',
+ '334 CONTACT D. MURPHY AT (307) 875-2580 (EXT 454).            ',
+ '335 CONTACT HARLOW ANDERSON AT (208) 236-8200 (EXT 345).      ',
+ '336 CONTACT HARLOW ANDERSON AT (208) 236-8200 (EXT 345).      ',
+ '337 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '338 CONTACT HARLOW ANDERSON AT (208) 236-8200 (EXT 345).      ',
+ '339 CONTACT HARLOW ANDERSON AT (208) 236-8200 (EXT 345).      ',
+ '340 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '341 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '344 CONTACT JIM WARRINER AT 624-5203.                         ',
+ '344 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '348 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '349 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '349 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '350 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '351 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '352 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '353 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '354 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '355 CONTACT HERB BRYANT AT 222-6498.                          ',
+ '400 CONTACT AL HOGAN AT 444-2300.                             ',
+ '401 CONTACT HUGH JUERGENS AT (612) 572-6107.                  ',
+ '402 CONTACT AL HOGAN AT 444-2300.                             ',
+ '403 CONTACT AL HOGAN AT 444-2300.                             ',
+ '404 CONTACT AL HOGAN AT 444-2300.                             ',
+ '405 CONTACT AL HOGAN AT 444-2300.                             ',
+ '406 CONTACT AL HOGAN AT 444-2300.                             ',
+ '407 CONTACT AL HOGAN AT 444-2300.                             ',
+ '408 CONTACT HARRY KNIGHT AT (205) 237-2841 (EXT 327).         ',
+ '411 CONTACT LARRY REAMES AT (803) 649-6211 (EXT 2344).        ',
+ '499 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '500 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '502 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '503 CONTACT BILL NADZAK AT (305) 851-3377 (EXT 2013).         ',
+ '504 CONTACT DICK BOENISCH AT (414) 284-5521 (EXT 200).        ',
+ '505 CONTACT KEN WARNER AT 445-3231.                           ',
+ '508 CONTACT AL HOGAN AT 444-2300.                             ',
+ '509 CONTACT DAVE RYAN AT (813) 683-5411.                      ',
+ '511 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '512 CONTACT WILLIE WIMBERLY AT 444-4554.                      ',
+ '514 CONTACT KENT MATAYO AT 326-2332.                          ',
+ '515 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '516 CONTACT HANK HOLKEY AT 8-226-4345.                        ',
+ '519 CONTACT DON WYMAN AT (503) 228-9281 (EXT 296).            ',
+ '520 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '521 CONTACT FRANK EIGHMEY AT 322-3187.                        ',
+ '522 CONTACT BOB KINSTLE AT (606) 269-5611 (EXT 246).          ',
+ '524 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '526 CONTACT MARV RUSNAK AT (412) 479-8011 (EXT 207).          ',
+ '528 CONTACT JERRY DELL AT (714) 865-5698.                     ',
+ '529 CONTACT JERRY FREEMAN AT (601) 869-5711 (EXT 380).        ',
+ '530 CONTACT MARK KISER AT (501) 933-1294.                     ',
+ '532 CONTACT MITCH GLASSCOCK AT 655-2288.                      ',
+ '534 CONTACT JERRY KING AT (501) 327-4433 (EXT 138).           ',
+ '538 CONTACT JERRY DELL AT (714) 865-5698.                     ',
+ '540 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '541 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '549 CONTACT BOB KINSTLE AT (606) 269-5611 (EXT 246).          ',
+ '551 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '553 CONTACT WARREN HECKROTE AT 264-5974.                      ',
+ '556 CONTACT GREGG NAMLIN AT (207) 594-4436 (EXT 201).         ',
+ '559 CONTACT JEFF REHM AT (317) 675-2185 (EXT 216).            ',
+ '565 CONTACT BERNIE MCGRAW AT 322-6110.                        ',
+ '570 CONTACT DICK WANGROVE AT 323-2375.                        ',
+ '571 CONTACT AL HOGAN AT 444-2300.                             ',
+ '572 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '574 CONTACT JOE CALABRESE AT 222-6335.                        ',
+ '575 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '580 CONTACT DICK WANGROVE AT 323-2375.                        ',
+ '581 CONTACT DICK WANGROVE AT 323-2375.                        ',
+ '582 CONTACT DICK WANGROVE AT 323-2375.                        ',
+ '589 CONTACT MARK KISER AT (501) 933-1294.                     ',
+ '590 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '591 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '594 CONTACT JERRY DELL AT (714) 865-5698.                     ',
+ '595 CONTACT VANCE PAYNE AT (713) 591-4134.                    ',
+ '618 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '802 START LOOKING FOR ANOTHER JOB.                            ',
+ '885 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '886 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '887 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '888 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '889 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '890 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '897 CONTACT DENNIS KONCZYK AT 333-6247.                       ',
+ '898 CONTACT DENNIS KONCZYK AT 333-6247.                       ');
+
+ CALL ISPLINK(VDEFINE, N_TEXT, TEXT, CHAR, L_TEXT);
+
+ BINARY_SEARCH:
+ DO WHILE(HIGH >= LOW  &  ªFOUND);
+     POS = (LOW + HIGH) / 2;
+     IF KEY = SUBSTR(TABLE(POS), 1, 4)
+         THEN FOUND = YES;
+         ELSE IF KEY > SUBSTR(TABLE(POS), 1, 4)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+
+ IF FOUND
+     THEN TEXT = SUBSTR(TABLE(POS), 5);
+
+ CALL ISPLINK(VPUT, N_TEXT);
+
+ END DIVIUP;
+

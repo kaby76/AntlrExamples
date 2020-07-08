@@ -1,0 +1,157 @@
+*PROCESS NM;
+ CATLOOK:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ /* CATLOOK  VERSION 1.0  BY CLYDE THOMAS ZUBER */
+ DECLARE  PLIXOPT  CHAR(7)  VARYING STATIC EXTERNAL INIT('ISA(8K)');
+ DECLARE  PGMID    CHAR(35) VARYING STATIC EXTERNAL
+     INIT('CATLOOK V1.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM DUMPS A VSAM CATALOG RECORD BY CONTROL INTERVAL      */
+ /* NUMBER FOR THE LOW INDEX OR DATA SET NAME FOR THE HIGH INDEX.     */
+ /*                                                                   */
+ /* DSN=DATA.SET.NAME                                                 */
+ /* CI=XXXXXX (3 BYTES = 6 HEX DIGITS, LEADING ZEROS NOT REQUIRED)    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PARM  CHAR(100) VARYING;
+
+ /* FILE DECLARATIONS */
+ DECLARE  SYSIN     FILE INPUT  STREAM;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+ DECLARE  CATALOG   FILE INPUT RECORD KEYED SEQUENTIAL
+          ENV(VSAM GENKEY PASSWORD(PSWD));
+ DECLARE  DUMPPRT   BASED(DCBPTR);
+ DECLARE  DCBPTR    PTR;
+
+ /* EXTERNAL ROUTINES */
+ DECLARE  TSOSET   ENTRY OPTIONS(ASM, INTER);
+ DECLARE  TSORST   ENTRY OPTIONS(ASM, INTER);
+ DECLARE  DUMPDCB  ENTRY OPTIONS(ASM, INTER);
+ DECLARE  DUMP     ENTRY OPTIONS(ASM, INTER);
+ DECLARE  (ADDR, INDEX, LENGTH, ONCODE, ONSOURCE, SUBSTR)  BUILTIN;
+
+ /* WORK IDENTIFIERS */
+ DECLARE  POS           FIXED BINARY;
+ DECLARE  NNN           FIXED BINARY;
+ DECLARE  IN_LENGTH     FIXED BINARY(31) STATIC INIT(505);
+ DECLARE  DUMP_OPTIONS  FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  MORE_SYSIN    BIT(1) INIT('1'B) STATIC;
+ DECLARE  OK            BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO            BIT(1) INIT('0'B) STATIC;
+ DECLARE  YES           BIT(1) INIT('1'B) STATIC;
+ DECLARE  CIBIT(6)      BIT(4) STATIC;
+ DECLARE  CICHAR        CHAR(3) BASED(ADDR(CIBIT));
+ DECLARE  PSWD          CHAR(8) STATIC;
+ DECLARE  INPT          CHAR(48);
+ DECLARE  HIGH_KEY      CHAR(44);
+ DECLARE  VSAM_REC      CHAR(505);
+ DECLARE  WORK          CHAR(8) VARYING;
+ DECLARE  LOW_KEY       CHAR(4) BASED(ADDR(LOW_KEY_BASE));
+ DECLARE
+     1  LOW_KEY_BASE,
+        2  FILLER  BIT(8) INIT('0'B),
+        2  CI_NUM  CHAR(3);
+1ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ ON KEY(CATALOG) BEGIN;
+     IF ONCODE = 51
+         THEN PUT SKIP EDIT('*** KEY NOT FOUND FOR:  ', INPT) (A);
+         ELSE DO;
+              PUT SKIP EDIT('*** TERMINATING DUE TO KEY ERROR, ONCODE=',
+                  ONCODE) (A, F(7));
+              SIGNAL ERROR;
+              END;
+     END;
+
+ ON CONVERSION BEGIN;
+     INPT = ONSOURCE;
+     ONSOURCE = (16) '0';
+     END;
+
+ PSWD = SUBSTR(PARM, 1);
+ CALL DUMPDCB(DCBPTR);  /* OPEN */
+ CALL TSOSET;
+
+ DO UNTIL(NNN = 0) WHILE(MORE_SYSIN);
+     GET FILE(SYSIN) LIST(NNN);
+     END;
+1DO WHILE(MORE_SYSIN);
+     SELECT;
+
+         WHEN(SUBSTR(INPT, 1, 3) = 'CI=') CI:  DO;
+             WORK = SUBSTR(INPT, 4) ]] ' ';
+             POS = INDEX(WORK, ' ');
+             WORK = SUBSTR(WORK, 1, POS-1);
+             IF LENGTH(WORK) > 7
+                 THEN DO;
+                      PUT SKIP EDIT('*** INVALID INPUT:  ', INPT) (A);
+                      OK = NO;
+                      PUT DATA(WORK, INPT);
+                      END;
+                 ELSE DO;
+                      DO WHILE(LENGTH(WORK) < 6);
+                          WORK = '0' ]] WORK;
+                          END;
+                      HEXPOS:
+                      DO POS = 1 TO 6;
+                          SELECT(SUBSTR(WORK, POS, 1));
+                              WHEN('0') CIBIT(POS) = '0000'B;
+                              WHEN('1') CIBIT(POS) = '0001'B;
+                              WHEN('2') CIBIT(POS) = '0010'B;
+                              WHEN('3') CIBIT(POS) = '0011'B;
+                              WHEN('4') CIBIT(POS) = '0100'B;
+                              WHEN('5') CIBIT(POS) = '0101'B;
+                              WHEN('6') CIBIT(POS) = '0110'B;
+                              WHEN('7') CIBIT(POS) = '0111'B;
+                              WHEN('8') CIBIT(POS) = '1000'B;
+                              WHEN('9') CIBIT(POS) = '1001'B;
+                              WHEN('A') CIBIT(POS) = '1010'B;
+                              WHEN('B') CIBIT(POS) = '1011'B;
+                              WHEN('C') CIBIT(POS) = '1100'B;
+                              WHEN('D') CIBIT(POS) = '1101'B;
+                              WHEN('E') CIBIT(POS) = '1110'B;
+                              WHEN('F') CIBIT(POS) = '1111'B;
+                              OTHERWISE DO;
+                                  PUT SKIP EDIT('*** INVALID INPUT:  ',
+                                      INPT) (A);
+                                  PUT DATA(WORK, INPT);
+                                  OK = NO;
+                                  END;
+                              END;
+                          END HEXPOS;
+                      END;
+             IF OK
+                 THEN DO;
+                      CI_NUM = CICHAR;
+                      READ FILE(CATALOG) INTO(VSAM_REC) KEY(LOW_KEY);
+                      END;
+             END CI;
+1        WHEN(SUBSTR(INPT, 1, 4) = 'DSN=') DO;
+             HIGH_KEY = SUBSTR(INPT, 5);
+             READ FILE(CATALOG) INTO(VSAM_REC) KEY(HIGH_KEY);
+             END;
+
+         OTHERWISE DO;
+             PUT SKIP EDIT('*** INVALID INPUT:  ', INPT) (A);
+             OK = NO;
+             PUT DATA(WORK, INPT);
+             END;
+         END;
+
+     IF OK
+         THEN CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         ELSE OK = YES;
+
+     DO UNTIL(NNN = 0) WHILE(MORE_SYSIN);
+         GET FILE(SYSIN) LIST(NNN);
+         END;
+     END;
+
+ CALL TSORST;
+ CALL DUMPDCB(DCBPTR);  /* CLOSE */
+
+ END CATLOOK;
+

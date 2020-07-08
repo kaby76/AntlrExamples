@@ -1,0 +1,89 @@
+*PROCESS NM;
+ GETDCB:  PROCEDURE(FILE, PARM) OPTIONS(REENTRANT) REORDER;
+ DECLARE  IDGETDC  CHAR(34) VARYING STATIC EXTERNAL
+     INIT('GETDCB V1.1  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*  THIS PROCEDURE DOES AN OPEN ON THE FILE PASSED AS A PARAMETER    */
+ /*  AND OBTAINS THE ADDRESS OF ITS DCB.  ALL RELEVANT INFORMATION    */
+ /*  IS OBTAINED AND RETURNED TO THE INVOKING PROGRAM VIA THE SECOND  */
+ /*  PARAMETER.                                                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  FILE  FILE VARIABLE;
+
+ DECLARE
+     1  PARM,
+        2  RECFM,
+           3  FIXED      BIT(1),
+           3  VARIABLE   BIT(1),
+           3  UNDEFINED  BIT(1),
+           3  BLOCKED    BIT(1),
+           3  SPANNED    BIT(1),
+           3  A_CNTL     BIT(1),
+           3  M_CNTL     BIT(1),
+           3  TRK_OVFL   BIT(1),
+        2  LRECL    FIXED BINARY,
+        2  BLKSIZE  FIXED BINARY;
+1DECLARE
+     1  FILE_DCLCB BASED(FILEPTR),
+        2  FILLER  CHAR(2),
+        2  DFCB_2  BIT(16);
+
+ DECLARE
+     1  FILE_FCB BASED(FCBPTR),
+        2  FILLER  CHAR(20),
+        2  DCBPTR  PTR;
+
+ DECLARE
+     1  FILE_DCB BASED(DCBPTR),
+        2  FILLER1  CHAR(36),
+        2  WHOLE_RECFM,
+           3  RECFM2     BIT(2),
+           3  TRACK_OVERFLOW   BIT(1),
+           3  BLOCKED_RECORDS  BIT(1),
+           3  SPANNED_RECORDS  BIT(1),
+           3  CONTROL_A  BIT(1),
+           3  CONTROL_M  BIT(1),
+           3  FILLER2    BIT(1),
+        2  FILLER3   CHAR(25),
+        2  DCB_BLKSIZE  FIXED BINARY,
+        2  FILLER4   CHAR(18),
+        2  DCB_LRECL FIXED BINARY;
+
+ DECLARE  (FCBPTR, FILEPTR, R12)   PTR;
+ DECLARE  OFFSET  FIXED BINARY(31);
+ DECLARE  LOAD    ENTRY RETURNS(PTR); /* REALLY ASM */
+ DECLARE  PLIR12  ENTRY OPTIONS(ASM, INTER);
+ DECLARE  UNSPEC  BUILTIN;
+ DECLARE  NO      BIT(1) STATIC INIT('0'B);
+ DECLARE  YES     BIT(1) STATIC INIT('1'B);
+1OPEN FILE(FILE);
+ UNSPEC(FILEPTR) = UNSPEC(FILE);
+ CALL PLIR12(R12);
+ OFFSET = 4;
+ R12 = LOAD(OFFSET, R12);
+ OFFSET = DFCB_2;
+ FCBPTR = LOAD(OFFSET, R12);
+
+ FIXED, VARIABLE, UNDEFINED = NO;
+ SELECT(RECFM2);
+     WHEN('10'B) FIXED = YES;
+     WHEN('01'B) VARIABLE = YES;
+     WHEN('11'B) UNDEFINED = YES;
+     OTHERWISE;
+     END;
+
+ BLOCKED = BLOCKED_RECORDS;
+ SPANNED = SPANNED_RECORDS;
+ A_CNTL = CONTROL_A;
+ M_CNTL = CONTROL_M;
+ TRK_OVFL = TRACK_OVERFLOW;
+
+ LRECL = DCB_LRECL;
+ BLKSIZE = DCB_BLKSIZE;
+
+ END GETDCB;
+

@@ -1,0 +1,86 @@
+*PROCESS M;
+ ICFCAT:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID    CHAR(34) VARYING STATIC EXTERNAL
+     INIT('ICFCAT V0.0  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(8)  VARYING STATIC EXTERNAL INIT('REPORT');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*********************************************************************/
+ DECLARE  VSAM_REC  CHAR(???) VARYING;
+ DECLARE  CELLPTR  PTR; /* CELL POINTER */
+
+ /********************/
+ /* BCS CELL FORMATS */
+ /********************/
+
+ /* BCS CELL TYPE CODES
+   01 - OWNERSHIP CELL
+   02 - SECURITY CELL
+   03 - ASSOCIATION CELL
+   04 - VOLUME CELL
+   05 - GENERATION AGING TABLE CELL
+   06 - RELATION CELL
+   21 - VVR DATA SET INFORMATION CELL
+   23 - VVR VOLUME INFORMATION CELL
+   60 - VVR AMDSB CELL
+   C1 - NONVSAM NAME CELL                            A
+   C2 - GDG BASE NAME CELL                           B
+   C3 - VSAM CLUSTER NAME CELL                       C
+   C4 - DATA NAME CELL                               D
+   C5 - VSAM EXTENSION NAME CELL                     E
+   C7 - AIX NAME CELL                                G
+   C8 - GENERATION DATA SET (GDS) NAME CELL          H
+   C9 - INDEX NAME CELL                              I
+   D1 - GDG EXTENSION NAME CELL                      J
+   D8 - VVR HEADER CELL (SECONDARY)                  Q
+   D9 - PATH NAME CELL                               R
+   E3 - TRUENAME CELL                                T
+   E4 - ICF CONNECTOR NAME CELL                      U
+   E7 - ALIAS NAME CELL                              X
+   E9 - VVR HEADER CELL (PRIMARY)                    Z
+ */
+
+ DECLARE
+     1  CELL  UNALIGNED BASED(CELLPTR),
+        2  LEN             FIXED BINARY,
+        2  TYPE            BIT(8);
+
+ DECLARE
+     1  NAME_CELL  UNALIGNED BASED(CELLPTR),
+        2  FILLER          CHAR(3),
+        2  COMP_LEN        FIXED BINARY,
+        2  FLAGS,
+           3  FLAG1        BIT(1),
+           3  FLAG2        BIT(1),
+           3  FLAG3        BIT(1),
+           3  RESERVED     BIT(5),
+        2  KEY_LEN         BIT(8),
+        2  KEY             CHAR(45);
+
+ DECLARE
+     1  NAME_CELL2  UNALIGNED BASED(CELLPTR),
+        2  FILLER          CHAR(5),
+        2  BITNUM          BIT(8),
+        2  FILLER2         CHAR(1),
+        2  NAME            CHAR(44);
+
+ DECLARE
+     1  NAME_CELL3  UNALIGNED BASED(CELLPTR),
+        2  FILLER          CHAR(4),
+        2  NVOLNUM         FIXED BINARY;
+
+ DECLARE
+     1  NAME_CELL4  UNALIGNED BASED(CELLPTR),
+        2  FILLER          CHAR(5),
+        2  GENNUM          FIXED BINARY,
+        2  VERSION         BIT(8),
+        2  GVOLNUM         FIXED BINARY;
+
+ DECLARE
+     1  NAME_CELL5  UNALIGNED BASED(CELLPTR),
+        2  FILLER          CHAR(5),
+        2  REFTYPE         CHAR(1);
+
+ END ICFCAT;
+

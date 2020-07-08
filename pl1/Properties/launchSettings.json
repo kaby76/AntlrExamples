@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "pl1": {
+      "commandName": "Project",
+      "commandLineArgs": "PLI-examples/catclean.PLI",
+      "workingDirectory": "$(ProjectDir)"
+    }
+  }
+}

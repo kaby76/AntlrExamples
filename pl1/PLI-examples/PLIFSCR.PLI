@@ -1,0 +1,51 @@
+*PROCESS NM;
+ PLIFSCR:  PROCEDURE(KEYWORD, ABREVIATION, CHOICE, SPACING, PLIFID,
+     OPTIONS) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PLIFSCR V2.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  KEYWORD(*)      CHAR(*) VARYING;
+ DECLARE  ABREVIATION(*)  CHAR(*) VARYING;
+ DECLARE  CHOICE(*)       BIT(*);
+
+ DECLARE
+     1  SPACING(*),
+        2  MARGIN,
+           3  NO_SPACE          BIT(*),
+           3  SPACE_ONCE        BIT(*),
+           3  SPACE_TWICE       BIT(*),
+           3  INDENT_CONSTRUCT  BIT(*),
+        2  LINE,
+           3  NEXT_LINE         BIT(*),
+           3  DOUBLE_SPACE      BIT(*),
+           3  TRIPLE_SPACE      BIT(*),
+           3  EJECT             BIT(*);
+
+ DECLARE  PLIFID  CHAR(*) VARYING;
+
+ DECLARE
+     1  OPTIONS,
+        2  SEQ_INCR      FIXED BINARY(31),
+        2  FLAGS,
+           3  VARYOUT    BIT(*),
+           3  LISTOUT    BIT(*),
+           3  LISTONLY   BIT(*),
+           3  COUNT      BIT(*),
+           3  USUSED5    BIT(*),
+           3  UNUSED6    BIT(*),
+           3  UNUSED7    BIT(*),
+           3  UNUSED8    BIT(*);
+
+ DECLARE  SYSPRINT  FILE STREAM OUTPUT PRINT;
+
+ PUT PAGE EDIT('PLIFSCR IS NOT IMPLEMENTED YET, RE-EXECUTE WITHOUT ',
+    'SCREEN PARAMETER.') (A);
+ EXIT;
+
+ END PLIFSCR;
+

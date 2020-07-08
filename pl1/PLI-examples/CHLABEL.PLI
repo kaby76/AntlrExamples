@@ -1,0 +1,75 @@
+*PROCESS NM;
+ CHLABEL:  PROCEDURE OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(36) VARYING STATIC EXTERNAL
+     INIT('CHLABEL  V1.1  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* OPEN AND CLOSE AN OUTPUT PDS OR SEQ DATA SET TO CHANGE LABEL DCB. */
+ /* IF A SEQ DDNAME IS PRESENT IT IS DONE OTHERWISE A DDNAME OF PDS   */
+ /* IS DONE.  JCL MUST PROVIDE THE OVERRIDE DCB INFORMATION.          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SEQ  FILE OUTPUT RECORD;
+ DECLARE  PDSPROC  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  NO   BIT(1) INIT('0'B) STATIC;
+ DECLARE  PLIRETV  BUILTIN;
+ DECLARE  SYSPRINT  FILE STREAM OUTPUT PRINT;
+ DECLARE  ERRMSG  BASED(ERRPTR) CHAR(32760) VARYING;
+
+ DECLARE
+   1  PARM,
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMNAME     CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6);
+1ON UNDEFINEDFILE(SEQ) GOTO PDS;
+
+ OPEN FILE(SEQ);
+ RETURN;
+
+ PDS:
+ OPEN_FOR_INPUT = NO;
+ DDNAME = 'PDS';
+ CALL PDSFUNC('OPEN');
+ CALL PDSFUNC('CLOSE');
+1PDSFUNC:  PROCEDURE(FUNCTION);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE FIRST PARAMETER IS THE FUNCTION TO */
+ /* BE PERFORMED BY PDSPROC.                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DCL FUNCTION CHAR(10);
+
+ CALL PDSPROC(FUNCTION, PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT SKIP EDIT(ERRMSG) (A);
+          PUT SKIP EDIT('RETURN CODE =', PLIRETV) (A, F(9));
+          SIGNAL ERROR;
+          END;
+ END PDSFUNC;
+
+ END CHLABEL;
+

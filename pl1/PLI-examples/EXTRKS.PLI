@@ -1,0 +1,1085 @@
+*PROCESS NM;
+ EXTRKS:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(34) VARYING STATIC EXTERNAL
+     INIT('EXTRKS V1.2  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(8) VARYING STATIC EXTERNAL INIT('ISA(24K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THE PURPOSE OF THIS PROGRAM IS TO SURVEY A GROUP OF PACKS         */
+ /* SPECIFIED BY DD CARDS FOR USERIDS WHICH HAVE TOO MANY TRACKS      */
+ /* ALLOCATED.  WHEN THIS CONDITION IS FOUND THE PROGRAM OUTPUTS      */
+ /* CONTROL CARDS WHICH WHEN INPUTED TO THE SYSTEM ARCHIVAL SYSTEM    */
+ /* WILL QUEUE THE INFREQUENTLY REFERENCED DATA SETS FOR ARCHIVAL.    */
+ /* UNDER TSO AN ADDITIONAL MESSAGE IS SENT TO THE USER NOTIFYING     */
+ /* HIM OF THIS FACT.  IF THE USER IS WITHIN TEN PERCENT OF WHAT HE   */
+ /* IS ALLOWED NO ARCHIVAL IS REQUESTED BUT A WARNING MESSAGE IS SENT */
+ /* TO HIM.                                                           */
+ /*                                                                   */
+ /*                                                                   */
+ /* DDNAMES REQUIRED BY PROGRAM                                       */
+ /* ===========================                                       */
+ /* ALLOWED      A VSAM DATA SET WHICH CONTAINS USERIDS AND ALLOWED   */
+ /*              NUMBER OF TRACKS                                     */
+ /* ARCHIVE      OUTPUT WHICH IN SUBSEQUENT STEP IS INPUT TO ASM2     */
+ /*              RECFM=FB,LRECL=80,BLKSIZE=6160                       */
+ /* TSO          OUTPUT WHICH IN SUBSEQUENT STEP IS INPUT TO TSO TMP  */
+ /*              RECFM=FB,LRECL=80,BLKSIZE=6160                       */
+ /* DSNLIST      ARCHIVED/DELETED DATASET REPORT, SYSOUT              */
+ /* SYSPRINT     PROGRAM MESSAGES AND EXCEPTION REPORT, SYSOUT        */
+ /* SORTIN       TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* SORTOUT      TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* SORTMSG      SORT MESSAGES, SYSOUT                                */
+ /* SORTWK01     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* SORTWK02     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /* SORTWK03     TEMPORARY WORK FILE, USUALLY SYSDA OR SYSVIO         */
+ /*                                                                   */
+ /* DDNAMES OPTIONALLY NECESSARY TO PROGRAM                           */
+ /* =======================================                           */
+ /* DISK1 - NN   UP TO A MAXIMUM OF 20 3350 DISK DRIVES SUPPORTED     */
+ /* SYSIN        INPUT FILE WHICH CAN SPECIFY ALTERNATE DDNAME TO     */
+ /*              USE INSTEAD OF DISKNN DDNAMES                        */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* OTHER PROGRAMS RELATED TO THIS PROGRAM:                           */
+ /* PROGRAM      FUNCTION                                             */
+ /* =======      ========                                             */
+ /* EXINIT       USED TO INITIALIZE VSAM DATA SET WITH USERIDS AND    */
+ /*              DEFAULT TRACK ALLOWANCE                              */
+ /* EXMAINT      USED TO UPDATE THE VSAM DATA SET WITH ADDITIONS,     */
+ /*              CHANGES, OR DELETIONS                                */
+ /*                                                                   */
+ /* VALID PARM INFORMATION:                                           */
+ /* PARM         EXPLANATION                                          */
+ /* ====         ===========                                          */
+ /* NC           NO ACTION=CHARGE WILL BE ALLOWED, FORCES ARCHIVE     */
+ /* ND           NO ACTION=DELETE WILL BE ALLOWED, FORCES ARCHIVE     */
+ /* L=NNN        REPLACES DEFAULT OF 10% LEEWAY, NNN IS PERCENT       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PARM  CHAR(100) VARYING;
+
+ /* FILE DECLARATIONS */
+ DECLARE  TSO       FILE OUTPUT STREAM ENV(FB RECSIZE(80));
+ DECLARE  ARCHIVE   FILE OUTPUT STREAM ENV(FB RECSIZE(80));
+ DECLARE  ALLOWED   FILE INPUT  RECORD KEYED ENV(VSAM SKIP);
+ DECLARE  (SORTIN,
+          SORTOUT)  FILE RECORD ENV(FB RECSIZE(53) BLKSIZE(6201));
+ DECLARE  SYSIN     FILE INPUT  STREAM;
+ DECLARE  DSNLIST   FILE OUTPUT STREAM PRINT;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ /* SUBROUTINE DECLARATIONS */
+ DECLARE  GETVTOC   ENTRY(CHAR(8), CHAR(140)) OPTIONS(ASM, INTER);
+ DECLARE  LINK      ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (ADDR, INDEX, NULL, ONSOURCE, PLIDUMP,
+           PLIRETV, STRING, SUBSTR, SUM, VERIFY)  BUILTIN;
+1/* FIXED BINARY DECLARATIONS */
+ DECLARE  ALLOWED_TRKS  FIXED BINARY(31) INIT(0)  STATIC;
+ DECLARE  TOTAL_TRKS    FIXED BINARY(31) INIT(0)  STATIC;
+ DECLARE  LEEWAY        FIXED BINARY     INIT(10) STATIC;
+ DECLARE  DDNUM         FIXED BINARY;
+ DECLARE  EXT#          FIXED BINARY;
+ DECLARE  NNN           FIXED BINARY;
+ DECLARE  POS           FIXED BINARY;
+ DECLARE  CONVERTB      BIT(16) ALIGNED;
+ DECLARE  CONVERT       FIXED BINARY  BASED(ADDR(CONVERTB));
+
+ /* CHARACTER DECLARATIONS */
+ DECLARE  DDNAME(20)  CHAR(8) STATIC INIT('DISK1', 'DISK2',  'DISK3',
+           'DISK4',  'DISK5',  'DISK6',  'DISK7',  'DISK8',  'DISK9',
+           'DISK10', 'DISK12', 'DISK13', 'DISK14', 'DISK15', 'DISK16',
+           'DISK17', 'DISK18', 'DISK19', 'DISK20');
+ DECLARE  INPT          CHAR(32);
+ DECLARE  NEXT_INDEX    CHAR(8) INIT(' ') STATIC;
+ DECLARE  PASSAREA      CHAR(8);
+ DECLARE  PASSADDR      CHAR(8);
+ DECLARE  PRES_INDEX    CHAR(8) INIT(' ') STATIC;
+ DECLARE  PIC_YEAR      PIC '(2)9';
+ DECLARE  PIC_DAY       PIC '(3)9';
+ DECLARE  ZHEX          BIT(40) STATIC INIT('0'B);
+ DECLARE  HEX_ZEROS     CHAR(5) BASED(ADDR(ZHEX));
+ DECLARE  DIRECT_READ   CHAR(3) INIT('111') STATIC;
+ DECLARE  PARM_SEL      CHAR(10);
+ DECLARE  PTRDS         CHAR(5);
+ DECLARE  VOLSER        CHAR(6);
+
+1/* BIT STRING DECLARATIONS */
+ DECLARE  CHARGES       BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_SORTOUT  BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_SYSIN    BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO            BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO_DELETES    BIT(1) INIT('0'B) STATIC;
+ DECLARE  USER          BIT(1)            STATIC;
+ DECLARE  YES           BIT(1) INIT('1'B) STATIC;
+
+ /* DECIMAL DECLARATIONS */
+ DECLARE  AVE_EX_EX          FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  AVE_EX_ALL         FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  AVE_NO_PER_INDEX   FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  PERCENT_EX_ALL     FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  PERCENT_EX_IDS     FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_ALLDSN       FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_ARCH         FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_CHARGE       FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_DEL          FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_DSN(20)      FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_EX           FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_INDEXES      FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_IDS_CHARGE   FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_IDS_EX       FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_USERIDS      FLOAT DECIMAL INIT(0) STATIC;
+ DECLARE  TOTAL_WARNINGS     FLOAT DECIMAL INIT(0) STATIC;
+1DECLARE
+     1  BINARY_DATE    BASED(ADDR(DS1REFD)),
+        2  YEAR        BIT(8),
+        2  DAY         BIT(16);
+
+ DECLARE
+     1  INFO_REC,      /* TOTAL LENGTH 53 */
+        2  DSNAME      CHAR(44),
+        2  LAST_USED   CHAR(5),
+        2  FLAGS       BIT(8),
+        2  NO_TRKS     FIXED BINARY,
+        2  DSORG_TYPE  BIT(8);
+
+ DECLARE
+     1  ALLOWED_REC,   /* TOTAL LENGTH 20 */
+        2  USERID      CHAR(8),
+        2  TRK_PERMIT  FIXED BINARY(31),
+        2  ACTION      CHAR(1),    /* A-ARCHIVE, C-CHARGE, D-DELETE */
+        2  FILLER      CHAR(7);    /* FOR FUTURE USE */
+
+ DECLARE  FIRST  PTR;
+ DECLARE  LAST   PTR;
+ DECLARE  PRES   PTR;
+ DECLARE
+     1  ID_LIST  BASED(PRES),
+        2  NEXT       PTR,
+        2  DSN        CHAR(44),
+        2  LAST_DATE  CHAR(5),
+        2  PSWD       BIT(8),
+        2  #TRKS      FIXED BINARY,
+        2  DSORG      BIT(8);
+
+ DECLARE
+     1  SORT_PARM           STATIC,
+        2  BYTE_COUNT       FIXED BINARY  INIT(28),
+        2  BEGIN_SORT_STMT  PTR,
+        2  END_SORT_STMT    PTR,
+        2  BEGIN_REC_STMT   PTR,
+        2  END_REC_STMT     PTR,
+        2  ADDR_E15         FIXED BINARY(31)  INIT(0),
+        2  ADDR_E35         FIXED BINARY(31)  INIT(0),
+        2  STORAGE          FIXED BINARY(31)  INIT(262144),
+        2  SORTCARD  CHAR(43)
+             INIT(' SORT FIELDS=(1,8,CH,A,45,5,CH,A,51,2,CH,D)'),
+        2  RECCARD   CHAR(24) INIT(' RECORD LENGTH=53,TYPE=F'),
+        2  RECEND    CHAR(1)  INIT(' ');
+1DECLARE
+     1  $AR         STATIC,
+        2  FILLER   CHAR(5)  INIT('$AR '''),
+        2  $AR_DSN  CHAR(75);
+
+ DECLARE
+     1  SEND1       STATIC,
+        2  FILLER   CHAR(4)  INIT('SE '''),
+        2  SE1_DSN  CHAR(45),
+        2  FILLER2  CHAR(3)  INIT(' U('),
+        2  SE1_WHOM CHAR(8)  INIT('$FCSXXX'),
+        2  FILLER3  CHAR(20) INIT(') L');
+
+ DECLARE
+     1  SEND2       STATIC,
+        2  FILLER   CHAR(4)  INIT('SE '''),
+        2  MSG      CHAR(45) INIT(
+         'QUEUED FOR ARCHIVE, TRK ALLOC LIMIT EXCEEDED'''),
+        2  FILLER2  CHAR(3)  INIT(' U('),
+        2  SE2_WHOM CHAR(8)  INIT('$FCSXXX'),
+        2  FILLER3  CHAR(20)  INIT(') L');
+
+ DECLARE
+     1  SEND_WARN   STATIC,
+        2  FILLER   CHAR(4)  INIT('SE '''),
+        2  WARN_MSG CHAR(52) INIT(
+         '|WARNING| FURTHER ALLOC OF TRKS WILL CAUSE ARCHIVAL'''),
+        2  FILLER2  CHAR(3)  INIT(' U('),
+        2  SEW_WHOM CHAR(8)  INIT('$FCSXXX'),
+        2  FILLER3  CHAR(13)  INIT(') L');
+
+ DECLARE
+     1  DEL         STATIC,
+        2  FILLER   CHAR(5)  INIT('DEL '''),
+        2  DEL_DSN  CHAR(75);
+
+ DECLARE
+     1  DEL2        STATIC,
+        2  FILLER   CHAR(4)  INIT('SE '''),
+        2  MSG      CHAR(34) INIT(
+         'DELETED, TRK ALLOC LIMIT EXCEEDED'''),
+        2  FILLER2  CHAR(3)  INIT(' U('),
+        2  DE2_WHOM CHAR(8)  INIT('$FCSXXX'),
+        2  FILLER3  CHAR(31)  INIT(') L');
+1DECLARE  BUFFER  CHAR(140) STATIC INIT(' ');
+ /*                    FORMAT 1 DSCB                                 */
+ DECLARE
+     1 IECSDSL1 BASED(ADDR(BUFFER)),    /* START OF THE FORMAT 1 DSCB*/
+         2 DS1DSNAM    CHAR(44),        /* DATA SET NAME             */
+         2 DS1FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS1DSSN     CHAR(6),         /* DATA SET SERIAL NUMBER    */
+         2 DS1VOLSQ    CHAR(2),         /* VOLUME SEQUENCE NUMBER    */
+         2 DS1CREDT    CHAR(3),         /* CREATION DATE             */
+         2 DS1EXPDT    CHAR(3),         /* EXPIRATION DATE           */
+         2 DS1NOEPV    CHAR(1),         /* NUMBER OF EXTENTS ON VOL  */
+         2 DS1NOBDB    CHAR(1),         /* NUMBER OF BYTES USED IN
+                                           LAST DIRECTORY BLOCK      */
+         2 FILLER1     CHAR(1),         /* RESERVED                  */
+         2 DS1SYSCD    CHAR(13),        /* SYSTEM CODE               */
+         2 DS1REFD     CHAR(3),         /* DATE LAST                 */
+                                        /* REFERENCED OR ZERO        */
+                                        /* IF NOT MAINTAINED         */
+         2 FILLER2     CHAR(4),         /* RESERVED                  */
+         2 DS1DSORG,                    /* DATA SET ORGANIZATION     */
+          3 DS1DSRG1,                   /* FIRST BYTE OF DS1DSORG    */
+           4 DS1DSGIS BIT(1),           /* IS - INDEXED
+                                           SEQUENTIAL ORGANIZATION   */
+           4 DS1DSGPS BIT(1),           /* PS - PHYSICAL
+                                           SEQUENTIAL ORGANIZATION   */
+           4 DS1DSGDA BIT(1),           /* DA - DIRECT
+                                                      ORGANIZATION   */
+           4 DS1DSGCX BIT(1),           /* CX - BTAM OR QTAM LINE
+                                            GROUP                    */
+           4 F1  BIT(1),                /* RESERVED                  */
+           4 F2  BIT(1),                /* RESERVES                  */
+           4 DS1DSGPO BIT(1),           /* PO - PARTITIONED
+                                            ORGANIZATION             */
+           4 DS1DSGU BIT(1),            /* U - UNMOVABLE, THE
+                                            DATA CONTAINS LOCATION
+                                            DEPENDENT INFORMATION    */
+          3 DS1DSRG2,                   /* SECOND BYTE OF DS1DSORG   */
+           4 DS1DSGGS BIT(1),           /* GS - GRAPHICS
+                                            ORGANIZATION             */
+           4 DS1DSGTX BIT(1),           /* TX - TCAM LINE GROUP      */
+           4 DS1DSGTQ BIT(1),           /* TQ - TCAM MESSAGE QUEUE   */
+           4 F3  BIT(1),                /* RESERVED                  */
+           4 DS1ACBM BIT(1),            /* ACCESS METHOD CONTROL
+                                            BLOCK                    */
+           4 DS1DSGTR BIT(1),           /* TR - TCAM 3705            */
+           4 F4 BIT(2),                 /*  RESERVED                 */
+1        2 DS1RECFM    CHAR(1),         /* RECORD FORMAT             */
+         2 DS1OPTCD    CHAR(1),         /* OPTION CODE               */
+         2 DS1BLKL     CHAR(2),         /* BLOCK LENGTH              */
+         2 DS1LRECL    CHAR(2),         /* RECORD LENGTH             */
+         2 DS1KEYL     CHAR(1),         /* KEY LENGTH                */
+         2 DS1RKP      CHAR(2),         /* RELATIVE KEY POSITION     */
+         2 DS1DSIND,                    /* DATA SET INDICATORS       */
+          3 DS1IND80    BIT(1),         /* LAST VOLUME ON            */
+                                        /* WHICH A DATA SET          */
+                                        /* RESIDES.                  */
+          3 DS1IND40    BIT(1),         /* DATA SET IS RACF          */
+                                        /* DEFINED                   */
+          3 DS1IND20    BIT(1),         /* BLOCK LENGTH IS A         */
+                                        /* MULTIPLE OF 8 BYTE        */
+          3 DS1IND10    BIT(1),         /* PASSWORD IS               */
+                                        /* REQUIRED TO READ          */
+                                        /* OR WRITE OR BOTH-         */
+                                        /* SEE DS1IND04              */
+          3 DS1IND08    BIT(1),         /* RESERVED.                 */
+          3 DS1IND04    BIT(1),         /* IF DS1IND10 IS 1          */
+                                        /* THEN IF DS1IND04          */
+                                        /* IS . . .                  */
+                                        /* 1 - PASSWORD IS           */
+                                        /* REQUIRED TO WRITE         */
+                                        /* BUT NOT TO READ           */
+                                        /* 0 - PASSWORD IS           */
+                                        /* REQUIRED TO WRITE         */
+                                        /* AND TO READ               */
+          3 DS1IND02    BIT(1),         /* DATASET HAS BEEN          */
+                                        /* OPENED FOR OTHER          */
+                                        /* THAN INPUT SINCE          */
+                                        /* LAST BACKUP COPY          */
+                                        /* WAS MADE.                 */
+          3 DS1IND01    BIT(1),         /* RESERVED                  */
+         2 DS1SCALO    CHAR(4),         /* SECONDARY ALLOCATION      */
+         2 DS1LSTAR    CHAR(3),         /* LAST USED TRACK AND LAST
+                                           BLOCK ON TRACK            */
+         2 DS1TRBAL    CHAR(2),         /* BYTES REMAINING ON LAST
+                                           TRACK USED                */
+         2 FILLER3     CHAR(2),         /* RESERVED                  */
+1        2 DS1EXNTS,                    /* THREE EXTENT FIELDS       */
+           3 DS1EXT1     CHAR(10),      /* FIRST EXTENT DESCRIP.
+                                           FIRST BYTE
+                                             EXTENT TYPE INDICATOR
+                                           SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER
+                                           THIRD - SIXTH BYTES
+                                             LOWER LIMIT
+                                           SEVENTH - TENTH BYTES
+                                             UPPER LIMIT            */
+           3 DS1EXT2     CHAR(10),      /* SECOND EXTENT DESCRIP.    */
+           3 DS1EXT3     CHAR(10),      /* THIRD EXTENT DESCRIP.     */
+         2 DS1PTRDS    CHAR(5),         /* POSSIBLE PTR TO A FORMAT
+                                           2 OR 3 DSCB               */
+         2 DS1END      CHAR(0);         /* END OF THE FORMAT 1 DSCB  */
+
+
+
+
+
+ /*                    FORMAT 3 DSCB                                 */
+ DECLARE
+     1 IECSDSL3 BASED(ADDR(BUFFER)),    /* START OF THE FORMAT 3 DSCB*/
+         2 FILLER1     CHAR(4),         /* KEY IDENTIFIER            */
+         2 DS3EXTNT(4) CHAR(10),        /* FOUR EXTENT DESCRIPTIONS
+                                           FIRST BYTE
+                                             EXTENT TYPE INDICATOR
+                                           SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER
+                                           THIRD - SIXTH BYTES
+                                             LOWER LIMIT
+                                           SEVENTH - TENTH BYTES
+                                             UPPER LIMIT             */
+         2 DS3FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS3ADEXT(9) CHAR(10),        /* NINE ADDITIONAL EXTENT
+                                           DESCRIPTIONS              */
+         2 DS3PTRDS    CHAR(5),         /* RESERVED                  */
+         2 DS3END      CHAR(0);         /* END OF THE FORMAT 3 DSCB  */
+1ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ ON UNDEFINEDFILE(SYSIN) GOTO READVTOCS;
+
+ ON CONVERSION BEGIN;
+     INPT = ONSOURCE;
+     ONSOURCE = (16) '0';
+     END;
+
+ /* PROCESS ANY PARM INFORMATION */
+ DO WHILE(PARM ª= '');
+     POS = INDEX(PARM, ',');
+     IF POS = 0
+         THEN DO;
+              PARM_SEL = PARM;
+              PARM = '';
+              END;
+         ELSE DO;
+              PARM_SEL = SUBSTR(PARM, 1, POS-1);
+              PARM = SUBSTR(PARM, POS+1);
+              END;
+     SELECT(PARM_SEL);
+         WHEN ('NC') CHARGES = NO;
+         WHEN ('ND') NO_DELETES = YES;
+         OTHERWISE
+             SELECT(SUBSTR(PARM_SEL, 1, 2));
+                 WHEN('L=')
+                     GET STRING(SUBSTR(PARM_SEL, 3)) LIST(LEEWAY);
+                 OTHERWISE
+                     PUT SKIP(2) EDIT('***** ', PARM_SEL,
+                         ' IS AN INVALID PARM.') (A);
+                 END;
+         END;
+     END;
+
+ /* GET ALTERNATE DDNAMES IF ANY */
+ GET LIST(NNN);
+ DDNUM = 1;
+ DO WHILE(MORE_SYSIN);
+     IF NNN = 0
+         THEN DO;
+              DDNAME(DDNUM) = INPT;
+              DDNUM = DDNUM + 1;
+              END;
+     GET LIST(NNN);
+     END;
+
+ PUT EDIT('EXTRKS ARCHIVE PROCESSOR INDEX LEVEL EXCEPTION REPORT')
+     (SKIP(2), A);
+1READVTOCS:  /* READ IN THE FORMAT 1 DSCBS FOR DISK1 - DISKN */
+ DO DDNUM = 1 TO 20;
+
+     PASSAREA = DDNAME(DDNUM);
+     CALL GETVTOC(PASSAREA, BUFFER);
+
+     SELECT(PASSAREA);
+         WHEN('EOF');
+         WHEN('OPENFAIL') LEAVE READVTOCS;
+         WHEN('NOTDA') PUT SKIP(3) EDIT('***** DDNAME ', DDNAME(DDNUM),
+             ' IS NOT DIRECT ACCESS! *****') (A);
+         WHEN('DUMP') DO;
+              PUT SKIP(3) DATA(BUFFER);
+              CALL PLIDUMP;
+              SIGNAL ERROR;
+              END;
+         OTHERWISE VOLSER = PASSAREA;
+         END;
+
+     READ_BLOCK:  /* READ UNTIL GETVTOC CHANGES PASSAREA */
+     DO WHILE(PASSAREA = VOLSER);
+         IF DS1FMTID = '1'
+             THEN CALL EXTRACT_INFO;
+         CALL GETVTOC(PASSAREA, BUFFER);
+         END READ_BLOCK;
+
+     IF PASSAREA ª= 'EOF'
+         THEN DO;
+              PUT SKIP(3) DATA(PASSAREA);
+              PUT SKIP(3) DATA(BUFFER);
+              CALL PLIDUMP;
+              SIGNAL ERROR;
+              END;
+
+     END READVTOCS;
+1CLOSE FILE(SORTIN);
+
+ BEGIN_SORT_STMT = ADDR(SORTCARD);
+ END_SORT_STMT   = ADDR(RECCARD);
+ BEGIN_REC_STMT  = ADDR(RECCARD);
+ END_REC_STMT    = ADDR(RECEND);
+
+ CALL LINK('SORT    ', SORT_PARM);
+
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT SKIP(3) EDIT('***** ERROR ON SORT, RETURN CODE=', PLIRETV)
+              (A, F(4));
+          SIGNAL ERROR;
+          END;
+
+ /* FLOW CONTINUES AT BEGIN_BLOCK LABEL */
+1EXTRACT_INFO:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE TAKES THE INPUT RECORD FROM A VTOC AND EXTRACTS    */
+ /* THE DESIRED INFORMATION FROM IT.  BEFORE IT IS WRITTEN OUT TO A   */
+ /* TEMPORARY FILE SOME PRELIMINARY PROCESSING IS DONE TO GET IT INTO */
+ /* A MORE USEFUL FORM.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ TOTAL_DSN(DDNUM) = TOTAL_DSN(DDNUM) + 1;  /* GATHER STATISTICS */
+
+ /* COPY DSN */
+ DSNAME = DS1DSNAM;
+
+ /* CONVERT DATE TO MMDDYY */
+ CONVERTB = '0'B;
+ SUBSTR(CONVERTB, 9) = YEAR;
+ PIC_YEAR = CONVERT;
+ CONVERTB = DAY;
+ PIC_DAY = CONVERT;
+ LAST_USED = PIC_YEAR || PIC_DAY;
+
+ /* COPY PROTECT INFO */
+ FLAGS = STRING(DS1DSIND);
+
+ /* COPY DSORG INFO */
+ DSORG_TYPE = STRING(DS1DSRG1);
+
+ /* ADD UP TRACKS OF FIRST THREE EXTENTS */
+ NO_TRKS = TRKEXT(DS1EXT1);
+ NO_TRKS = NO_TRKS + TRKEXT(DS1EXT2);
+ NO_TRKS = NO_TRKS + TRKEXT(DS1EXT3);
+1/* IF THERE ARE FORMAT 3 DSCBS THEN USE DIRECT READ TO LOCATE THEM */
+ IF DS1PTRDS ª= HEX_ZEROS
+     THEN FORMAT3:  DO;
+
+          PTRDS = DS1PTRDS;
+          PASSADDR = DIRECT_READ || PTRDS;
+          CALL GETVTOC(PASSADDR, BUFFER);
+          IF (PASSADDR ª= 'BADSEEK') & (DS1FMTID = '2')
+              THEN DO;
+                   PTRDS = DS1PTRDS;
+                   PASSADDR = DIRECT_READ || PTRDS;
+                   CALL GETVTOC(PASSADDR, BUFFER);
+                   END;
+          IF (PASSADDR = 'BADSEEK') | (DS1FMTID ª= '3')
+              THEN DO;
+                   PUT SKIP(3) DATA(PASSADDR);
+                   PUT SKIP(1) EDIT('*****  VTOC ERROR ON VOL ',
+                      'WITH DDNAME ', DDNAME(DDNUM), ' DSN=',
+                       DSNAME, ' DSCB1->DSCB3 CHAIN BAD') (A);
+                   RETURN;
+                   END;
+
+          /* ADD UP THE TRACKS ON THE REST OF THE EXTENTS */
+          DO EXT# = 1 TO 4;
+              NO_TRKS = NO_TRKS + TRKEXT(DS3EXTNT(EXT#));
+              END;
+          DO EXT# = 1 TO 9;
+              NO_TRKS = NO_TRKS + TRKEXT(DS3ADEXT(EXT#));
+              END;
+
+          END FORMAT3;
+
+ /* OUTPUT THE INFORMATION TO THE TEMPORARY FILE */
+ WRITE FILE(SORTIN) FROM(INFO_REC);
+1TRKEXT:  PROCEDURE(EXTENT) RETURNS(FIXED BINARY);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO EXTRACT_INFO.  THE FUNCTION IS TO   */
+ /* TAKE THE CCHH OF AN EXTENT OF A DATASET AND COMPUTE THE NUMBER OF */
+ /* TRACKS IN THAT EXTENT AND RETURN THAT VALUE.                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  EXTENT  CHAR(10);
+ DECLARE
+     1  EXTENT_DESCRIPT  BASED(ADDR(EXTENT)) UNALIGNED,
+        2  TYPE     BIT(8),
+        2  SEQ      CHAR(1),
+        2  STARTCC  FIXED BINARY,
+        2  STARTHH  FIXED BINARY,
+        2  ENDCC    FIXED BINARY,
+        2  ENDHH    FIXED BINARY;
+
+
+ IF TYPE = '00000000'B
+     THEN RETURN(0);
+
+ RETURN((ENDCC * 15 + ENDHH) - (STARTCC * 15 + STARTHH) + 1);
+
+ END TRKEXT;
+
+
+ END EXTRACT_INFO;
+1BEGIN_BLOCK:  BEGIN;
+
+ ON ENDFILE(SORTOUT) MORE_SORTOUT = NO;
+ ON KEY(ALLOWED) USER = NO;
+
+
+ CALL READ_SORTOUT;
+ PRES_INDEX = NEXT_INDEX;
+ LAST = NULL;
+
+ /* PROCESS THE ENTIRE SET OF DATA SET INFORMATION */
+ DO WHILE(MORE_SORTOUT);
+     TOTAL_INDEXES = TOTAL_INDEXES + 1;  /* GATHER STATISTICS */
+
+     USER = YES;
+     READ FILE(ALLOWED) INTO(ALLOWED_REC) KEY(PRES_INDEX);
+
+     IF USER
+
+         /* PROCESS THIS GROUP OF DSNAMES SINCE IT'S A USER */
+         THEN CHECK_USER:  DO;
+              TOTAL_USERIDS = TOTAL_USERIDS + 1; /* GATHER STATISTICS */
+              ALLOWED_TRKS = TRK_PERMIT;
+
+              /* BUILD AN IN-MEMORY LIST FOR EACH HIGH LEVEL INDEX */
+              DO WHILE(MORE_SORTOUT & (NEXT_INDEX = PRES_INDEX));
+                  ALLOCATE ID_LIST;
+                  IF LAST = NULL
+                      THEN DO;
+                           TOTAL_TRKS = 0;
+                           FIRST = PRES;
+                           END;
+                      ELSE LAST-> NEXT = PRES;
+                  NEXT = NULL;
+                  DSN = DSNAME;
+                  LAST_DATE = LAST_USED;
+                  PSWD = FLAGS;
+                  #TRKS = NO_TRKS;
+                  DSORG = DSORG_TYPE;
+                  TOTAL_TRKS = TOTAL_TRKS + NO_TRKS;
+                  LAST = PRES;
+                  CALL READ_SORTOUT;
+                  END;
+1             PUT SKIP(2) FILE(DSNLIST) EDIT('USER ', PRES_INDEX,
+                  ' HAD ', TOTAL_TRKS, ' BEFORE PROCESSING')
+                  (A,A,A,F(7),A);
+
+              /* KEEP TRACK OF EXCESSIVE ALLOWANCES */
+              IF ALLOWED_TRKS > 200
+                  THEN PUT SKIP(1) EDIT('USER ', PRES_INDEX,
+                     ' HAD ALLOCATED: ', TOTAL_TRKS, ', ALLOWED: ',
+                       ALLOWED_TRKS, ', EXCESSIVE ALLOWANCE')
+                       (A, A, A, F(7), A, F(7), A);
+
+              /* DO WE GO AFTER HIS DATA SETS? */
+              IF TOTAL_TRKS > ALLOWED_TRKS
+                  THEN CALL EXCESSIVE;
+
+              /* FREE THE LIST */
+              LAST = FIRST;
+              PRES = FIRST-> NEXT;
+              DO WHILE(LAST ª= NULL);
+                  FREE LAST-> ID_LIST;
+                  LAST = PRES;
+                  IF PRES ª= NULL
+                      THEN PRES = NEXT;
+                  END;
+
+              PUT SKIP FILE(DSNLIST) EDIT('USER ', PRES_INDEX, ' HAS ',
+                  TOTAL_TRKS, ' AFTER PROCESSING') (A,A,A,F(7),A);
+
+              END CHECK_USER;
+
+         /* NOT A USER SO SKIP ALL DSN WITH THIS HIGH LEVEL INDEX */
+         ELSE DO;
+              PUT LIST(PRES_INDEX);  /* EXCEPTION REPORT */
+              DO WHILE(MORE_SORTOUT & (NEXT_INDEX = PRES_INDEX));
+                  CALL READ_SORTOUT;
+                  END;
+              END;
+
+     PRES_INDEX = NEXT_INDEX;
+     END;
+1TOTAL_EX = TOTAL_ARCH + TOTAL_DEL;
+ TOTAL_ALLDSN = SUM(TOTAL_DSN);
+ IF TOTAL_IDS_EX ª= 0
+     THEN AVE_EX_EX = TOTAL_EX / TOTAL_IDS_EX;
+ IF TOTAL_INDEXES ª= 0
+     THEN DO;
+          AVE_EX_ALL = TOTAL_EX / TOTAL_INDEXES;
+          AVE_NO_PER_INDEX = TOTAL_ALLDSN / TOTAL_INDEXES;
+          END;
+ IF TOTAL_USERIDS ª= 0
+     THEN PERCENT_EX_IDS = (TOTAL_IDS_EX / TOTAL_USERIDS) * 100;
+ IF TOTAL_ALLDSN ª= 0
+     THEN PERCENT_EX_ALL = (TOTAL_EX / TOTAL_ALLDSN) * 100;
+
+ PUT PAGE;
+ DO DDNUM = 1 TO 20  WHILE(TOTAL_DSN(DDNUM) ª= 0);
+     PUT SKIP(1) EDIT(TOTAL_DSN(DDNUM), ' DATA SETS ON ',
+         DDNAME(DDNUM)) (F(9), A, A);
+     END;
+ PUT SKIP(2) EDIT(TOTAL_ALLDSN,
+     ' TOTAL DATA SETS ON ALL PROCESSED PACKS') (F(9), A);
+ PUT SKIP(2) EDIT(TOTAL_INDEXES,
+     ' HIGH LEVEL INDEXES PROCESSED') (F(9), A);
+ PUT SKIP(1) EDIT(TOTAL_USERIDS, ' INDEXES WERE IN THE ALLOWED TRACKS',
+     ' DATASET AND ELIGIBLE FOR ARCH/DEL') (F(9), A, A);
+ PUT SKIP(1) EDIT(TOTAL_IDS_EX,
+     ' OF THOSE HAD DATASETS ARCHIVED OR DELETED') (F(9), A);
+ PUT SKIP(1) EDIT(TOTAL_IDS_CHARGE, ' OF THOSE HAD THE CHARGE OPTION',
+     ' OR WOULD HAVE HAD DATASETS ARCHIVED OR DELETED') (F(9), A, A);
+ PUT SKIP(1) EDIT(TOTAL_WARNINGS,
+     ' OF THOSE WERE WITHIN WARNING RANGE OF ALLOWED TRKS') (F(9), A);
+ PUT SKIP(2) EDIT(TOTAL_ARCH, ' DATASETS WERE ARCHIVED') (F(9), A);
+ PUT SKIP(1) EDIT(TOTAL_DEL, ' DATASETS WERE DELETED') (F(9), A);
+ PUT SKIP(1) EDIT(TOTAL_EX, ' TOTAL DATASETS PROCESSED') (F(9), A);
+ PUT SKIP(1) EDIT(PERCENT_EX_ALL,
+     ' PERCENT DATASETS ARCH/DEL FOR ALL DATASETS') (F(9), A);
+ PUT SKIP(1) EDIT(PERCENT_EX_IDS,
+     ' PERCENT INDEXES WITH ARCH/DEL FOR ALL INDEXES') (F(9), A);
+ PUT SKIP(1) EDIT(AVE_EX_EX, ' AVERAGE DATASETS ARCH/DEL FOR ONLY',
+     ' INDEXES WITH DATASETS ARCH/DEL') (F(9, 2), A, A);
+ PUT SKIP(1) EDIT(AVE_EX_ALL,
+     ' AVERAGE DATASETS ARCH/DEL FOR ALL INDEXES') (F(9, 2), A);
+ PUT SKIP(2) EDIT(AVE_NO_PER_INDEX,
+     ' AVERAGE DATASET COUNT PER INDEX') (F(9, 2), A);
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1READ_SORTOUT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* READ THE SORTED FILE OF DATA SET INFORMATION.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ READ FILE(SORTOUT) INTO(INFO_REC);
+
+ POS = INDEX(DSNAME, '.');
+
+ IF POS = 0
+    THEN NEXT_INDEX = DSNAME;
+    ELSE NEXT_INDEX = SUBSTR(DSNAME, 1, POS-1);
+
+
+ END READ_SORTOUT;
+1EXCESSIVE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DETERMINE WHAT ACTION TO TAKE FOR THE USER WHO HAS TOO MANY       */
+ /* TRACKS ALLOCATED.                                                 */
+ /*                                                                   */
+ /*   1)  DO NOTHING - CHARGE ACTION SPECIFIED (EXCEPTION REPORT)     */
+ /*   2)  IF WITHIN LEEWAY PERCENT OF HIS ALLOWED USAGE THEN SEND HIM */
+ /*           A WARNING MESSAGE                                       */
+ /*   3)  ARCHIVE THROUGH HIS DATA SETS BY LAST USED DATE             */
+ /*   4)  DELETE THROUGH HIS DATA SETS BY LAST USED DATE              */
+ /*                                                                   */
+ /* IF UNABLE TO REQUEST ARCHIVE FOR SUFFIECIENT DATA SETS TO OBTAIN  */
+ /* LESS THAN ALLOWED NUMBER OF TRACKS THEN WRITE TO EXCEPTION REPORT.*/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  COMPLETE_MSG  BIT(1) INIT('0'B);
+
+ /* CHARGE HIS OVER ALLOCATION? */
+ IF ACTION = 'C' & CHARGES
+     THEN DO;
+          TOTAL_IDS_CHARGE = TOTAL_IDS_CHARGE+1; /* GATHER STATISTICS */
+          PUT SKIP(1) EDIT('USER ', PRES_INDEX, ' HAS ALLOCATED: ',
+             TOTAL_TRKS, ', ALLOWED: ', ALLOWED_TRKS, ', CHARGE OPTION')
+             (A, A, A, F(7), A, F(7), A);
+          RETURN;
+          END;
+
+ /* IS HE WITHIN LEEWAY PERCENT OF HIS TRACK ALLOWANCE? */
+ IF TOTAL_TRKS < ((ALLOWED_TRKS * LEEWAY) / 100) + ALLOWED_TRKS
+     THEN DO;
+          TOTAL_WARNINGS = TOTAL_WARNINGS + 1;  /* GATHER STATISTICS */
+          SEW_WHOM = PRES_INDEX;
+          PUT FILE(TSO) EDIT(SEND_WARN) (A);
+          RETURN;
+          END;
+1TOTAL_IDS_EX = TOTAL_IDS_EX + 1;  /* GATHER STATISTICS */
+
+ PRES = FIRST;
+ /* PROCESS DATA SETS UNTIL UNDER ALLOWANCE */
+ DO WHILE((PRES ª= NULL) & (TOTAL_TRKS > ALLOWED_TRKS));
+
+     PUT SKIP FILE(DSNLIST) EDIT(DSN, ' ', LAST_DATE, ' ', #TRKS)
+         (A, A, A, A, F(7));
+
+     /* DO NOT ARCHIVE PASSWORD PROTECTED OR DA DSORG DATA SETS */
+     IF ªSUBSTR(PSWD, 4, 1) & ªSUBSTR(DSORG, 3, 1)
+         THEN DO;
+
+              TOTAL_TRKS = TOTAL_TRKS - #TRKS;
+
+              /* ARCHIVE THEM OR DELETE THEM? */
+              IF ACTION = 'A' | NO_DELETES
+
+                  /* ARCHIVE DATA SETS */
+                  THEN DO;
+                       PUT FILE(DSNLIST) EDIT(' ARCHIVED') (A);
+                       TOTAL_ARCH = TOTAL_ARCH+1;/* GATHER STATISTICS */
+                       $AR_DSN = DSN;
+                       POS = INDEX($AR_DSN, ' ');
+                       SUBSTR($AR_DSN, POS, 1) = '''';
+                       PUT FILE(ARCHIVE) EDIT($AR) (A);
+                       SE1_DSN = DSN;
+                       POS = INDEX(SE1_DSN, ' ');
+                       SUBSTR(SE1_DSN, POS, 1) = '''';
+                       SE1_WHOM = PRES_INDEX;
+                       PUT FILE(TSO) EDIT(SEND1) (A);
+                       COMPLETE_MSG = YES;
+                       END;
+
+                  /* DELETE DATA SETS */
+                  ELSE DO;
+                       PUT FILE(DSNLIST) EDIT(' DELETED') (A);
+                       TOTAL_DEL = TOTAL_DEL + 1;/* GATHER STATISTICS */
+                       SE1_DSN = DSN;
+                       POS = INDEX(SE1_DSN, ' ');
+                       SUBSTR(SE1_DSN, POS, 1) = '''';
+                       SE1_WHOM = PRES_INDEX;
+                       PUT FILE(TSO) EDIT(SEND1) (A);
+                       DEL_DSN = SE1_DSN;
+                       PUT FILE(TSO) EDIT(DEL) (A);
+                       COMPLETE_MSG = YES;
+                       END;
+              END;
+         ELSE PUT FILE(DSNLIST) EDIT(' PSWD PROT OR DSORG=DA')(A);
+
+     PRES = NEXT;
+     END;
+1DO WHILE(PRES ª= NULL);
+     PUT SKIP FILE(DSNLIST) EDIT(DSN, ' ', LAST_DATE, ' ', #TRKS)
+         (A, A, A, A, F(7));
+     PRES = NEXT;
+     END;
+
+ /* FINISH MESSAGE IF WE ARCHIVED DATA SETS */
+ IF COMPLETE_MSG
+     THEN IF ACTION = 'A' | NO_DELETES
+              THEN DO;
+                   SE2_WHOM = PRES_INDEX;
+                   PUT FILE(TSO) EDIT(SEND2) (A);
+                   END;
+              ELSE DO;
+                   DE2_WHOM = PRES_INDEX;
+                   PUT FILE(TSO) EDIT(DEL2) (A);
+                   END;
+
+ /* WRITE EXCEPTION IF STILL OVER ALLOWANCE */
+ IF TOTAL_TRKS > ALLOWED_TRKS
+     THEN PUT SKIP(1) EDIT('USER ', PRES_INDEX, ' HAS ALLOCATED: ',
+              TOTAL_TRKS, ', ALLOWED: ', ALLOWED_TRKS,
+              ', UNABLE TO REQUEST FURTHER ARCHIVAL')
+              (A, A, A, F(7), A, F(7), A);
+
+ END EXCESSIVE;
+
+
+ END BEGIN_BLOCK;
+ END EXTRKS;
+*PROCESS NM;
+ EXINIT:  PROCEDURE OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(34) VARYING STATIC EXTERNAL
+     INIT('EXINIT V1.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM SETS UP THE VSAM FILE REQUIRED BY THE EXTRKS PROGRAM.*/
+ /* THE INPUT IS FROM THE DATASET 'TSOVSAM.$FCT176.TSOUSIDS' EITHER   */
+ /* DIRECTLY OR INDIRECTLY.  THE DATASET CAN BE REPRO TO SEQUENTIAL   */
+ /* BUT THE DCL FOR FILE IN SHOULD BE CHANGED.  THE OUTPUT IS         */
+ /* 'TSOVSAM.$FCT134.USERTRKS'.                                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  IN  FILE INPUT RECORD SEQUENTIAL KEYED ENV(VSAM);
+ DECLARE  OUT FILE OUTPUT RECORD SEQUENTIAL KEYED ENV(VSAM);
+ DECLARE  IN_REC  CHAR(80) VARYING;
+ DECLARE  MORE_IN  BIT(1) INIT('1'B) STATIC;
+ DECLARE  SUBSTR  BUILTIN;
+
+ DECLARE
+   1  OUT_REC STATIC,
+      2  USERID  CHAR(8) INIT(' '),
+      2  TRK_PERMIT  FIXED BINARY(31) INIT(200),
+      2  ACTION  CHAR(1) INIT('A'),
+      2  FILLER  CHAR(7) INIT(' ');
+
+ ON ENDFILE(IN) MORE_IN = '0';
+
+ READ FILE(IN) INTO(IN_REC);
+ DO WHILE(MORE_IN);
+     USERID = SUBSTR(IN_REC, 1, 8);
+     WRITE FILE(OUT) FROM(OUT_REC) KEYFROM(USERID);
+     READ FILE(IN) INTO(IN_REC);
+     END;
+
+ END EXINIT;
+*PROCESS NM;
+ EXMAINT:  PROCEDURE OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('EXMAINT V1.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM IS AN UPDATE PROGRAM FOR THE VSAM FILE USED WITH THE */
+ /* EXTRKS PROGRAM.  WITH THIS PROGRAM A TERMINAL USER CAN CHANGE THE */
+ /* TRACK ALLOCATION LIMIT FOR A USERID OR CHANGE THE ACTION CODE.    */
+ /* USERIDS CAN BE DELETED OR ADDED, LISTED EITHER BY A SPECIFIC      */
+ /* USERID OR IN GROUPS WITH A PARTIAL KEY.                           */
+ /*                                                                   */
+ /* WHEN THIS PROGRAM IS RECOMPILED IT IS DESIRABLE TO EDIT THE OBJ   */
+ /* MODULE.  TO DO THIS DO A CHANGE ON CAPITAL 'REC.' TO '    ' ALL.  */
+ /* THIS WILL DELETE THE STRING FROM THE PUT DATA STATEMENTS.  USERID */
+ /* TRKS AND ACTION ON THESE LINES MAY ALSO BE CHANGED TO LOWER CASE  */
+ /* IF DESIRED.                                                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  CAPITAL_LETTERS CHAR(26) STATIC INIT(
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+ DECLARE  SMALL_LETTERS CHAR(26) STATIC INIT(
+      'abcdefghijklmnopqrstuvwxyz');
+
+ DECLARE  ANSW  CHAR(30);
+ DECLARE  NNN   FIXED BINARY(31);
+ DECLARE  POS   FIXED BINARY(31);
+ DECLARE  MORE_SYSIN  BIT(1) INIT('1'B) STATIC;
+
+ DECLARE  INOUT     FILE UPDATE RECORD KEYED ENV(VSAM GENKEY);
+ DECLARE  SYSIN     FILE INPUT STREAM;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ DECLARE  (INDEX, ONCODE, ONSOURCE, SUBSTR, TRANSLATE)  BUILTIN;
+
+ DECLARE
+   1  REC,
+      2  USERID  CHAR(8),
+      2  TRKS    FIXED BINARY(31),
+      2  ACTION  CHAR(1),
+      2  FILLER  CHAR(7);
+1ON ENDFILE(SYSIN) MORE_SYSIN = '0'B;
+
+
+ ON ENDFILE(INOUT) BEGIN;
+ /* TRIED TO READ BEYOND END OF FILE ON A LIST COMMAND, JUST RESTART */
+     CLOSE FILE(INOUT);
+     GOTO REINIT;
+     END;
+
+
+ ON CONVERSION BEGIN;
+ /* GET THE INPUT FROM THE TERMINAL WITHOUT REQUIRING QUOTED STRINGS */
+     ANSW = ONSOURCE;
+     ONSOURCE = (16) '0';
+     ANSW = TRANSLATE(ANSW, CAPITAL_LETTERS, SMALL_LETTERS);
+     END;
+
+
+ ON KEY(INOUT) BEGIN;
+ /* FIGURE OUT WHAT WAS WRONG, PRINT ERROR MESSAGE AND RESTART */
+     SELECT(ONCODE);
+         WHEN(51) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Try over, userid was not found.')(A);
+         WHEN(52) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Try over, userid already present.')(A);
+         WHEN(54) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Try over, userid invalid.')(A);
+         WHEN(55) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Try over, userid invalid.')(A);
+         WHEN(56) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Try over, userid invalid.')(A);
+         WHEN(57) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('No space available, recreate dataset.')(A);
+         WHEN(58) PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Try over, userid invalid.')(A);
+         OTHERWISE PUT FILE(SYSPRINT) SKIP(3)
+                      EDIT('Unknown error encountered with userid.')(A);
+         END;
+     GOTO REINIT;
+     END;
+1PUT FILE(SYSPRINT) SKIP(1)
+     EDIT('ENTER: Stop (S) or End (E) to exit.') (A);
+
+ REINIT:  /* COME HERE AFTER KEY ERROR OR ENDFILE ON INOUT */
+ PUT FILE(SYSPRINT) SKIP(2) EDIT('ENTER: Add (A), Change (C), ',
+     'Delete (D), or List (L),  followed by a userid.') (A);
+
+
+ GET FILE(SYSIN) LIST(NNN);
+
+ DO WHILE(ANSW ª= 'STOP' & ANSW ª= 'END' & ANSW ª= 'S' & ANSW ª= 'E'
+    & MORE_SYSIN);
+
+     SELECT(ANSW);
+     /* ALLOW CERTAIN FORMS OF COMMANDS */
+         WHEN('ADD')    ANSW = 'A';
+         WHEN('CH')     ANSW = 'C';
+         WHEN('CHAN')   ANSW = 'C';
+         WHEN('CHANGE') ANSW = 'C';
+         WHEN('DEL')    ANSW = 'D';
+         WHEN('DELETE') ANSW = 'D';
+         WHEN('LIST')   ANSW = 'L';
+         OTHERWISE;
+         END;
+1    SELECT(ANSW);
+     /* FIGURE OUT WHAT TO DO */
+
+         WHEN('A') DO;  /* ADD */
+             GET FILE(SYSIN) LIST(NNN);
+             USERID = ANSW;
+             TRKS = 200;
+             ACTION = 'A';
+             FILLER = ' ';
+             WRITE FILE(INOUT) FROM(REC) KEYFROM(USERID);
+             PUT FILE(SYSPRINT) SKIP(1)
+                 EDIT(USERID, ' has been added, Trks=200, Archive.')(A);
+             END;
+
+         WHEN('C') DO;  /* CHANGE */
+             GET FILE(SYSIN) LIST(NNN);
+             USERID = ANSW;
+             READ FILE(INOUT) INTO(REC) KEY(USERID);
+             PUT FILE(SYSPRINT) SKIP(2)
+                 EDIT('ENTER: a number for trks,') (A);
+             PUT FILE(SYSPRINT) SKIP(1) EDIT('OR ENTER: Archive (A), ',
+                'Charge (C), Delete (D), for action.') (A);
+             PUT FILE(SYSPRINT) SKIP(1) DATA(USERID, TRKS, ACTION);
+             GET FILE(SYSIN) LIST(NNN);
+             IF NNN = 0
+                 THEN IF ANSW = 'A' | ANSW = 'ARCHIVE' | ANSW = 'ARCH' |
+                         ANSW = 'C' | ANSW = 'CHARGE' |
+                         ANSW = 'D' | ANSW = 'DELETE' | ANSW = 'DEL'
+                          THEN ACTION = ANSW;
+                          ELSE PUT FILE(SYSPRINT) SKIP(3) EDIT(
+                               'Invalid response, no changes made.')(A);
+                 ELSE TRKS = NNN;
+             REWRITE FILE(INOUT) FROM(REC) KEY(USERID);
+             END;
+1        WHEN('L') DO;  /* LIST, ALLOW FOR GENERIC KEYS */
+             GET FILE(SYSIN) LIST(NNN);
+             USERID = ANSW;
+             POS = INDEX(ANSW, ' ') - 1;
+             READ FILE(INOUT) INTO(REC)  KEY(SUBSTR(USERID, 1, POS));
+             DO WHILE(SUBSTR(ANSW, 1, POS) = SUBSTR(USERID, 1, POS));
+                 PUT FILE(SYSPRINT) SKIP(1) DATA(USERID, TRKS, ACTION);
+                 READ FILE(INOUT) INTO(REC);
+                 END;
+             END;
+
+         WHEN('D') DO;  /* DELETE */
+             GET FILE(SYSIN) LIST(NNN);
+             USERID = ANSW;
+             DELETE FILE(INOUT) KEY(USERID);
+             END;
+
+         OTHERWISE  /* NOT A VALID COMMAND */
+             PUT FILE(SYSPRINT) SKIP(2)
+                 EDIT('<< Response unrecognized, reenter >>') (A);
+         END;
+
+     PUT FILE(SYSPRINT) SKIP(3) EDIT('ENTER: Add (A), Change (C), ',
+         'Delete (D), List (L),  followed by a userid.') (A);
+
+     GET FILE(SYSIN) LIST(NNN);
+     END;
+
+
+ END EXMAINT;
+//EXTRKS  EXEC PGM=EXTRKS,PARM='/ND'
+//*********************************************************************
+//*                                                                   *
+//* LOGICAL DOCUMENTATION:                                            *
+//* =====================                                             *
+//* THE FOLLOWING COLLECTS INFORMATION FOR FORCING ARCHIVAL OF DATA   *
+//* SETS OF THOSE TSO USERS WHO OVERALLOC THEIR DISK SPACE ALLOWANCE. *
+//* THE PACK PROCESSED ARE GIVEN ON DDCARDS WHICH ARE IDENTIFIED BY   *
+//* SPECIFYING THEIR DDNAMES THROUGH SYSIN. PACKS MAY BE ADDED OR     *
+//* REMOVED BY ADDING OR REMOVING IT'S DDNAME TO/FROM THE SYSIN LIST. *
+//* DEFAULT DDNAMES ARE PROVIDED OF DISK1 THROUGH DISK20 WHICH ARE    *
+//* USED IN ORDER IF THERE IS NO SYSIN PROVIDED.                      *
+//* VALID PARMS AND THEIR MEANINGS:                                   *
+//* /      REQUIRED BEFORE PARMS TO AVOID WARNING MESSAGE             *
+//* NC     NO CHARGES ALLOWED, FORCE ARCHIVAL                         *
+//* ND     NO DELETES ALLOWED, FORCE ARCHIVAL                         *
+//* L=NNN  GRACE LEEWAY = SOME NNN PERCENTAGE                         *
+//*                                                                   *
+//*********************************************************************
+//SYSIN    DD *
+TSO010 TSO020 TSO030 TSO040 TSO050 TSO060 TSO070 TSO080
+//TSO010   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO010
+//TSO020   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO020
+//TSO030   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO030
+//TSO040   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO040
+//TSO050   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO050
+//TSO060   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO060
+//TSO070   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO070
+//TSO080   DD UNIT=DISK,DISP=OLD,VOL=SER=TSO080
+//TSO      DD DSN=DCC1.TSOMSG.DATA,DISP=(,CATLG,DELETE),UNIT=SYSDA,
+//            SPACE=(CYL,(1,1)),DCB=BLKSIZE=6160
+//ARCHIVE  DD DSN=DCC1.$ARCMD.DATA,DISP=(,CATLG,DELETE),UNIT=SYSDA,
+//            SPACE=(CYL,(1,1)),DCB=BLKSIZE=6160
+//ALLOWED  DD DSN=TSOVSAM.$FCT134.USERTRKS,DISP=SHR
+//SORTIN   DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SORTOUT  DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SORTWK01 DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SORTWK02 DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SORTWK03 DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SORTMSG  DD SYSOUT=*
+//SYSPRINT DD SYSOUT=A
+//SYSUDUMP DD SYSOUT=*
+//PLIDUMP  DD SYSOUT=*
+//ASM2     EXEC ASM2CMDU,TIME=999
+//SYSIN    DD DSN=DCC1.$ARCMD.DATA,DISP=(OLD,DELETE,KEEP)
+//TSO      EXEC PGM=IKJEFT01,DYNAMNBR=30,TIME=999
+//SYSTSIN  DD DSN=DCC1.TSOMSG.DATA,DISP=(OLD,DELETE,KEEP)
+//SYSTSPRT DD SYSOUT=*
+//SYSPRINT DD SYSOUT=*
+//SYSUDUMP DD SYSOUT=*
+

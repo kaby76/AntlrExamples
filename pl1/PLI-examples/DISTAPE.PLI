@@ -1,0 +1,392 @@
+*PROCESS NM;
+ DISTAPE:  PROCEDURE(PARM) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('DISTAPE V6.1  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(4K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM DISPLAYS ALL THE TAPE DRIVES THAT ARE ON THE SYSTEM, */
+ /* LISTING USEFUL INFORMATION READILY AVAILABLE.                     */
+ /* TWO OPTIONS MAY BE SELECTED THROUGH THE ONE CHARACTER INPUT AREA: */
+ /* A - TOGLES ALLOCATED BIT (DISPLAY ONLY ALLOCATED DRIVES)          */
+ /* O - TOGLES ONLINE BIT (DISPLAY ONLY ONLINE DRIVES)                */
+ /* NOTE THAT A IS MORE RESTRICTIVE THAN O.                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ /* CONSTANT IDENTIFIERS */
+ DECLARE  FULLZERO   FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  CHAR       CHAR(4)  STATIC INIT('CHAR');
+ DECLARE  DISPLAY    CHAR(8)  STATIC INIT('DISPLAY');
+ DECLARE  DISTAPE    CHAR(8)  STATIC INIT('DISTAPE');
+ DECLARE  VDEFINE    CHAR(8)  STATIC INIT('VDEFINE');
+ DECLARE  DASHES     CHAR(9)  STATIC INIT('---------');
+ DECLARE  BLANK      CHAR(1)  STATIC INIT(' ');
+ DECLARE  TAPEONLY   BIT(8)   STATIC INIT('10000000'B);
+ DECLARE  NO         BIT(1)   STATIC INIT('0'B);
+ DECLARE  YES        BIT(1)   STATIC INIT('1'B);
+
+ /* PROGRAM IDENTIFIERS */
+ DECLARE  FULLWORD   FIXED BINARY(31) INIT(16);
+ DECLARE  L          FIXED BINARY(31);
+ DECLARE  CVTPTR     PTR;
+ DECLARE  FILEPTR    PTR;
+ DECLARE  UCBPTR     PTR;
+ DECLARE  FILE_CH    CHAR(7) BASED(FILEPTR);
+ DECLARE  ALLOCATED  BIT(1) INIT('0'B);
+ DECLARE  ONLINE     BIT(1) INIT('0'B);
+
+ DECLARE
+     1  IOSVSUCB_WA,
+        2  DW_BOUNDARY   FLOAT BINARY(109),
+        2  WORK_AREA     CHAR(98) VARYING;
+1/* ISPF PANEL IDENTIFIERS */
+ DECLARE  A    CHAR(1) INIT(' ');
+ DECLARE  L_A  FIXED BINARY(31) STATIC INIT(1);
+ DECLARE  N_A  CHAR(4) STATIC INIT('(A)');
+
+ DECLARE  LINE(2:23)    CHAR(79) INIT((22)(1)' ');
+ DECLARE  L_LINE        FIXED BINARY(31) STATIC INIT(79);
+ DECLARE  N_LINE(2:23)  CHAR(8) STATIC INIT('(LINE2)', '(LINE3)',
+     '(LINE4)', '(LINE5)',  '(LINE6)',  '(LINE7)', '(LINE8)',
+     '(LINE9)', '(LINE10)', '(LINE11)', '(LINE12)', '(LINE13)',
+     '(LINE14)', '(LINE15)', '(LINE16)', '(LINE17)', '(LINE18)',
+     '(LINE19)', '(LINE20)', '(LINE21)', '(LINE22)', '(LINE23)');
+
+ /* FORMATING AREA FOR SCREEN OUTPUT */
+ DECLARE
+     1  LINEVAL(2:23),
+        2  GAP1     CHAR(2)       INIT((22)(1)' '),
+        2  ADDRESS  CHAR(3)       INIT((22)(1)' '),
+        2  GAP2     CHAR(3)       INIT((22)(1)' '),
+        2  TYPE     CHAR(1)       INIT((22)(1)' '),
+        2  GAP3     CHAR(2)       INIT((22)(1)' '),
+        2  DEN      CHAR(3)       INIT((22)(1)' '),
+        2  GAP4     CHAR(2)       INIT((22)(1)' '),
+        2  VOLUME   CHAR(6)       INIT((22)(1)' '),
+        2  GAP5     CHAR(3)       INIT((22)(1)' '),
+        2  LBLS     CHAR(3)       INIT((22)(1)' '),
+        2  GAP6     CHAR(2)       INIT((22)(1)' '),
+        2  FILE     PIC '(3)Z9BB' INIT((22)0),
+        2  JOB      CHAR(8)       INIT((22)(1)' '),
+        2  GAP7     CHAR(2)       INIT((22)(1)' '),
+        2  STEP     CHAR(8)       INIT((22)(1)' '),
+        2  GAP8     CHAR(2)       INIT((22)(1)' '),
+        2  STATUS   CHAR(20)      INIT((22)(1)' '),
+        2  GAP9     CHAR(3)       INIT((22)(1)' ');
+
+
+ /* ENTRY IDENTIFIERS */
+ DECLARE  IOSVSUCB  ENTRY VARIABLE OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  ISPLINK   ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (LOAD, LOADAD)  ENTRY RETURNS(PTR); /* REALLY ASM */
+ /* STRPTR TAKES HEX CHARS AND RETURNS PTR REPRESENTATION */
+ DECLARE  STRPTR   ENTRY(CHAR(*)) RETURNS(FIXED BINARY(31));
+ DECLARE  (ADDR, PLIRETV, STRING, SUBSTR, UNSPEC) BUILTIN;
+1/* BASED IDENTIFIERS */
+ DECLARE
+  1  CVT  BASED(CVTPTR),
+     2  FILLER1   CHAR(556),
+     2  CVTASVT   PTR,
+     2  FILLER2   CHAR(516),
+     2  CVTUCBSC  ENTRY; /* 8 BYTES (LAST 4 NOT USED) */
+
+ DECLARE
+    1  UCBOB  BASED(UCBPTR),
+       2  UCBJOBNR,
+          3  FILLER   BIT(7),
+          3  UCBMONT  BIT(1),
+       2  FILLER1     CHAR(2),
+       2  UCBSTAT,
+          3  UCBONLI  BIT(1),
+          3  FILLER1  BIT(3),
+          3  UCBALOC  BIT(1),
+          3  FILLER2  BIT(2),
+          3  UCBDADI  BIT(1),
+       2  FILLER2     CHAR(2),
+       2  UCBFLA,
+          3  FILLER1  BIT(1),
+          3  UCBNRY   BIT(1),
+          3  FILLER2  BIT(6),
+       2  FILLER3     CHAR(5),
+       2  UCBWGT,
+          3  FILLER1  BIT(3),
+          3  UCBREW   BIT(1),
+          3  FILLER2  BIT(4),
+       2  UCBNAME     CHAR(3),
+       2  UCBTBYT1,
+          3  FILLER1  BIT(5),
+          3  UCBD1600 BIT(1),
+          3  UCBD6250 BIT(1),
+          3  FILLER2  BIT(1),
+       2  UCBTBYT2,
+          3  UCB2OPT0 BIT(1),
+          3  FILLER1  BIT(1),
+          3  UCBDUDN1 BIT(1),
+          3  UCBDUDN2 BIT(1),
+          3  FILLER2  BIT(4),
+1      2  UCBTBYT3,
+          3  UCB3TAPE BIT(1),
+          3  FILLER   BIT(7),
+       2  FILLER4     CHAR(1),
+       2  UCBEXTPT    PTR,
+       2  UCBFSCT     FIXED BINARY,
+       2  UCBFSEQ     FIXED BINARY,
+       2  UCBVOLI     CHAR(6),
+       2  UCBSTAB,
+          3  FILLER1  BIT(5),
+          3  UCBBSTR  BIT(1),
+          3  FILLER2  BIT(2),
+       2  FILLER6     CHAR(8),
+       2  UCBTFL1,
+          3  UCBNLTP  BIT(1),
+          3  UCBNSLTP BIT(1),
+          3  FILLER   BIT(6);
+
+ DECLARE
+  1  UCBCMEXT  BASED(UCBEXTPT),
+     2  FILLER   CHAR(14),
+     2  UCBASID  FIXED BINARY;
+1/* DEFINE IDENTIFIERS TO ISPF */
+ CALL ISPLINK(VDEFINE, N_A, A, CHAR, L_A);
+ DO L = 2 TO 23;
+     CALL ISPLINK(VDEFINE, N_LINE(L), LINE(L), CHAR, L_LINE);
+     END;
+
+ /* DO INITIAL PROCESSING */
+ SELECT(PARM);
+     WHEN('A', 'ALLOCATED') ALLOCATED = ^ALLOCATED;
+     WHEN('O', 'ONLINE') ONLINE = ^ONLINE;
+     OTHERWISE;
+     END;
+
+ CVTPTR = LOAD(FULLWORD, FULLZERO);
+ L = 1;
+ CALL SCREEN(NO);
+
+ IOSVSUCB = CVTUCBSC;
+
+ MAIN:  /* MAIN LOOPS UNTIL USER ENTERS END KEY (PF3) */
+ DO WHILE(PLIRETV = 0);
+     WORK_AREA = '';
+     CALL IOSVSUCB(WORK_AREA, TAPEONLY, UCBPTR);
+     SUB:  /* SUB LOOPS UNTIL NO MORE TAPE UCB'S OR END KEY */
+     DO WHILE(PLIRETV = 0);
+         CALL TAPEDRIVE;
+         CALL SCREEN(NO);
+         IF PLIRETV = 0
+             THEN CALL IOSVSUCB(WORK_AREA, TAPEONLY, UCBPTR);
+         END SUB;
+     IF PLIRETV < 8
+         THEN CALL SCREEN(YES);
+     END MAIN;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW.                                      */
+ /*********************************************************************/
+1TAPEDRIVE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS EXECUTED FOR EACH TAPE DRIVE UCB RETURNED BY    */
+ /* IOSVSUCB.                                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ADDRESS(L) = UCBNAME;
+
+ IF UCB2OPT0
+     THEN TYPE(L) = '7';
+
+ SELECT;
+     WHEN(UCBDUDN1) DEN(L) = '2/3';
+     WHEN(UCBDUDN2) DEN(L) = '3/4';
+     WHEN(UCBD1600) DEN(L) = ' 3';
+     WHEN(UCBD6250) DEN(L) = ' 4';
+     OTHERWISE DO;
+         TYPE(L) = ' ';
+         DEN(L) = 'CRT';
+         END;
+     END;
+
+ IF ^UCBONLI
+     THEN DO;
+          IF ONLINE ] ALLOCATED
+              THEN L = L - 1;
+              ELSE STATUS(L) = 'OFFLINE';
+          RETURN;
+          END;
+
+ GAP5(L) = BLANK;
+ GAP6(L) = BLANK;
+ VOLUME(L) = UCBVOLI;
+ FILE(L) = UCBFSEQ;
+1SELECT;
+     WHEN(UCBDADI) LBLS(L) = 'SL';
+     WHEN(UCBNLTP) DO;
+         GAP5(L) = '  B';
+         LBLS(L) = '/NL';
+         END;
+     WHEN(UCBBSTR)  LBLS(L) = 'AL';
+     WHEN(UCBNSLTP) LBLS(L) = 'UL';
+     OTHERWISE GAP5(L) = '  -';
+     END;
+
+ IF ^UCBALOC
+     THEN DO;
+          IF ALLOCATED
+              THEN L = L - 1;
+              ELSE STATUS(L) = 'UNALLOCATED';
+          RETURN;
+          END;
+
+ IF UCBMONT
+     THEN SELECT;
+              WHEN(UCBNRY)  STATUS(L) = 'NOT READY, RETAINED';
+              WHEN(UCBREW)  STATUS(L) = 'REWINDING, RETAINED';
+              OTHERWISE     STATUS(L) = 'RETAINED';
+              END;
+     ELSE SELECT;
+              WHEN(UCBNRY)  STATUS(L) = 'NOT READY';
+              WHEN(UCBREW)  STATUS(L) = 'REWINDING';
+              OTHERWISE;
+              END;
+
+ GAP7(L) = BLANK;
+ CALL QCBJOBN(JOB(L), STEP(L));
+1QCBJOBN:  PROCEDURE(JOB, STEP);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SETS THE POINTER TO THE JOBNAME ASSOCIATED WITH    */
+ /* A PARTICULAR UCB.  STARTING WITH VERSION 3.0 IT ALSO SETS THE     */
+ /* POINTER FOR THE STEPNAME.  THIS PROCEDURE IS INTERNAL TO          */
+ /* TAPEDRIVE.                                                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  (JOB, STEP)  CHAR(*);
+ DECLARE  JOBNAME   CHAR(8) BASED(JOBNPTR);
+ DECLARE  STEPNAME  CHAR(8) BASED(STEPNPTR);
+ DECLARE  (JOBNPTR, STEPNPTR)  PTR;
+ DECLARE  LOADAD    ENTRY RETURNS(FIXED BINARY(31)); /* REALLY ASM */
+
+ DECLARE  ASCBPTR  PTR;
+ DECLARE
+    1  ASCB  BASED(ASCBPTR),
+       2  FILLER    CHAR(172),
+       2  ASCBJBNI  FIXED BINARY(31),
+       2  ASCBJBNS  PTR;
+
+ FULLWORD = 524;
+ FULLWORD = LOADAD(FULLWORD, CVTASVT) + 4 * UCBASID;
+ ASCBPTR  = LOAD(FULLZERO, FULLWORD);
+
+ IF ASCBJBNI = FULLZERO
+     THEN DO;
+          STEPNPTR = ADDR(DASHES);
+          JOBNPTR = ASCBJBNS;
+          END;
+     ELSE DO;
+          FULLWORD = ASCBJBNI + 56;
+          UNSPEC(STEPNPTR) = UNSPEC(FULLWORD);
+          UNSPEC(JOBNPTR) = UNSPEC(ASCBJBNI);
+          END;
+
+ JOB = JOBNAME;
+ STEP = STEPNAME;
+
+ END QCBJOBN;
+ END TAPEDRIVE;
+1SCREEN:  PROCEDURE(LASTSCR);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PREPARES A LINE OF THE SCREEN WITH INITAL VALUES   */
+ /* IF THE SCREEN IS NOT FULL OTHERWISE IT PUTS OUT THE SCREEN FIRST. */
+ /* IF LASTSCR THEN IT CLEARS TO THE BOTTOM OF THE SCREEN WITH BLANKS */
+ /* AND THE PUTS OUT THE SCREEN.                                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  LASTSCR  BIT(1);
+
+ IF LASTSCR
+     THEN DO L = L TO 23;
+              STRING(LINEVAL(L)) = BLANK;
+              END;
+1L = L + 1;
+ IF L > 23
+     THEN DO;
+          DO L = 2 TO 23;
+              LINE(L) = STRING(LINEVAL(L));
+              END;
+          A = BLANK;
+          CALL ISPLINK(DISPLAY, DISTAPE);
+          IF A = 'A'
+              THEN ALLOCATED = ^ALLOCATED;
+          IF A = 'O'
+              THEN ONLINE = ^ONLINE;
+          L = 2;
+          END;
+
+ TYPE(L) = '9';
+ VOLUME(L) = DASHES;
+ GAP5(L) = DASHES;
+ LBLS(L) = DASHES;
+ GAP6(L) = DASHES;
+ FILEPTR = ADDR(FILE(L));
+ FILE_CH = DASHES;
+ JOB(L) = DASHES;
+ GAP7(L) = DASHES;
+ STEP(L) = DASHES;
+ STATUS(L) = BLANK;
+
+ END SCREEN;
+1/*********************************************************************/
+ /*                                                                   */
+ /* THIS IS THE GENERAL FORMAT OF THE ISPF SCREEN AND ITS TUTORIAL    */
+ /* WHICH ARE USED WITH THIS VERSION OF DISTAPE. (VERSION 4 IS THE    */
+ /* LAST VERSION WHICH PERFORMED ITS OWN TPUTS).  &LINE3 THROUGH      */
+ /* &LINE23 ARE JUST LINE &LINE2.  THE PROGRAM CAN BE SELECTED FROM   */
+ /* A MENU OR WITH "ISPEXEC SELECT PGM(DISTAPE) PARM('/&A&O')" FROM   */
+ /* A CLIST.                                                          */
+ /*                                                                   */
+ /*********************************************************************/
+ /*
+
+ _A%ADDR TRK DEN  VOLUME  LBLS  FILE  --JOB---  --STEP--  -------STATUS-
+ +&LINE2
+ )INIT
+   .HELP = DISTAPET
+ )END
+
+
+ %TUTORIAL ------------------------- DISTAPE --------------------------
+ +
+ +         THIS PROGRAM DISPLAYS ANY AVAILABLE INFORMATION CONCERNING A
+ +         SYSTEM TAPE DRIVE.
+ +
+ +         THE PROGRAM WILL ACCEPT AS INPUT TWO ONE CHARACTER COMMANDS
+ +         IN THE UPPER LEFT HAND CORNER OF THE SCREEN.  THESE COMMANDS
+ +         CAUSE A CORRESPONDING SWITCH TO BE CHANGED.  THE ALLOCATED
+ +         SWITCH DETERMINES WHETHER ONLY ALLOCATED TAPE DRIVES ARE TO
+ +         BE DISPLAYED.  IT IS MORE POWERFUL THAN THE ONLINE SWITCH
+ +         WHICH DETERMINES WHETHER ONLY ONLINE TAPE DRIVES ARE TO BE
+ +         DISPLAYED.
+ +
+ +         A - WILL CAUSE THE ALLOCATED SWITCH TO BE CHANGED
+ +         O - WILL CAUSE THE ONLINE SWITCH TO BE CHANGED
+ )END
+
+ */
+
+ END DISTAPE;
+

@@ -1,0 +1,163 @@
+*PROCESS;
+ VCATSRT:  PROCEDURE OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('VCATSRT V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(4K)');
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM SORTS THE DEF OR DEL DATA SET PRODUCED BY THE        */
+ /* VSAMCAT PROGRAM.  THE MAIN OBSTACLE IS THE CONTINUATION CARDS.    */
+ /* THESE ARE PUT ASIDE IN A DIRECT ACCESS DATA SET UNTIL AFTER THE   */
+ /* SORT AND THEN REINSERTED.                                         */
+ /*                                                                   */
+ /* REQUIRED FILES:                                                   */
+ /* FILE      EXPLANATION                                             */
+ /* ====      ===========                                             */
+ /* IN        INPUT DATASET (IE. THE DEF OR DEL DATASET FROM VSAMCAT) */
+ /* OUT       THE SORTED OUTPUT DATASET                               */
+ /* DIR       TEMPORARY DIRECT ACCESS WORK DATASET                    */
+ /* SORTIN    TEMPORARY DATASET                                       */
+ /* SORTOUT   TEMPORARY DATASET                                       */
+ /* SORTMSG   MESSAGES FROM SORT ROUTINE / SORT OUTPUT                */
+ /* SORTWK01  REQUIRED FOR SORT / WORK FILE                           */
+ /* SORTWK02  REQUIRED FOR SORT / WORK FILE                           */
+ /* SORTWK03  REQUIRED FOR SORT / WORK FILE                           */
+ /* SYSPRINT  ERROR MESSAGE FILE / EXCEPTION REPORT                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+ /* ENTRY DECLARATIONS */
+
+ /* IVERIFY IS THE SAME AS VERIFY EXCEPT THAT IT WORKS FROM RIGHT TO
+    LEFT BUT STILL GIVES THE RETURN VALUE FROM THE LEFT */
+ DECLARE  IVERIFY  ENTRY RETURNS(FIXED BINARY(31)); /* REALLY ASM */
+
+ DECLARE  LINK  ENTRY OPTIONS(ASM, INTER, RETCODE);
+
+ DECLARE  (ADDR, PLIRETV, SUBSTR)  BUILTIN;
+1DECLARE  POS           FIXED BINARY(31);
+ DECLARE  YES           BIT(1) STATIC INIT('1'B);
+ DECLARE  NO            BIT(1) STATIC INIT('0'B);
+ DECLARE  MORE_SORTOUT  BIT(1) STATIC INIT('1'B);
+ DECLARE  MORE_IN       BIT(1) STATIC INIT('1'B);
+ DECLARE  CNT           PIC '(8)9' INIT(1);
+ DECLARE  NULL          PIC '(8)9' INIT(0);
+ DECLARE  GETKEY        PIC '(8)9';
+ DECLARE  SORT          CHAR(8)  STATIC INIT('SORT');
+ DECLARE  ERRMSG        CHAR(57) STATIC
+    INIT('***ERROR:  LAST REC FROM FILE(IN) INDICATES CONTINUATION.');
+
+ /* FILE DECLARATIONS */
+ DECLARE  IN   FILE RECORD INPUT  ENV(FB RECSIZE(80));
+ DECLARE  OUT  FILE RECORD OUTPUT ENV(FB RECSIZE(80));
+ DECLARE  DIR  FILE RECORD KEYED ENV(F REGIONAL(1) RECSIZE(80));
+ DECLARE  (SORTIN, SORTOUT)  FILE RECORD
+                             ENV(FB RECSIZE(80) BLKSIZE(6160));
+ DECLARE  SYSPRINT  FILE STREAM OUTPUT PRINT;
+
+ DECLARE
+     1  REC,
+        2  BODY  CHAR(72),
+        2  SEQ   PIC '(8)9';
+
+ DECLARE  /* CONTROL PARAMETER FOR SORT PROGRAM */
+     1  SORT_PARM           STATIC,
+        2  BYTE_COUNT       FIXED BINARY  INIT(28),
+        2  BEGIN_SORT_STMT  PTR,
+        2  END_SORT_STMT    PTR,
+        2  BEGIN_REC_STMT   PTR,
+        2  END_REC_STMT     PTR,
+        2  ADDR_E15         FIXED BINARY(31)  INIT(0),
+        2  ADDR_E35         FIXED BINARY(31)  INIT(0),
+        2  STORAGE          FIXED BINARY(31)  INIT(131072),
+        2  SORTCARD  CHAR(24)  INIT(' SORT FIELDS=(1,72,CH,A)'),
+        2  RECCARD   CHAR(24)  INIT(' RECORD LENGTH=80,TYPE=F'),
+        2  RECEND    CHAR(1)   INIT(' ');
+1ON ENDFILE(IN) MORE_IN = NO;
+
+ OPEN FILE(DIR) OUTPUT SEQUENTIAL;
+
+ READ FILE(IN) INTO(REC);
+ DO WHILE(MORE_IN);
+     IF CONTINUED
+         THEN DO;
+              SEQ = CNT;
+              WRITE FILE(SORTIN) FROM(REC);
+              DO WHILE(SEQ ª= NULL);
+                  READ FILE(IN) INTO(REC);
+                  IF ªMORE_IN
+                      THEN DO;
+                           PUT SKIP EDIT(ERRMSG) (A);
+                           SIGNAL ERROR;
+                           END;
+                  IF CONTINUED
+                      THEN SEQ = CNT + 1;
+                      ELSE SEQ = NULL;
+                  WRITE FILE(DIR) FROM(REC) KEYFROM(CNT);
+                  CNT = CNT + 1;
+                  END;
+              END;
+         ELSE DO;
+              SEQ = NULL;
+              WRITE FILE(SORTIN) FROM(REC);
+              END;
+     READ FILE(IN) INTO(REC);
+     END;
+
+ CLOSE FILE(DIR);
+ CLOSE FILE(SORTIN);
+ BEGIN_SORT_STMT = ADDR(SORTCARD);
+ END_SORT_STMT   = ADDR(RECCARD);
+ BEGIN_REC_STMT  = ADDR(RECCARD);
+ END_REC_STMT    = ADDR(RECEND);
+ CALL LINK(SORT, SORT_PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT EDIT('SORT ERROR, RETURN CODE=', PLIRETV) (A, F(9));
+          SIGNAL ERROR;
+          END;
+1BEGIN_BLOCK:  BEGIN;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* REINITIALIZE ENDFILE FOR SORTOUT SO WE CAN READ IT.               */
+ /*                                                                   */
+ /*********************************************************************/
+ ON ENDFILE(SORTOUT) MORE_SORTOUT = NO;
+
+ OPEN FILE(DIR) INPUT DIRECT;
+ READ FILE(SORTOUT) INTO(REC);
+ DO WHILE(MORE_SORTOUT);
+     WRITE FILE(OUT) FROM(REC);
+     DO WHILE(SEQ ª= NULL);
+         GETKEY = SEQ;
+         READ FILE(DIR) INTO(REC) KEY(GETKEY);
+         WRITE FILE(OUT) FROM(REC);
+         END;
+     READ FILE(SORTOUT) INTO(REC);
+     END;
+
+ END BEGIN_BLOCK;
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW.                                      */
+ /*********************************************************************/
+1CONTINUED:  PROCEDURE RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS FUNCTION PROCEDURE DETERMINES WHETHER A RECORD IS CONTINUED  */
+ /* AND RETURNS THE LOGICAL ANSWER.                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ POS = IVERIFY(BODY, ' ');
+ IF SUBSTR(BODY, POS, 1) = '+'
+     THEN RETURN(YES);
+     ELSE RETURN(NO);
+
+ END CONTINUED;
+
+ END VCATSRT;
+

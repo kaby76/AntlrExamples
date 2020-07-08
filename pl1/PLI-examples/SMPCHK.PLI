@@ -1,0 +1,987 @@
+*PROCESS NM;
+ SMPCHK:  PROCEDURE(PARM) OPTIONS(MAIN,REENTRANT) REORDER;
+
+ DECLARE  PGMID   CHAR(58) VARYING STATIC EXTERNAL
+    INIT('SMPCHK V2.1  BY CLYDE THOMAS ZUBER / STEVEN MARK STEVENSON');
+ DECLARE  PLIXOPT  CHAR(9) VARYING INIT('ISA(256K)') STATIC EXTERNAL;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* VERSION 2:  SUPPLIES SUPPORT FOR SMP/E.                           */
+ /*                                                                   */
+ /* PURPOSE:  DETERMINE IF SYSMOD CONSTRUCTION TAKES INTO ACCOUNT     */
+ /*           ALL CORRECTIVE MAINTENANCE ON THE SMP CDS.  APPLY       */
+ /*           PROCESSING CATCHES MOST REGRESSION BUT IS ESPECIALLY    */
+ /*           OPEN TO UNDETECTED REGRESSION WHEN THE VERSION KEYWORD  */
+ /*           IS USED IN THE SYSMOD TO BE APPLIED.                    */
+ /*                                                                   */
+ /* METHOD:   OBTAIN LIST CDS OUTPUT FOR ALL MOD, MAC OR SRC ++ STATE-*/
+ /*           MENTS IN THE SYSMOD.  CHECK THE LASTUPD, RMID AND UMID  */
+ /*           AND MAKE SURE THAT THE SYSMOD "KNOWS" ABOUT IT.  IF     */
+ /*           THE SYSMOD SUPS OR VERSIONS THEM IT IS OK.  IF IT ONLY  */
+ /*           PRES OR REQS THEM IT SHOULD BE OK BUT PRINT A MESSAGE.  */
+ /*           IF IT IS NOT FOUND AT ALL IN THE SYSMOD IT WILL BE      */
+ /*           REGRESSED.  THIS REGRESSION WOULD NOT BE NOTED BY SMP   */
+ /*           IF THE FMID OF THE ELEMENT WAS SPECIFIED IN THE VERSION */
+ /*           KEYWORD.                                                */
+ /*                                                                   */
+ /*********************************************************************/
+ /* NOTE:  F 'HIGHLY' FOR SMP LIST FORMAT DEPENDENT SECTIONS OF CODE  */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* REQUIRED DDNAMES:                                                 */
+ /* PTSSMP   - SHOULD POINT TO THE SYSMOD TO BE CHECKED BEFORE APPLY. */
+ /* SYSPRINT - SMPCHK OUTPUT FILE (USUALLY SYSOUT).                   */
+ /* SMPLIST  - TEMPORARY WORK FILE USED WHEN SMP IS INVOKED.          */
+ /* SMPCNTL  - TEMPORARY WORK FILE USED WHEN SMP IS INVOKED.          */
+ /*                                                                   */
+ /* OTHER REQUIRED DDNAMES:                                           */
+ /* SMPCSI/SMPCDS - TARGET SMP CONTROL ZONE/DATASET.                  */
+ /* SMPLOG   - ALLOCATE TO DUMMY.                                     */
+ /* SMPOUT   - ALLOCATE TO DUMMY.                                     */
+ /* SMPRPT   - ALLOCATE TO DUMMY.                                     */
+ /*                                                                   */
+ /* VALID PARAMETERS:                                                 */
+ /* TARGET='VALUE'- THE ZONE WHICH WILL BE IN THE SMP/E SET COMMAND.  */
+ /*                 IF THIS PARAMETER IS NOT FOUND SMP/4 WILL BE USED.*/
+ /* SYSREL='VALUE'- THE SYSTEM RELEASE TO CHECK FOR ON THE ++VER      */
+ /*                 STATEMENT.  THE PROGRAM DEFAULT IS Z038.          */
+ /*                 NOTE THAT ON PARM QUOTES MUST BE DOUBLED.         */
+ /* TABLES=N      - A MULTIPLICATION FACTOR FOR PROGRAM TABLE SIZES.  */
+ /*                 THE DEFAULT IS 1.  SHOULD ONLY BE SPECIFIED IF    */
+ /*                 A PREVIOUS INVOCATION WITH THE INPUT SYSMOD       */
+ /*                 PRODUCED A "TABLE" ERROR MESSAGE.  (SEE ERROR     */
+ /*                 MESSAGES BELOW).  AT LEAST 100K SHOULD BE ADDED   */
+ /*                 TO THE ISASIZE FOR EVERY INCREMENT OF THIS VALUE. */
+ /*                 IE.   PGM=SMPCHK,PARM='ISA(300K)/TABLES=2'        */
+ /*                       PGM=SMPCHK,PARM='ISA(400K)/TABLES=3'        */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* EXAMPLES OF OUTPUT:                                               */
+ /*                                                                   */
+ /* ERROR MESSAGES START WITH "***" AND HAVE A NUMBER ASSOCIATED WITH */
+ /* THEM FOLLOWING A "#".  THESE NUMBERS ARE SEQUENTIAL THROUGH THE   */
+ /* THE PROGRAM SOURCE AND ARE FOR REFERENCE.  IN ADDITION A WORD     */
+ /* FOLLOWS WHICH IS EITHER "PTSSMP" INDICATING THAT THE INPUT SYSMOD */
+ /* IS THOUGHT TO BE IN ERROR OR "TABLE" INDICATING THAT THE PROGRAM  */
+ /* SHOULD BE RERUN WITH A LARGER TABLE SIZE (USUALLY BY SPECIFYING   */
+ /* THE TABLE PARM).  IF ONE TABLE IS PARTICULARLY OFFENDING IN THIS  */
+ /* REGARD THE ERROR NUMBER WILL DETERMINE WITH THE PROGRAM SOURCE    */
+ /* WHICH TABLE SHOULD HAVE ITS DEFAULT SIZE INCREASED BY PROGRAM     */
+ /* MODIFICATION.  EXCEPT FOR THE CASE OF INVALID PARMS, ERROR        */
+ /* MESSAGES ARE FOLLOWED BY PROGRAM TERMINATION.                     */
+ /*                                                                   */
+ /* INFORMATION MESSAGES START WITH "<<<" AND GENERALLY AFFECT        */
+ /* INTERPRETATION OF PROGRAM RESULTS.                                */
+ /*                                                                   */
+ /* MESSAGE FORMAT:                                                   */
+ /* SYSMOD   FIELD  TYPE   ELEMENT  COND          FMID    FCOND       */
+ /*                                                                   */
+ /* AZ99999  UMID - MODULE ISTCVXXX NOT FOUND   - JBB1326 VERSIONED   */
+ /* AZ99999  RMID - MACRO  ISTCVXXX IN PRE LIST - JBBXXXX UNKNOWN     */
+ /* UZ99999  LUPD - SOURCE ISTCVXXX IN REQ LIST - JBBXXXX VER FMID    */
+ /*                                                                   */
+ /* EXPLANATION OF OUTPUT SECTIONS:                                   */
+ /* SYSMOD  - THE FUNCTION, PTR, APAR OR USERMOD WHICH MAY BE         */
+ /*           REGRESSED BY APPLY PROCESSING.                          */
+ /* FIELD   - THE TYPE OF PROCESSING THE SYSMOD DID TO THE ELEMENT.   */
+ /* TYPE    - MACRO, MODULE OR SOURCE TYPE ELEMENT                    */
+ /* ELEMENT - THE NAME OF THE MACRO, MODULE OR SOURCE                 */
+ /* COND    - THE SYSMOD'S RELATIONSHIP TO THE SYSMOD TO BE APPLIED.  */
+ /*           THIS IS THE CONDITION WHICH CAUSED THE MESSAGE TO BE    */
+ /*           ISSUED.                                                 */
+ /* FMID    - THE FMID OF THE ELEMENT (AND ALSO THE SYSMOD).          */
+ /* FCOND   - WHETHER THE SYSMOD TO BE APPLIED "KNOWS" OF THE         */
+ /*           ELEMENT'S FMID.                                         */
+ /*                                                                   */
+ /*********************************************************************/
+1/* ENTRY DECLARATIONS */
+
+ DECLARE  HEAPSRT  ENTRY((*)CHAR(*), FIXED BINARY);
+ DECLARE  LINK     ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  IVERIFY  ENTRY RETURNS(FIXED BINARY(31));
+ DECLARE  (ADDR, HBOUND, INDEX, PLIRETV, SUBSTR, VERIFY)  BUILTIN;
+
+
+ /* FILE DECLARATIONS */
+
+ DECLARE  PTSSMP    FILE RECORD INPUT;
+ DECLARE  SYSPRINT  FILE STREAM OUTPUT PRINT;
+ DECLARE  SMPLIST   FILE RECORD INPUT;
+ DECLARE  SMPCNTL   FILE RECORD OUTPUT ENV(FB RECSIZE(80));
+
+
+ /* ARITHMETIC DECLARATIONS */
+
+ /* THE FOLLOWING ARE GENERAL WORK IDENTIFIERS.  SINCE DECLARED
+    GLOBALLY CARE SHOULD BE TAKEN WHEN CHANGING OR EXTENDING THEIR
+    USE. */
+ DECLARE  POS           FIXED BINARY;
+ DECLARE  P1            FIXED BINARY;
+ DECLARE  P2            FIXED BINARY;
+ DECLARE  P3            FIXED BINARY;
+ DECLARE  P4            FIXED BINARY;
+ DECLARE  I             FIXED BINARY;
+ /* CHANGES WITH PARM TO MULTIPLY TABLE SIZES */
+ DECLARE  TABMULT       FIXED BINARY INIT(1);
+ /* THE FOLLOWING HOLD THE HIGH USED POSITION OF THEIR CORRESPONDING
+    TABLE. */
+ DECLARE  U             FIXED BINARY;
+ DECLARE  R             FIXED BINARY INIT(0);
+ DECLARE  SUP_HIGH      FIXED BINARY INIT(0);
+ DECLARE  PRE_HIGH      FIXED BINARY INIT(0);
+ DECLARE  REQ_HIGH      FIXED BINARY INIT(0);
+ DECLARE  VER_HIGH      FIXED BINARY INIT(0);
+ DECLARE  FMD_HIGH      FIXED BINARY INIT(0);
+1/* CHARACTER STRING DECLARATIONS */
+
+ /* FOR PARAMETER PROCESSING */
+ DECLARE  PARM          CHAR(100) VARYING;
+ DECLARE  PARM_SEL      CHAR(24);
+ /* SMPLIST RECORD INPUT AREA */
+ DECLARE  SMPLIST_AREA  CHAR(121);
+ /* VALID SYSTEM RELEASE FOR ++VER STATEMENT */
+ DECLARE  SYSREL        CHAR(8) INIT('Z038');
+ /* CHARACTER CONSTANTS */
+ DECLARE  REQMSG        CHAR(11) STATIC INIT('IN REQ LIST');
+ DECLARE  SMP4PARM      CHAR(8) VARYING STATIC INIT('DATE=IPL');
+ DECLARE  SMPEPARM      CHAR(20) VARYING STATIC
+                        INIT('DATE=IPL,PROCESS=END');
+ DECLARE  PREMSG        CHAR(11) STATIC INIT('IN PRE LIST');
+ DECLARE  NOTMSG        CHAR(9)  STATIC INIT('NOT FOUND');
+ /* LIST CDS OUTPUT FIELDS */
+ DECLARE  TYPE          CHAR(6) INIT(' ');
+ DECLARE  ELEMENT       CHAR(8);
+ DECLARE  RMID          CHAR(8);
+ DECLARE  FMID          CHAR(8);
+ DECLARE  LUPD          CHAR(8);
+ DECLARE  UMID(50)      CHAR(8) CONTROLLED;
+ /* TABLE DECLARATIONS */
+ DECLARE  SUP(5000)     CHAR(8) CONTROLLED;
+ DECLARE  PRE(500)      CHAR(8) CONTROLLED;
+ DECLARE  REQ(500)      CHAR(8) CONTROLLED;
+ DECLARE  VER(50)       CHAR(8) CONTROLLED;
+ DECLARE  FMD(50)       CHAR(8) CONTROLLED;
+ /* STORAGE TO HOLD OUTPUT MESSAGES FOR SORTING PRIOR TO PRINT */
+ DECLARE  RESULT_SORT(5000)  CHAR(56) BASED(ADDR(RESULT(1)));
+ DECLARE
+     1  RESULT(5000) CONTROLLED,
+        2  R_SORTCHAR   CHAR(4),
+        2  R_SYSMOD     CHAR(7),
+        2  R_ELEMENT    CHAR(8),
+        2  R_FIELD      CHAR(4),
+        2  R_TYPE       CHAR(6),
+        2  R_FMID       CHAR(7),
+        2  R_COND       CHAR(11),
+        2  R_FCOND      CHAR(9);
+1/* PTSSMP RECORD INPUT AREA */
+ DECLARE
+     1  REC_AREA,
+        2  REC    CHAR(72),
+        2  FILLER CHAR(8);
+
+ /* SET CONTROL CARD */
+ DECLARE
+     1  SETLINE,
+        2  FILLER1  CHAR(8) INIT('SET BDY('),
+        2  TZONE    CHAR(7) INIT(' '),
+        2  FILLER2  CHAR(65) INIT(').');
+
+ /* LIST CDS CONTROL CARD */
+ DECLARE
+     1  CMDLINE,
+        2  LISTCMD  CHAR(9) INIT('LIST'),
+        2  CMDTYPE  CHAR(3),
+        2  FILLER2  CHAR(1) INIT('('),
+        2  NAME     CHAR(8),
+        2  FILLER3  CHAR(59) INIT(').');
+
+
+ /* BIT STRING DECLARATIONS */
+
+ DECLARE  SMP4          BIT(1) INIT('0'B);
+ /* END OF FILE FLAGS */
+ DECLARE  MORE_PTSSMP   BIT(1) INIT('1'B);
+ DECLARE  MORE_SMPLIST  BIT(1) INIT('1'B);
+ /* FLAGS INDICATE IF ++ STATEMENT HAS CHANGED IN READ_PTSSMP */
+ DECLARE  SAME_STMT     BIT(1) INIT('1'B);
+ DECLARE  SMP_STMT      BIT(1) INIT('0'B);
+ /* FLAG DETERMINES IF ++IF (S) FOLLOW A VALID ++VER STATEMENT */
+ DECLARE  TAKE_IFS      BIT(1) INIT('0'B);
+ /* THE FOLLOWING CORRESPOND WITH THE SUP, PRE, REQ AND VER TABLES
+    AND INDICATE THAT THE TABLE HAS BEEN BUILT FOR THE CURRENT ++VER */
+ DECLARE  SD            BIT(1) INIT('0'B);
+ DECLARE  PD            BIT(1) INIT('0'B);
+ DECLARE  RD            BIT(1) INIT('0'B);
+ DECLARE  VD            BIT(1) INIT('0'B);
+ /* BIT STRING CONSTANTS */
+ DECLARE  YES           BIT(1) STATIC INIT('1'B);
+ DECLARE  NO            BIT(1) STATIC INIT('0'B);
+1ON ENDFILE(PTSSMP) MORE_PTSSMP = NO;
+
+ /* PARSE ANY PARAMETERS SPECIFIED BY USER */
+ DO WHILE(PARM ª= '');
+     POS = INDEX(PARM, ',');
+     IF POS = 0
+         THEN DO;
+              PARM_SEL = PARM;
+              PARM = '';
+              END;
+         ELSE DO;
+              PARM_SEL = SUBSTR(PARM, 1, POS-1);
+              PARM = SUBSTR(PARM, POS+1);
+              END;
+     SELECT(SUBSTR(PARM_SEL, 1, 7));
+         WHEN('TARGET=') DO;
+             GET STRING(SUBSTR(PARM_SEL, 8)) LIST(TZONE);
+             PUT SKIP EDIT('<<< TZONE=', TZONE)(A);
+             END;
+         WHEN('SYSREL=') DO;
+             GET STRING(SUBSTR(PARM_SEL, 8)) LIST(SYSREL);
+             PUT SKIP EDIT('<<< SYSREL=', SYSREL)(A);
+             END;
+         WHEN('TABLES=') DO;
+             GET STRING(SUBSTR(PARM_SEL, 8)) LIST(TABMULT);
+             PUT SKIP EDIT('<<< TABLES=', TABMULT)(A, F(5));
+             END;
+         OTHERWISE
+             PUT SKIP(2) EDIT('*** ERROR: ', PARM_SEL,
+                 ' IS AN INVALID PARM.') (A);
+         END;
+     END;
+
+ /* ALLOCATE THE TABLES TO THE REQUIRED SIZES */
+ ALLOC SUP(5000 * TABMULT);
+ ALLOC PRE(500  * TABMULT);
+ ALLOC REQ(500  * TABMULT);
+ ALLOC VER(50   * TABMULT);
+ ALLOC FMD(50   * TABMULT);
+
+ ALLOC UMID(50 * TABMULT);
+ ALLOC RESULT(5000 * TABMULT);
+1IF TZONE = ' '
+     THEN DO;
+          SMP4 = YES;
+          LISTCMD = 'LIST CDS';
+          END;
+     ELSE WRITE FILE(SMPCNTL) FROM(SETLINE);
+
+ CALL READ_PTSSMP;
+
+ PTS_LOOP:  /* READ THROUGH THE FUNCTION SYSMOD AND BUILD THE PROGRAM
+               TABLES.  ALSO CREATE LIST CDS CARDS FOR SMP. */
+ DO WHILE(MORE_PTSSMP);
+     IF SUBSTR(REC, 1, 2) = '++'
+         THEN DO;
+              POS = VERIFY(SUBSTR(REC, 3), ' ') + 2;
+
+              PLUS_PLUS:  /* DETERMINE TYPE OF ++ CARD */
+              SELECT(SUBSTR(REC, POS, 3));
+                  WHEN('FUN') CALL READ_PTSSMP;
+                  WHEN('PTF') CALL READ_PTSSMP;
+                  WHEN('APA') CALL READ_PTSSMP;
+                  WHEN('USE') CALL READ_PTSSMP;
+                  WHEN('HOL') CALL READ_PTSSMP;
+                  WHEN('JCL') CALL READ_PTSSMP;
+                  WHEN('VER') CALL VER_STMT;
+                  WHEN('IF ') CALL IF_STMT;
+                  WHEN('MOD') CALL LISTCDS('MOD');
+                  WHEN('ZAP') CALL LISTCDS('MOD');
+                  WHEN('MAC') CALL LISTCDS('MAC');
+                  WHEN('UPD') CALL LISTCDS('MAC');
+                  WHEN('SRC') CALL LISTCDS('SRC');
+                  OTHERWISE DO;
+                      PUT SKIP(2) EDIT('<<< UNEXPECTED ++')(A);
+                      PUT SKIP EDIT(REC) (A);
+                      CALL READ_PTSSMP;
+                      END;
+                  END PLUS_PLUS;
+
+              END;
+         ELSE CALL READ_PTSSMP;
+     END PTS_LOOP;
+1/* OUR CONTROL CARD OUTPUT IS SMP'S INPUT */
+ CLOSE FILE(SMPCNTL);
+ IF SMP4
+     THEN CALL LINK('HMASMP  ', SMP4PARM);
+     ELSE CALL LINK('GIMSMP  ', SMPEPARM);
+ IF PLIRETV > 4
+     THEN PUT SKIP(2) EDIT('*** SMP RETURN CODE=', PLIRETV)(A, F(10));
+
+ /* SORT THE TABLES FOR LATER BINARY SEARCH */
+ CALL HEAPSRT(SUP, SUP_HIGH);
+ CALL HEAPSRT(PRE, PRE_HIGH);
+ CALL HEAPSRT(REQ, REQ_HIGH);
+ CALL HEAPSRT(VER, VER_HIGH);
+ CALL HEAPSRT(FMD, FMD_HIGH);
+
+ /* SET UP ENVIRONMENT FOR READING SMP'S OUTPUT */
+ POST_SMP:  BEGIN;
+ ON ENDFILE(SMPLIST) MORE_SMPLIST = NO;
+
+ CALL READ_SMPLIST;
+1LIST_LOOP:  /* HIGHLY DEPENDENT ON FORMAT OF LIST OUTPUT */
+ DO WHILE(MORE_SMPLIST);
+
+     /* OBTAIN ELEMENT TYPE (IE. MACRO, MODULE OR SOURCE) */
+     POS = INDEX(SMPLIST_AREA, ' SMPCDS  ');
+     IF POS = 1
+         THEN TYPE = SUBSTR(SMPLIST_AREA, 10, 6);
+     POS = INDEX(SMPLIST_AREA, TZONE);
+     IF POS = 2
+         THEN TYPE = SUBSTR(SMPLIST_AREA, 10, 6);
+
+     /* FIND TITLE LINE IN OUTPUT */
+     POS = INDEX(SMPLIST_AREA, '   NAME  ');
+     IF POS = 1
+         THEN CALL LIST_ENTRY;
+         ELSE CALL READ_SMPLIST;
+     END LIST_LOOP;
+
+ END POST_SMP;
+
+ /* SORT AND PRINT OUTPUT MESSAGES */
+ CALL HEAPSRT(RESULT_SORT, R);
+ PUT PAGE;
+
+ DO I = 1 TO R;
+     PUT SKIP EDIT(R_SYSMOD(I), R_FIELD(I), '-', R_COND(I), '-',
+         R_TYPE(I), R_ELEMENT(I), '-', R_FMID(I), R_FCOND(I))
+         (X(5), A, X(2), A, X(1), A, X(1), A, X(1), A, X(1), A, X(1), A,
+         X(1), A, X(1), A, X(1), A);
+     END;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* THE FOLLOWING SET OF PROCEDURES ARE CALLED FROM THE PTS_LOOP      */
+ /* SECTION OF THE MAIN BODY OF THE PROGRAM.  THESE PROCEDURES ARE    */
+ /* READ_PTSSMP, LISTCDS, IF_STMT, VER_STMT AND BUILD_TABLE.          */
+ /* BUILD_TABLE IS NOT CALLED DIRECTLY BUT FROM IF_STMT AND VER_STMT. */
+ /*                                                                   */
+ /*********************************************************************/
+1READ_PTSSMP:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCEDURE FOR PTSSMP INPUT AND COMMON PROCESSING.                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  BEGPOS  FIXED BINARY;
+ DECLARE  ENDPOS  FIXED BINARY;
+ DECLARE  REC2    CHAR(72) INIT(' ');
+1READ FILE(PTSSMP) INTO(REC_AREA);
+
+ IF SUBSTR(REC, 1, 2) ª= '++' & ªSMP_STMT
+     THEN DO;
+          REC = ' ';
+          RETURN;
+          END;
+
+ BEGPOS = INDEX(REC, '/*');
+ DO WHILE(BEGPOS ª= 0 & MORE_PTSSMP);
+     SAME_STMT = YES;
+     ENDPOS = INDEX(REC, '*/');
+     DO WHILE(ENDPOS = 0 & MORE_PTSSMP & SAME_STMT);
+         SUBSTR(REC, BEGPOS) = ' ';
+         IF REC ª= ' '
+             THEN REC2 = REC;
+         BEGPOS = 1;
+         READ FILE(PTSSMP) INTO(REC_AREA);
+         ENDPOS = INDEX(REC, '*/');
+         IF SUBSTR(REC, 1, 2) = '++'
+             THEN SAME_STMT = NO;
+         END;
+     IF ENDPOS ª= 0
+         THEN SUBSTR(REC, BEGPOS, ENDPOS-BEGPOS+2) = ' ';
+     IF REC2 ª= ' ' & SAME_STMT
+         THEN REC = SUBSTR(REC2, 1, IVERIFY(REC2, ' ')) || ' ' ||
+                  SUBSTR(REC, VERIFY(REC, ' '));
+     BEGPOS = INDEX(REC, '/*');
+     END;
+
+ IF INDEX(REC, '.') = 0
+     THEN SMP_STMT = YES;
+     ELSE SMP_STMT = NO;
+
+ END READ_PTSSMP;
+1LISTCDS:  PROCEDURE(TYPE);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CREATE A LIST CDS CONTROL CARD FOR EACH ELEMENT THAT THE FUNCTION */
+ /* REPLACES.  SCAN ++ STATEMENT FOR VERSION AND DELETE KEYWORDS.     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  TYPE  CHAR(3);
+
+ IF INDEX(REC, 'VERSION') ª= 0
+     THEN DO;
+          PUT SKIP EDIT('<<< SYSMOD CONTAINS VERSION KEYWORD ON ++',
+              TYPE, ' STATEMENT') (A);
+          PUT SKIP EDIT(REC) (A);
+          END;
+
+ IF INDEX(REC, 'DELETE') ª= 0
+     THEN DO;
+          PUT SKIP EDIT('<<< SYSMOD CONTAINS DELETE KEYWORD ON ++',
+              TYPE, ' STATEMENT') (A);
+          PUT SKIP EDIT(REC) (A);
+          END;
+
+ CMDTYPE = TYPE;
+ POS = INDEX(REC, '(') + 1;
+ NAME = SUBSTR(REC, POS, INDEX(REC, ')')-POS);
+
+ WRITE FILE(SMPCNTL) FROM(CMDLINE);
+ CALL READ_PTSSMP;
+
+ END LISTCDS;
+1IF_STMT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS ++IF STATEMENTS ADDING THEIR REQ LISTS TO THE ++VER REQ   */
+ /* TABLE.  ONLY PROCESS ++IF IF THE PRECEDING ++VER WAS HAD THE      */
+ /* VALID SYSREL.                                                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+ IF ªTAKE_IFS
+     THEN RETURN;
+
+ DO UNTIL(POS ª= 0 | ªMORE_PTSSMP);
+     /* FMID TABLE DOES NOT CALL BUILD_TABLE SINCE CAN ONLY BE ONE
+        ENTRY PER ++IF. */
+     I = INDEX(REC, 'FMID');
+     IF I ª= 0
+         THEN DO;
+              FMD_HIGH = FMD_HIGH + 1;
+              IF FMD_HIGH > HBOUND(FMD, 1)
+                  THEN DO;
+                       PUT SKIP(3) EDIT('*** ERROR #1 TABLE')(A);
+                       STOP;
+                       END;
+              I = INDEX(SUBSTR(REC, I), '(') + I;
+              I = VERIFY(SUBSTR(REC, I), ' ,') + I - 1;
+              FMD(FMD_HIGH) = SUBSTR(REC, I, 7);
+              END;
+     P1 = INDEX(REC, 'REQ');
+     CALL BUILD_TABLE(REQ, REQ_HIGH, P1, RD);
+     POS = INDEX(REC, '.');
+     CALL READ_PTSSMP;
+     END;
+
+ RD = NO;
+
+ IF ªMORE_PTSSMP
+     THEN DO;
+          PUT SKIP(3) EDIT('*** ERROR #2 PTSSMP')(A);
+          STOP;
+          END;
+
+ END IF_STMT;
+1VER_STMT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS THE ++VER STATEMENT AND BUILD THE VERSION, SUP, REQ AND   */
+ /* PRE TABLES WITH THE SYSMODS WITHIN THE PARENTHESIS FOR THESE      */
+ /* KEYWORDS.  THE "COMBINATIONAL" SECTION MAKES SURE THAT THESE      */
+ /* SECTIONS ARE PROCESSED IN THE ORDER IN WHICH THEY OCCUR IN THE    */
+ /* CONTROL STATEMENT.  THIS IS DONE TO PREVENT LOSS OF TABLES.       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ /* VERIFY THAT THIS ++VER APPLIES TO THE SYSTEM RELEASE */
+ POS = INDEX(REC, '(') + 1;
+ POS = VERIFY(SUBSTR(REC, POS), ' ,') + POS - 1;
+ IF SUBSTR(REC, POS, 4) ª= SYSREL
+     THEN DO;
+          TAKE_IFS = NO;
+          CALL READ_PTSSMP;
+          RETURN;
+          END;
+
+ /* SET FLAG FOR IF_STMT PROCEDURE */
+ TAKE_IFS = YES;
+1SCAN_VER:  /* LOOK FOR KEYWORDS WHICH INDICATE DESIRED LISTS */
+ DO UNTIL(POS ª= 0 | ªMORE_PTSSMP);
+
+     /* FMID TABLE DOES NOT CALL BUILD_TABLE SINCE CAN ONLY BE ONE
+        ENTRY PER ++VER. */
+     I = INDEX(REC, 'FMID');
+     IF I ª= 0
+         THEN DO;
+              FMD_HIGH = FMD_HIGH + 1;
+              IF FMD_HIGH > HBOUND(FMD, 1)
+                  THEN DO;
+                       PUT SKIP(3) EDIT('*** ERROR #3 TABLE')(A);
+                       STOP;
+                       END;
+              I = INDEX(SUBSTR(REC, I), '(') + I;
+              I = VERIFY(SUBSTR(REC, I), ' ,') + I - 1;
+              FMD(FMD_HIGH) = SUBSTR(REC, I, 7);
+              END;
+
+     /* SCAN FOR INFORMATIONAL MESSAGES */
+     IF INDEX(REC, 'NPRE') ª= 0
+         THEN DO;
+              PUT SKIP EDIT('<<< SYSMOD CONTAINS NEGATIVE PREREQS')(A);
+              PUT SKIP EDIT(REC) (A);
+              END;
+
+     IF INDEX(REC, 'DELETE') ª= 0
+         THEN DO;
+              PUT SKIP EDIT('<<< SYSMOD CONTAINS DELETE KEYWORD')(A);
+              PUT SKIP EDIT(REC) (A);
+              END;
+
+     /* SCAN FOR KEYWORDS */
+     P1 = INDEX(REC, 'SUP');
+     P2 = INDEX(REC, 'PRE');
+     P3 = INDEX(REC, 'REQ');
+     P4 = INDEX(REC, 'VERSION');
+1    COMBINATIONAL:  /* DETERMINE ORDER KEYWORDS ARE FOUND */
+     SELECT;
+
+         WHEN((P1<P2) & (P1<P3) & (P1<P4)) ONE_LOW:  DO;
+             CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+             SELECT;
+                 WHEN((P2<P3) & (P2<P4)) DO;
+                     CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                     IF P3 < P4
+                         THEN DO;
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              END;
+                     END;
+                 WHEN((P3<P2) & (P3<P4)) DO;
+                     CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                     IF P2 < P4
+                         THEN DO;
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              END;
+                     END;
+                 OTHERWISE /*((P4<P2) & (P4<P3))*/ DO;
+                     CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                     IF P2 < P3
+                         THEN DO;
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              END;
+                     END;
+                 END;
+             END ONE_LOW;
+1        WHEN((P2<P1) & (P2<P3) & (P2<P4)) TWO_LOW:  DO;
+             CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+             SELECT;
+                 WHEN((P1<P3) & (P1<P4)) DO;
+                     CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                     IF P3 < P4
+                         THEN DO;
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              END;
+                     END;
+                 WHEN((P3<P1) & (P3<P4)) DO;
+                     CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                     IF P1 < P4
+                         THEN DO;
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              END;
+                     END;
+                 OTHERWISE /*((P4<P1) & (P4<P3))*/ DO;
+                     CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                     IF P1 < P3
+                         THEN DO;
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              END;
+                     END;
+                 END;
+             END TWO_LOW;
+1        WHEN((P3<P1) & (P3<P2) & (P3<P4)) THREE_LOW:  DO;
+             CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+             SELECT;
+                 WHEN((P1<P2) & (P1<P4)) DO;
+                     CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                     IF P2 < P4
+                         THEN DO;
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              END;
+                     END;
+                 WHEN((P2<P1) & (P2<P4)) DO;
+                     CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                     IF P1 < P4
+                         THEN DO;
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              END;
+                     END;
+                 OTHERWISE /*((P4<P1) & (P4<P2))*/ DO;
+                     CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+                     IF P1 < P2
+                         THEN DO;
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              END;
+                     END;
+                 END;
+             END THREE_LOW;
+1        OTHERWISE /*((P4<P1) & (P4<P2) & (P4<P3))*/ FOUR_LOW:  DO;
+             CALL BUILD_TABLE(VER, VER_HIGH, P4, VD);
+             SELECT;
+                 WHEN((P1<P2) & (P1<P3)) DO;
+                     CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                     IF P2 < P3
+                         THEN DO;
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              END;
+                     END;
+                 WHEN((P2<P1) & (P2<P3)) DO;
+                     CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                     IF P1 < P3
+                         THEN DO;
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              END;
+                     END;
+                 OTHERWISE /*((P3<P1) & (P3<P2))*/ DO;
+                     CALL BUILD_TABLE(REQ, REQ_HIGH, P3, RD);
+                     IF P1 < P2
+                         THEN DO;
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              END;
+                         ELSE DO;
+                              CALL BUILD_TABLE(PRE, PRE_HIGH, P2, PD);
+                              CALL BUILD_TABLE(SUP, SUP_HIGH, P1, SD);
+                              END;
+                     END;
+                 END;
+             END FOUR_LOW;
+         END COMBINATIONAL;
+1    POS = INDEX(REC, '.');
+     CALL READ_PTSSMP;
+     END SCAN_VER;
+
+ /* RESET DONE FLAGS IN CASE ANOTHER VALID ++VER STATEMENT FOUND */
+ SD, RD, PD, VD = NO;
+
+ IF ªMORE_PTSSMP
+     THEN DO;
+          PUT SKIP(3) EDIT('*** ERROR #4 PTSSMP')(A);
+          STOP;
+          END;
+
+ END VER_STMT;
+1BUILD_TABLE:  PROCEDURE(TABLE, HIGH, POS, DONE);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE REDUCES THE SMP ++VER OR THE ++IF STATEMENT TO ITS */
+ /* TOKENS AND ENTERS THEM IN THE PROVIDED TABLE.  THE CORRECT TABLE  */
+ /* IS DETERMINED BY THE CALLING PROGRAM AND PASSED AS A PARAMETER.   */
+ /* WHILE BUILDING THE TABLE "HIGH" IS THE MOST CURRENT USED POSITION.*/
+ /* "POS" IS THE POSITION OF THE KEYWORD (IE. VERSION, SUP, ETC.).    */
+ /* "DONE" IS WHETHER THE TABLE HAS ALREADY BEEN BUILT.               */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  TABLE(*)  CHAR(*);
+ DECLARE  HIGH      FIXED BINARY;
+ DECLARE  POS       FIXED BINARY;
+ DECLARE  DONE      BIT(*);
+
+ IF DONE | POS = 0
+     THEN RETURN;
+
+ POS = INDEX(SUBSTR(REC, POS), '(') + POS;
+ POS = VERIFY(SUBSTR(REC, POS), ' ,') + POS - 1;
+1TOKENS:  /* PARSE THE LIST AND ENTER THE TOKENS INTO THEIR TABLE */
+ DO WHILE(SUBSTR(REC, POS, 1) ª= ')');
+
+     HIGH = HIGH + 1;
+     IF HIGH > HBOUND(TABLE, 1)
+         THEN DO;
+              PUT SKIP(3) EDIT('*** ERROR #5 TABLE')(A);
+              PUT LIST(TABLE);
+              STOP;
+              END;
+
+     TABLE(HIGH) = SUBSTR(REC, POS, 7);
+     POS = POS + 7;
+
+     IF VERIFY(SUBSTR(REC, POS), ' ,') = 0
+         THEN DO;
+              CALL READ_PTSSMP;
+              IF ªMORE_PTSSMP
+                  THEN DO;
+                       PUT SKIP(3) EDIT('*** ERROR #6 PTSSMP')(A);
+                       STOP;
+                       END;
+              POS = VERIFY(REC, ' ,');
+              END;
+         ELSE POS = VERIFY(SUBSTR(REC, POS), ' ,') + POS - 1;
+     END TOKENS;
+
+ DONE = YES;
+
+ END BUILD_TABLE;
+1/*********************************************************************/
+ /*                                                                   */
+ /* THE FOLLOWING SET OF PROCEDURE ARE CALLED FROM THE POST_SMP       */
+ /* SECTION OF THE MAIN BODY OF THE PROGRAM.  THESE PROCEDURES ARE    */
+ /* LIST_ENTRY, CHECK_OUT, CREATE_RESULT, READ_SMPLIST AND PRESENT.   */
+ /* LIST_ENTRY AND READ_SMPLIST ARE CALLED DIRECTLY FROM THE BODY.    */
+ /* CHECK_OUT IS INTERNAL TO LIST_ENTRY.  CREATE_RESULT AND PRESENT   */
+ /* ARE INTERNAL TO CHECK_OUT.                                        */
+ /*                                                                   */
+ /*********************************************************************/
+1LIST_ENTRY:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE (NOT INCLUDING INTERNAL PROCEDURES) IS HIGHLY      */
+ /* DEPENDENT ON THE FORMAT OF SMP LIST OUTPUT.                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ /* SKIP BLANK LINE */
+ CALL READ_SMPLIST;
+ CALL READ_SMPLIST;
+
+ /* GET NAME OF MOD, MAC OR SRC */
+ ELEMENT = SUBSTR(SMPLIST_AREA, 2, 8);
+
+ /* INITIALIZE FOR EACH ELEMENT */
+ U = 0;
+ UMID = ' ';
+ RMID, FMID, LUPD = ' ';
+
+ CALL READ_SMPLIST;
+1LIST_EXTRACT:  /* GET THE INFORMATION FROM THE SMP LISTING */
+ DO WHILE(SMPLIST_AREA ª= ' ' & MORE_SMPLIST);
+
+     SELECT(SUBSTR(SMPLIST_AREA, 12, 4));
+         WHEN('LAST') LUPD = SUBSTR(SMPLIST_AREA, 30, 7);
+         WHEN('FMID') FMID = SUBSTR(SMPLIST_AREA, 30, 7);
+         WHEN('RMID') RMID = SUBSTR(SMPLIST_AREA, 30, 7);
+         WHEN('UMID')
+             DO UNTIL(SUBSTR(SMPLIST_AREA, 12, 4) ª= ' ');
+                 SMPLIST_AREA = SUBSTR(SMPLIST_AREA, 30);
+                 POS = VERIFY(SMPLIST_AREA, ' ');
+                 DO WHILE(POS ª= 0);
+                     SMPLIST_AREA = SUBSTR(SMPLIST_AREA, POS);
+                     POS = INDEX(SMPLIST_AREA, ' ');
+                     U = U + 1;
+                     IF U > HBOUND(UMID, 1)
+                         THEN DO;
+                              PUT SKIP EDIT('*** ERROR #7 TABLE')(A);
+                              STOP;
+                              END;
+                     UMID(U) = SUBSTR(SMPLIST_AREA, 1, POS);
+                     SMPLIST_AREA = SUBSTR(SMPLIST_AREA, POS+1);
+                     POS = VERIFY(SMPLIST_AREA, ' ');
+                     END;
+                 CALL READ_SMPLIST;
+                 END;
+         OTHERWISE;
+         END;
+
+     CALL READ_SMPLIST;
+     END LIST_EXTRACT;
+
+
+ /* CHECK EACH FIELD FROM THE LIST OUTPUT */
+
+ IF LUPD ª= 'JCLIN' & LUPD ª= 'UCLIN' & LUPD ª= ' '
+     THEN CALL CHECK_OUT(LUPD, 'LUPD', TYPE, ELEMENT, FMID);
+
+ IF RMID ª= ' '
+     THEN CALL CHECK_OUT(RMID, 'RMID', TYPE, ELEMENT, FMID);
+
+ DO I = 1 TO U;
+     CALL CHECK_OUT(UMID(I), 'UMID', TYPE, ELEMENT, FMID);
+     END;
+1CHECK_OUT:  PROCEDURE(SYSMOD, FIELD, TYPE, ELEMENT, FMID);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO LIST_ENTRY.                         */
+ /* SEARCH THE TABLES TO FIND OUT IF THE SYSMOD FROM THE SMP LISTING  */
+ /* IS PRESENT.  IF NOT OR IF ONLY IN THE PRE OR REQ TABLES GENERATE  */
+ /* A RESULT ENTRY WHICH WILL BE SORTED AND OUTPUT LATER.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SYSMOD   CHAR(*);
+ DECLARE  FIELD    CHAR(*);
+ DECLARE  TYPE     CHAR(*);
+ DECLARE  ELEMENT  CHAR(*);
+ DECLARE  FMID     CHAR(*);
+
+
+ IF ªPRESENT(SYSMOD, FMD, FMD_HIGH)
+     THEN IF ªPRESENT(SYSMOD, VER, VER_HIGH)
+              THEN IF ªPRESENT(SYSMOD, SUP, SUP_HIGH)
+                       THEN IF PRESENT(SYSMOD, REQ, REQ_HIGH)
+                                THEN CALL CREATE_RESULT('3', REQMSG);
+                                ELSE IF PRESENT(SYSMOD, PRE, PRE_HIGH)
+                                         THEN CALL CREATE_RESULT('2',
+                                                  PREMSG);
+                                         ELSE CALL CREATE_RESULT('1',
+                                                  NOTMSG);
+1CREATE_RESULT:  PROCEDURE(SC, COND);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO CHECK_OUT.                          */
+ /* CREATE AN ENTRY IN THE RESULT HOLDING AREA WHICH WILL LATER BE    */
+ /* SORTED AND OUTPUT TO SYSPRINT.                                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SC  CHAR(*);
+ DECLARE  COND  CHAR(*);
+
+
+ R = R + 1;
+ IF R > HBOUND(R_SYSMOD, 1)
+     THEN DO;
+          PUT SKIP(3) EDIT('*** ERROR #8 TABLE')(A);
+          STOP;
+          END;
+
+ R_SORTCHAR(R) = SC;
+ R_SYSMOD(R) = SYSMOD;
+ R_FIELD(R) = FIELD;
+ R_TYPE(R) = TYPE;
+ R_ELEMENT(R) = ELEMENT;
+ R_COND(R) = COND;
+ R_FMID(R) = FMID;
+
+ /* SEE IF THE ELEMENT'S FMID IS "KNOWN" BY THE SYSMOD BEING CHECKED */
+ SELECT;
+     WHEN(PRESENT(FMID, VER, VER_HIGH)) R_FCOND(R) = 'VERSIONED';
+     WHEN(PRESENT(FMID, FMD, FMD_HIGH)) R_FCOND(R) = 'VER / IF';
+     OTHERWISE R_FCOND(R) = 'UNKNOWN';
+     END;
+
+ END CREATE_RESULT;
+1PRESENT:  PROCEDURE(KEY, TABLE, HIGH) RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO CHECK_OUT.                          */
+ /* THE FUNCTION OF THE PROCEDURE IS TO SEARCH THE TABLE FOR THE KEY  */
+ /* VALUE (BOTH PARAMETERS).  IF THE KEY IS FOUND IN THE TABLE RETURN */
+ /* A BINARY "TRUE" VALUE OTHERWISE "FALSE".                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  KEY           CHAR(*);
+ DECLARE  TABLE(*)      CHAR(*);
+ DECLARE  HIGH          FIXED BINARY;
+
+ DECLARE  POS           FIXED BINARY;
+ DECLARE  UPPER         FIXED BINARY;
+ DECLARE  LOWER         FIXED BINARY;
+
+ LOWER = 1;
+ UPPER = HIGH;
+
+ BINARY_SEARCH:
+ DO WHILE(UPPER >= LOWER);
+     POS = (LOWER + UPPER) / 2;
+     IF KEY = TABLE(POS)
+         THEN RETURN(YES);
+         ELSE IF KEY > TABLE(POS)
+                  THEN LOWER = POS + 1;
+                  ELSE UPPER = POS - 1;
+     END BINARY_SEARCH;
+
+ RETURN(NO);
+
+
+ END PRESENT;
+ END CHECK_OUT;
+ END LIST_ENTRY;
+1READ_SMPLIST:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCEDURE FOR SMPLIST INPUT AND COMMON PROCESSING.                */
+ /*                                                                   */
+ /*********************************************************************/
+
+ SMPLIST_AREA = ' ';
+
+ READ FILE(SMPLIST) INTO(SMPLIST_AREA);
+
+
+ END READ_SMPLIST;
+
+ END SMPCHK;
+

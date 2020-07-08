@@ -1,0 +1,109 @@
+*PROCESS NM;
+ PANLESS:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PANLESS V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING INIT('ISA(8K)') STATIC EXTERNAL;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM REMOVES PAN VALET ADDITIONS TO SOURCE CODE FOR ASM,  */
+ /* PLI, FORT AND COBOL TYPE PROGRAMS.  IF A PARM OF ANY VALUE IS     */
+ /* PASSED TO THE PROGRAM PAN#1 IS NOT INVOKED OTHERWISE IT IS.       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PARM  CHAR(100) VARYING;
+ DECLARE  PANOUT   FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  SYSPRINT FILE OUTPUT STREAM PRINT;
+
+ DECLARE  PRIV_CSECT  CHAR(80) INIT('         CSECT');
+ DECLARE  PAN_VALET   CHAR(24) INIT('77  PAN-VALET PICTURE X(') STATIC;
+ DECLARE  REC   CHAR(80);
+ DECLARE  REC2  CHAR(80);
+ DECLARE  MORE_PANDD2  BIT(1) INIT('1'B) STATIC;
+ DECLARE  WRITE_REC   BIT(1) INIT('1'B) STATIC;
+ DECLARE  YES         BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO          BIT(1) INIT('0'B) STATIC;
+ DECLARE  SUBSTR  BUILTIN;
+ DECLARE  LINK    ENTRY OPTIONS(ASM, INTER);
+
+ IF PARM = ''
+     THEN CALL LINK('PAN#1   ', PARM);
+1BEGIN_BLOCK:  BEGIN;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* FILE INITIALIZATION AFTER PAN#1.                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PANDD2   FILE INPUT  RECORD ENV(FB RECSIZE(80));
+
+ ON ENDFILE(PANDD2) MORE_PANDD2 = NO;
+
+ PUT SKIP(3) EDIT('THE FOLLOWING LINES EXTRACTED FROM PANDD2') (A);
+ READ FILE(PANDD2) INTO(REC);
+
+ DO WHILE(MORE_PANDD2);
+     SELECT;
+         WHEN(MORE_PANDD2  &  SUBSTR(REC, 12, 9) = 'DATA SET '  &
+              SUBSTR(REC, 32, 9) = 'AT LEVEL ' &
+              SUBSTR(REC, 45, 6) = 'AS OF') WRITE_REC = NO;
+         WHEN(SUBSTR(REC, 8, 24) = PAN_VALET) WRITE_REC = NO;
+         WHEN(SUBSTR(REC, 1, 72) = PRIV_CSECT) CALL PRIVATE_CSECT;
+         OTHERWISE;
+         END;
+     IF WRITE_REC
+         THEN WRITE FILE(PANOUT) FROM(REC);
+         ELSE DO;
+              WRITE_REC = YES;
+              PUT SKIP EDIT(REC) (A);
+              END;
+     IF MORE_PANDD2
+         THEN READ FILE(PANDD2) INTO(REC);
+     END;
+1PRIVATE_CSECT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PROCESSES ASM PRIVATE CSECTS ADDED BY PAN#1.       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ READ FILE(PANDD2) INTO(REC2);
+ IF ªMORE_PANDD2
+     THEN RETURN;
+
+ SELECT;
+     WHEN(SUBSTR(REC2, 10, 4) = 'END') DO;
+         PUT SKIP EDIT(REC) (A);
+         REC = REC2;
+         END;
+     WHEN(SUBSTR(REC2, 1, 20) ='         DC    CL21''') DO;
+         REC = REC2;
+         READ FILE(PANDD2) INTO(REC2);
+         IF MORE_PANDD2
+             THEN IF SUBSTR(REC2, 10, 4) = 'END'
+                      THEN DO;
+                           PUT SKIP EDIT(PRIV_CSECT) (A);
+                           PUT SKIP EDIT(REC) (A);
+                           REC = REC2;
+                           END;
+                      ELSE DO;
+                           WRITE FILE(PANOUT) FROM(PRIV_CSECT);
+                           WRITE FILE(PANOUT) FROM(REC);
+                           REC = REC2;
+                           END;
+             ELSE WRITE FILE(PANOUT) FROM(PRIV_CSECT);
+         END;
+     OTHERWISE DO;
+         WRITE FILE(PANOUT) FROM(REC);
+         REC = REC2;
+         END;
+     END;
+
+ END PRIVATE_CSECT;
+ END BEGIN_BLOCK;
+ END PANLESS;
+

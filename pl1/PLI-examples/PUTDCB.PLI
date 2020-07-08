@@ -1,0 +1,98 @@
+*PROCESS NM;
+ PUTDCB:  PROCEDURE(FILE, PARM) REORDER;
+ DECLARE  IDPUTDC  CHAR(34) VARYING STATIC EXTERNAL
+     INIT('PUTDCB V1.1  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE UPDATES THE PL/I ENVIRONMENT BLOCK FOR A FILE      */
+ /* DECLARATION.  THIS SHOULD BE DONE PRIOR TO OPENNING THE DATASET.  */
+ /* THE FILE SHOULD BE DECLARED AS FOLLOWS INCLUDING THE ENV.         */
+ /*                                                                   */
+ /* DECLARE  OUT  FILE OUTPUT ENV(FB RECSIZE(80) BLKSIZE(3120));      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FILE  FILE VARIABLE;
+
+ DECLARE
+     1  PARM,
+        2  RECFM,
+           3  FIXED      BIT(1),
+           3  VARIABLE   BIT(1),
+           3  UNDEFINED  BIT(1),
+           3  BLOCKED    BIT(1),
+           3  SPANNED    BIT(1),
+           3  A_CNTL     BIT(1),
+           3  M_CNTL     BIT(1),
+           3  TRK_OVFL   BIT(1),
+        2  LRECL    FIXED BINARY,
+        2  BLKSIZE  FIXED BINARY;
+1DECLARE
+     1  DCLCB  BASED(FILEPTR),
+        2  FILLER  CHAR(12),
+        2  DENV    PTR;
+
+ DECLARE
+     1  ENVB  BASED(DENV),
+        2  FILLER1  CHAR(1),
+        2  INIT1,
+           3  F_V_U1      BIT(2),
+           3  TRK_OVFL1   BIT(1),
+           3  BLOCKED1    BIT(1),
+           3  SPANNED1    BIT(1),
+           3  A_CNTL1     BIT(1),
+           3  M_CNTL1     BIT(1),
+           3  FILLER      BIT(1),
+        2  FILLER2  CHAR(4),
+        2  INIT2,
+           3  FIXED2      BIT(1),
+           3  VARIABLE2   BIT(1),
+           3  UNDEFINED2  BIT(1),
+           3  SPANNED2    BIT(1),
+           3  BLOCKED2    BIT(1),
+           3  FILLER      BIT(3),
+        2  FILLER3  CHAR(5),
+        2  NBLK     PTR,
+        2  NREC     PTR;
+
+ DECLARE  BLKSIZE1  FIXED BINARY(31) BASED(NBLK);
+ DECLARE  LRECL1    FIXED BINARY(31) BASED(NREC);
+
+ DECLARE  FILEPTR  PTR;
+ DECLARE  (STRING, UNSPEC)  BUILTIN;
+
+ DECLARE  FIXED_BITS       BIT(2) STATIC INIT('10'B);
+ DECLARE  UNDEFINED_BITS   BIT(2) STATIC INIT('11'B);
+ DECLARE  VARIABLE_BITS    BIT(2) STATIC INIT('01'B);
+
+ DECLARE  NO    BIT(1) STATIC INIT('0'B);
+ DECLARE  YES   BIT(1) STATIC INIT('1'B);
+1UNSPEC(FILEPTR) = UNSPEC(FILE);
+ STRING(INIT1) = NO;
+ STRING(INIT2) = NO;
+
+ SELECT;
+     WHEN(FIXED) F_V_U1 = FIXED_BITS;
+     WHEN(VARIABLE) F_V_U1 = VARIABLE_BITS;
+     WHEN(UNDEFINED) F_V_U1 = UNDEFINED_BITS;
+     END;
+
+ TRK_OVFL1 = TRK_OVFL;
+ BLOCKED1 = BLOCKED;
+ SPANNED1 = SPANNED;
+ A_CNTL1 = A_CNTL;
+ M_CNTL1 = M_CNTL;
+
+ FIXED2 = FIXED;
+ VARIABLE2 = VARIABLE;
+ UNDEFINED2 = UNDEFINED;
+ SPANNED2 = SPANNED;
+ BLOCKED2 = BLOCKED;
+
+ BLKSIZE1 = BLKSIZE;
+ LRECL1 = LRECL;
+
+ END PUTDCB;
+

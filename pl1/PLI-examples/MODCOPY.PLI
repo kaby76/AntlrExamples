@@ -1,0 +1,538 @@
+*PROCESS NM;
+ MODCOPY:  PROCEDURE(PARM) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('MODCOPY V2.5  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT CHAR(9) VARYING STATIC EXTERNAL INIT('ISA(128K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM ENABLES ONE TO COPY A DATASET AND CHANGE ITS         */
+ /* ATTRIBUTES IN A VARIETY OF WAYS.  FOR MORE INFORMATION SEE THE    */
+ /* DATA IN THE HELP PROCEDURE.                                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ DECLARE
+     1  IN_PARM,
+        2  I_RECFM,
+           3  I_FIXED      BIT(1),
+           3  I_VARIABLE   BIT(1),
+           3  I_UNDEFINED  BIT(1),
+           3  I_BLOCKED    BIT(1),
+           3  I_SPANNED    BIT(1),
+           3  I_A_CNTL     BIT(1),
+           3  I_M_CNTL     BIT(1),
+           3  I_TRK_OVFL   BIT(1),
+        2  I_LRECL    FIXED BINARY,
+        2  I_BLKSIZE  FIXED BINARY;
+
+ DECLARE
+     1  OUT_PARM,
+        2  O_RECFM,
+           3  O_FIXED      BIT(1) INIT('0'B),
+           3  O_VARIABLE   BIT(1) INIT('0'B),
+           3  O_UNDEFINED  BIT(1) INIT('0'B),
+           3  O_BLOCKED    BIT(1) INIT('0'B),
+           3  O_SPANNED    BIT(1) INIT('0'B),
+           3  O_A_CNTL     BIT(1) INIT('0'B),
+           3  O_M_CNTL     BIT(1) INIT('0'B),
+           3  O_TRK_OVFL   BIT(1) INIT('0'B),
+        2  O_LRECL    FIXED BINARY INIT(0),
+        2  O_BLKSIZE  FIXED BINARY INIT(0);
+1/* CONTROL CONSTANTS */
+ DECLARE  C_BACKSCAN  CHAR(8) STATIC INIT('BACKSCAN');
+ DECLARE  C_BLKSIZE   CHAR(7) STATIC INIT('BLKSIZE');
+ DECLARE  C_CANCEL    CHAR(6) STATIC INIT('CANCEL');
+ DECLARE  C_END       CHAR(3) STATIC INIT('END');
+ DECLARE  C_FINISH    CHAR(6) STATIC INIT('FINISH');
+ DECLARE  C_HELP      CHAR(4) STATIC INIT('HELP');
+ DECLARE  C_LRECL     CHAR(5) STATIC INIT('LRECL');
+ DECLARE  C_NUMBERED  CHAR(8) STATIC INIT('NUMBERED');
+ DECLARE  C_PAD       CHAR(3) STATIC INIT('PAD');
+ DECLARE  C_RECFM     CHAR(5) STATIC INIT('RECFM');
+ DECLARE  C_RENUM     CHAR(5) STATIC INIT('RENUM');
+ DECLARE  C_START     CHAR(5) STATIC INIT('START');
+ DECLARE  C_TRIM      CHAR(4) STATIC INIT('TRIM');
+ DECLARE  C_TRUNC     CHAR(8) STATIC INIT('TRUNCATE');
+ DECLARE  C_UNNUM     CHAR(5) STATIC INIT('UNNUM');
+ DECLARE  C_UNWRAP    CHAR(6) STATIC INIT('UNWRAP');
+ DECLARE  C_WRAP      CHAR(4) STATIC INIT('WRAP');
+
+ /* FILE DECLARATIONS */
+ DECLARE  IN        FILE INPUT  BUFFERED RECORD;
+ DECLARE  OUT       FILE OUTPUT ENV(FB RECSIZE(80) BLKSIZE(3120));
+ DECLARE  SYSIN     FILE INPUT  STREAM;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ /* EXTERNAL ROUTINES */
+ DECLARE  (GETDCB, PUTDCB)  ENTRY;
+
+ /* COMPILER ROUTINES */
+ DECLARE (HBOUND, INDEX, LENGTH, MOD, ONSOURCE, SUBSTR, UNSPEC) BUILTIN;
+1/* ARITHMETIC DECLARATIONS */
+ DECLARE  CH_BLKSIZE  FIXED BINARY     INIT(-1);
+ DECLARE  CH_LRECL    FIXED BINARY     INIT(-1);
+ DECLARE  FINISH      FIXED BINARY(31) INIT(0);
+ DECLARE  FIRST_COL   FIXED BINARY(31) INIT(0);
+ DECLARE  I           FIXED BINARY;
+ DECLARE  ICOUNT      FIXED BINARY(31) INIT(0);
+ DECLARE  LAST_COL    FIXED BINARY(31) INIT(0);
+ DECLARE  LINE_RENUM  PIC '(8)9'       INIT(0);
+ DECLARE  IMAX        FIXED BINARY(31) INIT(0);
+ DECLARE  OMAX        FIXED BINARY(31) INIT(0);
+ DECLARE  IMIN        FIXED BINARY(31) INIT(32767);
+ DECLARE  OMIN        FIXED BINARY(31) INIT(32767);
+ DECLARE  NNN         FIXED BINARY(31) INIT(0);
+ DECLARE  OCOUNT      FIXED BINARY(31) INIT(0);
+ DECLARE  PAD_END     FIXED BINARY(31) INIT(0);
+ DECLARE  START       FIXED BINARY(31) INIT(1);
+
+ /* BIT IDENTIFIERS AND CONSTANTS */
+ DECLARE  BACKSCAN    BIT(1) INIT('0'B);
+ DECLARE  MORE_SYSIN  BIT(1) INIT('1'B);
+ DECLARE  MORE_IN     BIT(1) INIT('1'B);
+ DECLARE  NUMBERED    BIT(1) INIT('0'B);
+ DECLARE  PAD         BIT(1) INIT('0'B);
+ DECLARE  RENUM       BIT(1) INIT('0'B);
+ DECLARE  UNNUM       BIT(1) INIT('0'B);
+ DECLARE  WRAP        BIT(1) INIT('0'B);
+ DECLARE  NO          BIT(1) STATIC INIT('0'B);
+ DECLARE  YES         BIT(1) STATIC INIT('1'B);
+
+ /* CHARACTER DECLARATIONS */
+ DECLARE  ANSW        CHAR(30);
+ DECLARE  CH_RECFM    CHAR(4) INIT(' ');
+ DECLARE  IPR_RECFM   CHAR(7) VARYING INIT('');
+ DECLARE  OPR_RECFM   CHAR(8) VARYING INIT('');
+ DECLARE  PADDING     CHAR(32759) INIT(' ');
+ DECLARE  REC         CHAR(32760) VARYING;
+1ON ENDFILE(IN) MORE_IN = NO;
+
+ /* PROCESS HELP PARM */
+ IF PARM = C_HELP
+     THEN DO;
+          CALL HELP;
+          RETURN;
+          END;
+
+ /* PROCESS USER INPUT FROM SYSIN CONTROL */
+ CALL CONTROL;
+
+ /* FIND INPUT DCB ATTRIBUTES */
+ CALL GETDCB(IN, IN_PARM);
+
+ /* SET OUTPUT DCB ATTRIBUTES */
+
+ /* SET RECFM TO DESIRED TYPE */
+ IF CH_RECFM = ' '
+     THEN O_RECFM = I_RECFM;
+     ELSE DO I = 1 TO 4;
+              SELECT(SUBSTR(CH_RECFM, I, 1));
+                  WHEN(' ');
+                  WHEN('F') O_FIXED = YES;
+                  WHEN('V') O_VARIABLE = YES;
+                  WHEN('U') O_UNDEFINED = YES;
+                  WHEN('B') O_BLOCKED = YES;
+                  WHEN('S') O_SPANNED = YES;
+                  WHEN('A') O_A_CNTL = YES;
+                  WHEN('M') O_M_CNTL = YES;
+                  WHEN('T') O_TRK_OVFL = YES;
+                  OTHERWISE DO;
+                      PUT SKIP EDIT('INVALID RECFM:  ', CH_RECFM) (A);
+                      RETURN;
+                      END;
+                  END;
+              END;
+1/* SET LRECL TO DESIRED VALUE */
+ IF CH_LRECL = -1
+     THEN IF I_FIXED & O_VARIABLE
+              THEN O_LRECL = I_LRECL + 4;
+              ELSE O_LRECL = I_LRECL;
+     ELSE O_LRECL = CH_LRECL;
+
+ /* SET BLKSIZE TO DESIRED VALUE */
+ IF CH_BLKSIZE = -1
+     THEN O_BLKSIZE = I_BLKSIZE;
+     ELSE O_BLKSIZE = CH_BLKSIZE;
+
+
+ /* COMPUTE LRECL AND BLKSIZE IF TRIM OPTION DESIRED AND RECFM IS F */
+ IF (LAST_COL-FIRST_COL > 0) & (LAST_COL <= I_LRECL)  &  ^WRAP  &  ^PAD
+     THEN IF O_FIXED
+              THEN DO;
+                   O_LRECL = LAST_COL - FIRST_COL + 1;
+                   O_BLKSIZE = O_BLKSIZE - MOD(O_BLKSIZE, O_LRECL);
+                   END;
+              ELSE;
+     ELSE DO;
+          FIRST_COL = 0;
+          LAST_COL = 0;
+          END;
+1/* REPORT DATA SET ATTRIBUTES */
+ SELECT;
+     WHEN(I_FIXED) IPR_RECFM = IPR_RECFM ]] 'F';
+     WHEN(I_VARIABLE) IPR_RECFM = IPR_RECFM ]] 'V';
+     WHEN(I_UNDEFINED) IPR_RECFM = IPR_RECFM ]] 'U';
+     END;
+ IF I_BLOCKED
+     THEN IPR_RECFM = IPR_RECFM ]] 'B';
+ IF I_SPANNED
+     THEN IPR_RECFM = IPR_RECFM ]] 'S';
+ IF I_TRK_OVFL
+     THEN IPR_RECFM = IPR_RECFM ]] 'T';
+ IF I_A_CNTL
+     THEN IPR_RECFM = IPR_RECFM ]] 'A';
+ IF I_M_CNTL
+     THEN IPR_RECFM = IPR_RECFM ]] 'M';
+ DO WHILE(LENGTH(IPR_RECFM) < 7);
+     IPR_RECFM = ' ' ]] IPR_RECFM;
+     END;
+
+ SELECT;
+     WHEN(O_FIXED) OPR_RECFM = OPR_RECFM ]] 'F';
+     WHEN(O_VARIABLE) OPR_RECFM = OPR_RECFM ]] 'V';
+     WHEN(O_UNDEFINED) OPR_RECFM = OPR_RECFM ]] 'U';
+     END;
+ IF O_BLOCKED
+     THEN OPR_RECFM = OPR_RECFM ]] 'B';
+ IF O_SPANNED
+     THEN OPR_RECFM = OPR_RECFM ]] 'S';
+ IF O_TRK_OVFL
+     THEN OPR_RECFM = OPR_RECFM ]] 'T';
+ IF O_A_CNTL
+     THEN OPR_RECFM = OPR_RECFM ]] 'A';
+ IF O_M_CNTL
+     THEN OPR_RECFM = OPR_RECFM ]] 'M';
+ DO WHILE(LENGTH(OPR_RECFM) < 8);
+     OPR_RECFM = ' ' ]] OPR_RECFM;
+     END;
+
+ PUT SKIP(2) EDIT('     IN     OUT') (A);
+ PUT SKIP(1) EDIT('  =====   =====') (A);
+ PUT SKIP EDIT(IPR_RECFM, OPR_RECFM, '  RECFM') (A);
+ PUT SKIP EDIT(I_LRECL, O_LRECL, '  LRECL') (F(7), F(8), A);
+ PUT SKIP EDIT(I_BLKSIZE, O_BLKSIZE, '  BLKSIZE') (F(7), F(8), A);
+1/* SET OUTPUT DCB ATTRIBUTES */
+ CALL PUTDCB(OUT, OUT_PARM);
+
+ /* FORCE PAD/TRUNCATE IF LRECL CHANGES */
+ IF (I_LRECL ^= O_LRECL)  &  ^WRAP  &  ^O_VARIABLE
+     THEN PAD = YES;
+
+ IF PAD /* FIGURE PAD/TRUNCATE LENGTH */
+     THEN IF O_VARIABLE
+              THEN PAD_END = O_LRECL - 4;
+              ELSE PAD_END = O_LRECL;
+
+ /* SKIP TO FIRST DESIRED RECORD */
+ DO WHILE(ICOUNT < START);
+     CALL GETIN;
+     END;
+
+ COPY_LOOP:  /* PREPROCESS AND COPY EACH DESIRED RECORD */
+ DO WHILE(MORE_IN);
+
+     IF /*TRIM*/ LAST_COL - FIRST_COL > 0
+         THEN IF LAST_COL > LENGTH(REC)
+                  THEN REC = SUBSTR(REC, FIRST_COL);
+                  ELSE REC = SUBSTR(REC,FIRST_COL,LAST_COL-FIRST_COL+1);
+
+     IF PAD
+         THEN DO;
+              REC = REC ]] PADDING;
+              REC = SUBSTR(REC, 1, PAD_END);
+              END;
+
+     IF NUMBERED
+         THEN SELECT;
+                  WHEN(I_VARIABLE  &  O_FIXED)
+                       REC = SUBSTR(REC, 9) ]] SUBSTR(REC, 1, 8);
+                  WHEN(I_FIXED  &  O_VARIABLE)
+                       REC = SUBSTR(REC, LENGTH(REC)-7) ]]
+                           SUBSTR(REC, 1, LENGTH(REC)-8);
+                  OTHERWISE;
+                  END;
+1    IF RENUM
+         THEN DO;
+              LINE_RENUM = LINE_RENUM + 10;
+              SELECT;
+                  WHEN(O_FIXED) REC = SUBSTR(REC, 1, LENGTH(REC)-8) ]]
+                      LINE_RENUM;
+                  WHEN(O_VARIABLE) REC = LINE_RENUM ]] SUBSTR(REC, 9);
+                  OTHERWISE;
+                  END;
+              END;
+     IF UNNUM
+         THEN SELECT;
+                  WHEN(O_FIXED) REC = SUBSTR(REC, 1, LENGTH(REC)-8) ]]
+                      (8)' ';
+                  WHEN(O_VARIABLE) REC = (8)' ' ]] SUBSTR(REC, 9);
+                  OTHERWISE;
+                  END;
+
+     IF O_VARIABLE  &  ^PAD  &  ^WRAP
+         THEN DO;
+              IF BACKSCAN
+                  THEN DO WHILE(LENGTH(REC) > 1 &
+                       SUBSTR(REC, LENGTH(REC), 1) = ' ');
+                           REC = SUBSTR(REC, 1, LENGTH(REC)-1);
+                           END;
+              IF LENGTH(REC) > OMAX
+                  THEN OMAX = LENGTH(REC);
+              IF LENGTH(REC) < OMIN
+                  THEN OMIN = LENGTH(REC);
+              WRITE FILE(OUT) FROM(REC);
+              END;
+         ELSE DO;
+              IF LENGTH(REC) > OMAX
+                  THEN OMAX = LENGTH(REC);
+              IF LENGTH(REC) < OMIN
+                  THEN OMIN = LENGTH(REC);
+              PUT FILE(OUT) EDIT(REC) (A);
+              END;
+
+     OCOUNT = OCOUNT + 1;
+     IF ICOUNT = FINISH
+         THEN LEAVE;
+     CALL GETIN;
+     END COPY_LOOP;
+1/* REPORT GATHERED STATISTICS */
+
+ /* IN/OUT RECORD COUNTS */
+ IF WRAP  &  (O_LRECL ^= I_LRECL)
+     THEN PUT SKIP EDIT(ICOUNT, 'WRAP', '  RECORDS PROCESSED')
+              (F(7), X(4), A, A);
+     ELSE PUT SKIP EDIT(ICOUNT, OCOUNT, '  RECORDS PROCESSED')
+              (F(7), F(8), A);
+
+ IF ^O_VARIABLE  &  ^I_VARIABLE
+     THEN RETURN;
+
+ /* MIN/MAX RECORD LENGTH */
+ IF WRAP  &  (O_LRECL ^= I_LRECL)
+     THEN DO;
+          PUT SKIP EDIT(IMIN, '  MIN LENGTH') (F(7), X(8), A);
+          PUT SKIP EDIT(IMAX, '  MAX LENGTH') (F(7), X(8), A);
+          END;
+     ELSE DO;
+          PUT SKIP EDIT(IMIN, OMIN, '  MIN LENGTH') (F(7), F(8), A);
+          PUT SKIP EDIT(IMAX, OMAX, '  MAX LENGTH') (F(7), F(8), A);
+          END;
+1GETIN:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* READ AN INPUT RECORD INTO THE BUFFER AREA.                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+ READ FILE(IN) INTO(REC);
+
+ IF MORE_IN
+     THEN DO;
+          ICOUNT = ICOUNT + 1;
+
+          IF LENGTH(REC) > IMAX
+              THEN IMAX = LENGTH(REC);
+          IF LENGTH(REC) < IMIN
+              THEN IMIN = LENGTH(REC);
+          END;
+ END GETIN;
+1CONTROL:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SETS THE PROCESSING OPTIONS FROM THE SYSIN CONTROL */
+ /* FILE INPUT.  IF SYSIN UNDEFINED DEFAULT PROCESSING CONTINUES.     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ PUT SKIP EDIT(PGMID) (A);
+ PUT SKIP EDIT('   ENTER ''HELP'' FOR INFORMATION') (A); PUT SKIP(2);
+ CALL GETINPT;
+1CONTROL_LOOP:  /* ALLOW USER TO SPECIFY OPTIONS AS DESIRED */
+ DO WHILE(MORE_SYSIN & ANSW ^= C_END);
+     SELECT(ANSW);
+         WHEN(C_BACKSCAN) BACKSCAN = YES;
+         WHEN(C_BLKSIZE) DO;
+             GET LIST(CH_BLKSIZE);
+             PUT EDIT(CH_BLKSIZE, ' ') (F(7), A);
+             END;
+         WHEN(C_CANCEL) EXIT;
+         WHEN(C_FINISH) DO;
+             GET LIST(FINISH);
+             PUT EDIT(FINISH, ' ') (F(7), A);
+             END;
+         WHEN(C_HELP) CALL HELP;
+         WHEN(C_LRECL) DO;
+             GET LIST(CH_LRECL);
+             PUT EDIT(CH_LRECL, ' ') (F(7), A);
+             END;
+         WHEN(C_NUMBERED) NUMBERED = YES;
+         WHEN(C_PAD) PAD = YES;
+         WHEN(C_RECFM) DO;
+             CALL GETINPT;
+             CH_RECFM = ANSW;
+             END;
+         WHEN(C_RENUM) RENUM = YES;
+         WHEN(C_START) DO;
+             GET LIST(START);
+             PUT EDIT(START, ' ') (F(7), A);
+             END;
+         WHEN(C_TRIM) DO;
+             GET LIST(FIRST_COL);
+             GET LIST(LAST_COL);
+             PUT EDIT(FIRST_COL, ' ', LAST_COL, ' ') (F(7), A);
+             END;
+         WHEN(C_TRUNC) PAD = YES;
+         WHEN(C_UNNUM) UNNUM = YES;
+         WHEN(C_UNWRAP) WRAP = YES;
+         WHEN(C_WRAP) WRAP = YES;
+         OTHERWISE PUT SKIP(2) EDIT('COMMAND UNRECOGNIZED, REENTER')(A);
+         END;
+     CALL GETINPT;
+     END CONTROL_LOOP;
+1GETINPT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE OBTAINS INPUT FROM SYSIN FILE.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ON CONVERSION BEGIN; /* RECOVER AND OBTAIN INPUT */
+     ANSW = ONSOURCE;
+     UNSPEC(ANSW) = UNSPEC(ANSW) ] (30) '01000000'B;
+     ONSOURCE = (16) '0';
+     END;
+
+ ON UNDEFINEDFILE(SYSIN) BEGIN;
+     PUT SKIP EDIT('NO SYSIN CONTROL FILE - DEFAULT PROCESSING') (A);
+     PUT SKIP EDIT('OUT ATTRIBUTES WILL BE MADE THE SAME AS IN') (A);
+     MORE_SYSIN = NO;
+     GOTO END_GETINPT;
+     END;
+
+ ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ GET FILE(SYSIN) LIST(NNN);
+ IF NNN ^= 0
+     THEN ANSW = ' ';
+ IF MORE_SYSIN
+     THEN PUT EDIT(SUBSTR(ANSW, 1, INDEX(ANSW, ' '))) (A);
+
+ END_GETINPT:
+ END GETINPT;
+ END CONTROL;
+1HELP:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE LISTS THE HELP INFORMATION FOR THE USER.           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  HELP_TEXT(88)  CHAR(68) STATIC INIT(
+ 'MODCOPY  by Clyde Thomas Zuber                                      ',
+ '    This program allows the modification of data set attributes as  ',
+ 'it copies the data from file IN to OUT.                             ',
+ '                                                                    ',
+ 'If no commands are given the default is to copy all input attributes',
+ 'to the output data set.  Some commands are implied by other commands',
+ 'or exclusive of other commands.  These are logical implicatitions   ',
+ 'and it does not hurt to explicitly command any desired result.  In  ',
+ 'a few instances a value may be recomputed by MODCOPY if the value   ',
+ 'specified is determined to be invalid.  In other cases if invalid   ',
+ 'values are specified a MODCOPY or PL/I error message may be given.  ',
+ '                                                                    ',
+ 'DDNAMES:  IN, OUT, SYSIN, SYSPRINT                                  ',
+ 'If SYSIN is undefined default attributes are assumed for the output.',
+ '                                                                    ',
+ '                                                                    ',
+ 'Control Loop Commands                                               ',
+ '=====================                                               ',
+ '                                                                    ',
+ 'BACKSCAN                                                            ',
+ '    Removes trailing blanks from each record when converting from   ',
+ '    fixed to variable record format.                                ',
+ '                                                                    ',
+ 'BLKSIZE number                                                      ',
+ '    Specify output data set block size.                             ',
+ '                                                                    ',
+ 'CANCEL                                                              ',
+ '    No copy is performed.                                           ',
+ '                                                                    ',
+ 'END                                                                 ',
+ '    End control loop and begin copy.                                ',
+ '                                                                    ',
+ 'FINISH number                                                       ',
+ '    Specify the last relative record to copy from the input data    ',
+ '    set.                                                            ',
+ '                                                                    ',
+ 'HELP                                                                ',
+ '    Displays this text.                                             ',
+ '                                                                    ',
+ 'LRECL number                                                        ',
+ '    Specify the output data set logical record length.              ',
+ '                                                                    ',
+ 'NUMBERED                                                            ',
+ '    Changes the position of line numbers when converting from       ',
+ '    variable to fixed or fixed to variable record formats.  This    ',
+ '    movement occurs before renumbering or unnumbering if those      ',
+ '    options are selected.                                           ',
+ '                                                                    ',
+ 'PAD                                                                 ',
+ '    Add blanks to end of input records if necessary to achieve      ',
+ '    output data set logical record length.                          ',
+ '                                                                    ',
+ 'RECFM letters                                                       ',
+ '    Specify output data set record format.                          ',
+ '                                                                    ',
+ 'RENUM                                                               ',
+ '    Renumber fixed or variable record format output.  Fixed will    ',
+ '    have line numbers in the last eight columns.  Variable will have',
+ '    line numbers in the first eight columns.  Any data in those     ',
+ '    columns will be lost.                                           ',
+ '                                                                    ',
+ 'START number                                                        ',
+ '    Specify first relative record to copy from input data set.      ',
+ '                                                                    ',
+ 'TRIM col1 col2                                                      ',
+ '    Use the input record from col1 to col2 columns to copy.         ',
+ '                                                                    ',
+ 'TRUNCATE                                                            ',
+ '    Truncates end of input record to the output logical record      ',
+ '    length.                                                         ',
+ '                                                                    ',
+ 'UNNUM                                                               ',
+ '    Unnumber fixed or variable record format output.  Fixed will    ',
+ '    have blanks in the last eight columns.  Variable will have      ',
+ '    blanks in the first eight columns.  Any data or numbers in those',
+ '    columns will be lost.                                           ',
+ '                                                                    ',
+ 'UNWRAP                                                              ',
+ '    See wrap.  Used for changing a data set back to original        ',
+ '    attributes.                                                     ',
+ '                                                                    ',
+ 'WRAP                                                                ',
+ '    Wrap the input records to the output logical record length.     ',
+ '    If the output logical record length is larger than the input    ',
+ '    logical record length the output will contain more than a       ',
+ '    single record.  If shorter it will contain less than a single   ',
+ '    record.                                                         ',
+ ' ');
+
+ DO I = 1 TO HBOUND(HELP_TEXT, 1);
+     PUT SKIP EDIT(HELP_TEXT(I)) (A);
+     END;
+
+ END HELP;
+ END MODCOPY;
+

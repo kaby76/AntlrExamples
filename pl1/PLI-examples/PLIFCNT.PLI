@@ -1,0 +1,782 @@
+*PROCESS NM;
+ PLIFCNT:  PROCEDURE(KEYWORD, ABREVIATION, CHOICE, SPACING, PLIFID,
+     OPTIONS, SYSIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PLIFCNT V2.0  BY CLYDE THOMAS ZUBER');
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS A SYSIN CONTROL LOOP FOR THE PLIFORM PROGRAM    */
+ /* SET.  THIS IS THE DEFAULT PROCESSING BEFORE THE SOURCE PROGRAM IS */
+ /* PROCESSED BY PLIFEXC.  THE PURPOSE OF THIS PROCEDURE IS TO ALLOW  */
+ /* THE USER TO ALTER THE PROCESSING OPTIONS AND CONTROL TABLES WHICH */
+ /* PLIFORM WILL USE TO FORMAT THE PL/I PROGRAM SOURCE.  IF SYSIN IS  */
+ /* UNDEFINED DEFAULT OPTIONS ARE USED AND PROCESSING CONTINUES.      */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  KEYWORD(*)      CHAR(*) VARYING;
+ DECLARE  ABREVIATION(*)  CHAR(*) VARYING;
+ DECLARE  CHOICE(*)       BIT(*);
+
+ DECLARE
+     1  SPACING(*),
+        2  MARGIN,
+           3  NO_SPACE          BIT(*),
+           3  SPACE_ONCE        BIT(*),
+           3  SPACE_TWICE       BIT(*),
+           3  INDENT_CONSTRUCT  BIT(*),
+        2  LINE,
+           3  NEXT_LINE         BIT(*),
+           3  DOUBLE_SPACE      BIT(*),
+           3  TRIPLE_SPACE      BIT(*),
+           3  EJECT             BIT(*);
+
+ DECLARE  PLIFID  CHAR(*) VARYING;
+
+ DECLARE
+     1  OPTIONS,
+        2  SEQ_INCR      FIXED BINARY(31),
+        2  FLAGS,
+           3  VARYOUT    BIT(*),
+           3  LISTOUT    BIT(*),
+           3  LISTONLY   BIT(*),
+           3  COUNT      BIT(*),
+           3  ALTINDENT  BIT(*),
+           3  UNUSED6    BIT(*),
+           3  UNUSED7    BIT(*),
+           3  UNUSED8    BIT(*);
+
+ DECLARE  SYSIN   FILE VARIABLE;
+1/* CONTROL CONSTANTS */
+ DECLARE  C_ABR        CHAR(3) STATIC INIT('ABR');
+ DECLARE  C_ALTINDENT  CHAR(9) STATIC INIT('ALTINDENT');
+ DECLARE  C_CANCEL     CHAR(6) STATIC INIT('CANCEL');
+ DECLARE  C_COMMANDS   CHAR(8) STATIC INIT('COMMANDS');
+ DECLARE  C_COMPRESS   CHAR(8) STATIC INIT('COMPRESS');
+ DECLARE  C_CONTROL    CHAR(7) STATIC INIT('CONTROL');
+ DECLARE  C_COUNT      CHAR(5) STATIC INIT('COUNT');
+ DECLARE  C_DEBUG      CHAR(5) STATIC INIT('DEBUG');
+ DECLARE  C_DOUBLESP   CHAR(8) STATIC INIT('DOUBLESP');
+ DECLARE  C_END        CHAR(3) STATIC INIT('END');
+ DECLARE  C_EJECT      CHAR(5) STATIC INIT('EJECT');
+ DECLARE  C_EXPLAIN    CHAR(7) STATIC INIT('EXPLAIN');
+ DECLARE  C_FUNCTION   CHAR(8) STATIC INIT('FUNCTION');
+ DECLARE  C_HELP       CHAR(4) STATIC INIT('HELP');
+ DECLARE  C_HELPS      CHAR(5) STATIC INIT('HELPS');
+ DECLARE  C_INDENTOR   CHAR(8) STATIC INIT('INDENTOR');
+ DECLARE  C_JCL        CHAR(3) STATIC INIT('JCL');
+ DECLARE  C_KEEP       CHAR(4) STATIC INIT('KEEP');
+ DECLARE  C_KEY        CHAR(3) STATIC INIT('KEY');
+ DECLARE  C_KEYWORDS   CHAR(8) STATIC INIT('KEYWORDS');
+ DECLARE  C_LIST       CHAR(4) STATIC INIT('LIST');
+ DECLARE  C_LISTOUT    CHAR(7) STATIC INIT('LISTOUT');
+ DECLARE  C_LISTONLY   CHAR(8) STATIC INIT('LISTONLY');
+ DECLARE  C_NEXTLINE   CHAR(8) STATIC INIT('NEXTLINE');
+ DECLARE  C_NOSUB      CHAR(5) STATIC INIT('NOSUB');
+ DECLARE  C_PARMS      CHAR(5) STATIC INIT('PARMS');
+ DECLARE  C_SEQ        CHAR(3) STATIC INIT('SEQ');
+ DECLARE  C_SPACE0     CHAR(6) STATIC INIT('SPACE0');
+ DECLARE  C_SPACE1     CHAR(6) STATIC INIT('SPACE1');
+ DECLARE  C_SPACE2     CHAR(6) STATIC INIT('SPACE2');
+ DECLARE  C_STATE      CHAR(5) STATIC INIT('STATE');
+ DECLARE  C_SYNTAX     CHAR(6) STATIC INIT('SYNTAX');
+ DECLARE  C_TABLES     CHAR(6) STATIC INIT('TABLES');
+ DECLARE  C_TRIPLESP   CHAR(8) STATIC INIT('TRIPLESP');
+ DECLARE  C_TSO        CHAR(3) STATIC INIT('TSO');
+ DECLARE  C_VARYOUT    CHAR(7) STATIC INIT('VARYOUT');
+1DECLARE  (HBOUND, INDEX, LENGTH, ONSOURCE, SUBSTR, UNSPEC) BUILTIN;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ DECLARE  ANSW         CHAR(30);
+ DECLARE  I            FIXED BINARY;
+ DECLARE  NNN          FIXED BINARY(31) INIT(0);
+ DECLARE  MORE_SYSIN   BIT(1) STATIC INIT('1'B);
+ DECLARE  NO           BIT(1) STATIC INIT('0'B);
+ DECLARE  POS          FIXED BINARY;
+ DECLARE  S_COMPRESS   BIT(1) STATIC INIT('0'B);
+ DECLARE  S_NOSUB      BIT(1) STATIC INIT('0'B);
+ DECLARE  YES          BIT(1) STATIC INIT('1'B);
+
+ DECLARE  ABREV_NOSUB  BIT(3) STATIC INIT('010'B);
+ DECLARE  ABREV___SUB  BIT(3) STATIC INIT('011'B);
+ DECLARE  KEYWD_NOSUB  BIT(3) STATIC INIT('100'B);
+ DECLARE  KEYWORD_SUB  BIT(3) STATIC INIT('101'B);
+ DECLARE  LEAVE_NOSUB  BIT(3) STATIC INIT('110'B);
+ DECLARE  LEAVE___SUB  BIT(3) STATIC INIT('111'B);
+1PUT SKIP EDIT(PLIFID) (A);
+ PUT SKIP EDIT('   ENTER ''HELP'' FOR INFORMATION') (A); PUT SKIP(2);
+
+ CALL GETINPT;
+
+ CONTROL_LOOP:  /* ALLOW USER TO SPECIFY OPTIONS AS DESIRED */
+ DO WHILE(MORE_SYSIN);
+     SELECT(ANSW);
+         WHEN(C_ABR) CALL SET_CHOICE(ABREV___SUB);
+         WHEN(C_ALTINDENT) ALTINDENT = YES;
+         WHEN(C_CANCEL) EXIT;
+         WHEN(C_COMMANDS) CALL TEXT(COMMANDS_TEXT);
+         WHEN(C_COMPRESS) CALL COMPRESS;
+         WHEN(C_CONTROL, C_SYNTAX) CALL TEXT(CONTROL_TEXT);
+         WHEN(C_COUNT) COUNT = YES;
+         WHEN(C_DEBUG) CALL NOSUB(YES);
+         WHEN(C_DOUBLESP) CALL SET_SPACER(C_DOUBLESP);
+         WHEN(C_END) RETURN;
+         WHEN(C_EJECT) CALL SET_SPACER(C_EJECT);
+         WHEN(C_EXPLAIN, C_PARMS) CALL TEXT(EXPLAIN_TEXT);
+         WHEN(C_FUNCTION) CALL TEXT(FUNCTION_TEXT);
+         WHEN(C_HELP) CALL TEXT(HELP_TEXT);
+         WHEN(C_HELPS) DO;
+             CALL TEXT(HELP_TEXT);
+             CALL TEXT(FUNCTION_TEXT);
+             CALL TEXT(CONTROL_TEXT);
+             CALL TEXT(EXPLAIN_TEXT);
+             CALL TEXT(TABLES_TEXT);
+             CALL TEXT(TSO_TEXT);
+             CALL TEXT(JCL_TEXT);
+             END;
+1        WHEN(C_INDENTOR) CALL SET_SPACER(C_INDENTOR);
+         WHEN(C_JCL) CALL TEXT(JCL_TEXT);
+         WHEN(C_KEEP) CALL SET_CHOICE(LEAVE___SUB);
+         WHEN(C_KEY) CALL SET_CHOICE(KEYWORD_SUB);
+         WHEN(C_LIST) CALL LISTTAB;
+         WHEN(C_LISTOUT) LISTOUT = YES;
+         WHEN(C_LISTONLY) LISTONLY = YES;
+         WHEN(C_NEXTLINE) CALL SET_SPACER(C_NEXTLINE);
+         WHEN(C_NOSUB) CALL NOSUB(NO);
+         WHEN(C_SEQ) DO;
+             GET LIST(SEQ_INCR);
+             PUT EDIT(SEQ_INCR, ' ') (F(7), A);
+             END;
+         WHEN(C_SPACE0) CALL SET_SPACER(C_SPACE0);
+         WHEN(C_SPACE1) CALL SET_SPACER(C_SPACE1);
+         WHEN(C_SPACE2) CALL SET_SPACER(C_SPACE2);
+         WHEN(C_STATE) CALL STATE;
+         WHEN(C_TABLES) CALL TEXT(TABLES_TEXT);
+         WHEN(C_TRIPLESP) CALL SET_SPACER(C_TRIPLESP);
+         WHEN(C_TSO) CALL TEXT(TSO_TEXT);
+         WHEN(C_VARYOUT) VARYOUT = YES;
+         OTHERWISE PUT SKIP(2) EDIT('COMMAND UNRECOGNIZED, REENTER')(A);
+         END;
+     CALL GETINPT;
+     END CONTROL_LOOP;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW.                                      */
+ /*********************************************************************/
+1GETINPT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE OBTAINS INPUT FROM SYSIN FILE.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ON CONVERSION BEGIN; /* RECOVER AND OBTAIN INPUT */
+     ANSW = ONSOURCE;
+     UNSPEC(ANSW) = UNSPEC(ANSW) | (30) '01000000'B;
+     ONSOURCE = (16) '0';
+     END;
+
+ ON UNDEFINEDFILE(SYSIN) BEGIN;
+     PUT SKIP EDIT('NO SYSIN CONTROL FILE - DEFAULT OPTIONS') (A);
+     MORE_SYSIN = NO;
+     GOTO END_GETINPT;
+     END;
+
+ ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ ANSW = ' ';
+ GET LIST(NNN);
+ PUT EDIT(SUBSTR(ANSW, 1, INDEX(ANSW, ' '))) (A);
+
+ END_GETINPT:
+ END GETINPT;
+1COMPRESS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CHANGE TABLE TO CAUSE ALL BLANKS TO BE LEFT OUT OF OUTPUT.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DO I = 1 BY 1 WHILE(KEYWORD(I) < 'A');
+     IF LENGTH(KEYWORD(I)) > 1
+         THEN IF SUBSTR(KEYWORD(I), 2, 1) < 'A'
+                  THEN NO_SPACE(I) = YES;
+                  ELSE;
+         ELSE NO_SPACE(I) = YES;
+     END;
+
+ SPACE_ONCE = YES;
+ SPACE_TWICE = NO;
+ INDENT_CONSTRUCT = NO;
+
+ NEXT_LINE = NO;
+ DOUBLE_SPACE = NO;
+ TRIPLE_SPACE = NO;
+ EJECT = NO;
+
+ S_COMPRESS = YES;
+
+ END COMPRESS;
+1LISTTAB:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE LISTS OUT THE CONTROL TABLE ELEMENTS FOR A         */
+ /* PARTICULAR KEYWORD.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CALL GETINPT;
+ IF SUBSTR(ANSW, 1, 1) = '@'
+     THEN ANSW = SUBSTR(ANSW, 2);
+
+ IF TABSEARCH(ANSW)
+     THEN DO;
+          CALL LISTER(POS);
+          RETURN;
+          END;
+
+ SELECT(ANSW);
+     WHEN(C_KEYWORDS) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         CALL LISTER(POS);
+         END;
+     WHEN(C_SPACE0) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF NO_SPACE(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_SPACE1) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF SPACE_ONCE(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_SPACE2) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF SPACE_TWICE(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_INDENTOR) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF INDENT_CONSTRUCT(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_NEXTLINE) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF NEXT_LINE(POS)
+             THEN CALL LISTER(POS);
+         END;
+1    WHEN(C_DOUBLESP) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF DOUBLE_SPACE(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_TRIPLESP) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF TRIPLE_SPACE(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_EJECT) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF EJECT(POS)
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_KEY) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF CHOICE(POS) = KEYWORD_SUB
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_ABR) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF CHOICE(POS) = ABREV___SUB
+             THEN CALL LISTER(POS);
+         END;
+     WHEN(C_KEEP) DO POS = 1 TO HBOUND(KEYWORD, 1);
+         IF CHOICE(POS) = LEAVE___SUB
+             THEN CALL LISTER(POS);
+         END;
+     OTHERWISE DO;
+         PUT SKIP EDIT(SUBSTR(ANSW,1, INDEX(ANSW,' ')), 'NOT FOUND')(A);
+         RETURN;
+         END;
+     END;
+1LISTER:  PROCEDURE(I);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO LISTTAB AND IS USED TO LIST OUT     */
+ /* A POSITION IN THE TABLE.                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  I  FIXED BINARY;
+
+ PUT SKIP(2) EDIT(I, KEYWORD(I), ABREVIATION(I))
+     (F(4), COL(7), A(24), A(10));
+ SELECT(CHOICE(I));
+     WHEN(ABREV_NOSUB) PUT EDIT('ABREVIATION, NOALTER') (A);
+     WHEN(ABREV___SUB) PUT EDIT('ABREVIATION, ALTER') (A);
+     WHEN(KEYWD_NOSUB) PUT EDIT('KEYWORD,     NOALTER') (A);
+     WHEN(KEYWORD_SUB) PUT EDIT('KEYWORD,     ALTER') (A);
+     WHEN(LEAVE_NOSUB) PUT EDIT('LEAVE ALONE, NOALTER') (A);
+     WHEN(LEAVE___SUB) PUT EDIT('LEAVE ALONE, ALTER') (A);
+     END;
+ PUT SKIP EDIT('OPTIONS:') (X(6),A);
+ IF NO_SPACE(I)
+     THEN PUT EDIT(C_SPACE0) (X(2), A);
+ IF SPACE_ONCE(I)
+     THEN PUT EDIT(C_SPACE1) (X(2), A);
+ IF SPACE_TWICE(I)
+     THEN PUT EDIT(C_SPACE2) (X(2), A);
+ IF INDENT_CONSTRUCT(I)
+     THEN PUT EDIT(C_INDENTOR) (X(2), A);
+ IF NEXT_LINE(I)
+     THEN PUT EDIT(C_NEXTLINE) (X(2), A);
+ IF DOUBLE_SPACE(I)
+     THEN PUT EDIT(C_DOUBLESP) (X(2), A);
+ IF TRIPLE_SPACE(I)
+     THEN PUT EDIT(C_TRIPLESP) (X(2), A);
+ IF EJECT(I)
+     THEN PUT EDIT(C_EJECT) (X(2), A);
+
+ END LISTER;
+
+ END LISTTAB;
+1NOSUB:  PROCEDURE(DEBUG);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE RESETS THE ENTIRE CHOICE TABLE TO EITHER LEAVE-SUB */
+ /* OR LEAVE-NOSUB.  LEAVE-SUB IS RESERVED FOR DEBUGGING PURPOSES AS  */
+ /* IT ENABLES THE ENTIRE TABLE TO BE SET TO ANY VALUE WHETHER        */
+ /* MEANINGFUL OR NOT.                                                */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  DEBUG  BIT(*);
+
+ IF DEBUG
+     THEN CHOICE = LEAVE___SUB;
+     ELSE CHOICE = LEAVE_NOSUB;
+
+ S_NOSUB = YES;
+
+ END NOSUB;
+1SET_CHOICE:  PROCEDURE(SEL);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SETS THE CHOICE TABLE TO A USER SPECIFIED VALUE.   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SEL  BIT(*);
+
+ CALL GETINPT;
+ IF SUBSTR(ANSW, 1, 1) = '@'
+     THEN ANSW = SUBSTR(ANSW, 2);
+
+ IF TABSEARCH(ANSW)
+     THEN IF SUBSTR(CHOICE(POS), 3, 1)
+              THEN CHOICE(POS) = SEL;
+              ELSE PUT SKIP EDIT(KEYWORD(POS), ' CANNOT BE CHANGED')(A);
+     ELSE PUT SKIP EDIT(SUBSTR(ANSW,1,INDEX(ANSW,' ')), 'NOT FOUND')(A);
+
+ END SET_CHOICE;
+1SET_SPACER:  PROCEDURE(OPT);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SETS THE SPACING TABLE ACCORDING TO USER INPUT.    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  OPT  CHAR(*);
+ DECLARE  SET  BIT(1) INIT('1'B);
+
+ CALL GETINPT;
+ IF SUBSTR(ANSW, 1, 1) = '@'
+     THEN ANSW = SUBSTR(ANSW, 2);
+
+ IF SUBSTR(ANSW, 1, 1) = 'ª'
+     THEN DO;
+          SET = NO;
+          ANSW = SUBSTR(ANSW, 2);
+          IF SUBSTR(ANSW, 1, 1) = '@'
+              THEN ANSW = SUBSTR(ANSW, 2);
+          END;
+
+ IF TABSEARCH(ANSW)
+     THEN SELECT(OPT);
+              WHEN(C_SPACE0) NO_SPACE(POS) = SET;
+              WHEN(C_SPACE1) SPACE_ONCE(POS) = SET;
+              WHEN(C_SPACE2) SPACE_TWICE(POS) = SET;
+              WHEN(C_INDENTOR) INDENT_CONSTRUCT(POS) = SET;
+              WHEN(C_NEXTLINE) NEXT_LINE(POS) = SET;
+              WHEN(C_DOUBLESP) DOUBLE_SPACE(POS) = SET;
+              WHEN(C_TRIPLESP) TRIPLE_SPACE(POS) = SET;
+              WHEN(C_EJECT) EJECT(POS) = SET;
+              END;
+     ELSE PUT SKIP EDIT(SUBSTR(ANSW,1,INDEX(ANSW,' ')), 'NOT FOUND')(A);
+
+ END SET_SPACER;
+1STATE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE LISTS THE OPTIONS IN EFFECT AT THE TIME THE STATE  */
+ /* COMMAND IS ISSUED.                                                */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ PUT SKIP EDIT('OPTIONS IN EFFECT: ') (A);
+
+ IF ALTINDENT
+     THEN PUT EDIT(C_ALTINDENT) (X(1), A);
+
+ IF S_COMPRESS
+     THEN PUT EDIT(C_COMPRESS) (X(1), A);
+
+ IF COUNT
+     THEN PUT EDIT(C_COUNT) (X(1), A);
+
+ SELECT;
+     WHEN(LISTONLY) PUT EDIT(C_LISTONLY) (X(1), A);
+     WHEN(LISTOUT) PUT EDIT(C_LISTOUT) (X(1), A);
+     OTHERWISE;
+     END;
+
+ IF S_NOSUB
+     THEN PUT EDIT(C_NOSUB) (X(1), A);
+
+ IF VARYOUT
+     THEN PUT EDIT(C_VARYOUT) (X(1), A);
+
+ PUT SKIP EDIT('SEQUENCE INCREMENT=', SEQ_INCR) (A, F(7));
+
+ END STATE;
+1TABSEARCH:  PROCEDURE(OBJECT) RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SEARCHES THE KEYWORD AND ABREVIATION TABLES FOR    */
+ /* THE DESIRED OBJECT.  POS IS A GLOBAL IDENTIFIER FOR THIS PROCESS. */
+ /* THE RETURNED VALUE IS FOUND (WHETHER YES OR NO).                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  OBJECT  CHAR(*);
+ DECLARE  FOUND   BIT(1) INIT('0'B);
+ DECLARE  HIGH    FIXED BINARY INIT(HBOUND(KEYWORD, 1));
+ DECLARE  LOW     FIXED BINARY INIT(1);
+
+
+ BINARY_SEARCH:
+ DO WHILE(HIGH >= LOW & ªFOUND);
+     POS = (LOW + HIGH) / 2;
+     IF OBJECT = KEYWORD(POS)
+         THEN FOUND = YES;
+         ELSE IF OBJECT > KEYWORD(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+
+ IF ªFOUND
+     THEN DO;
+          IF POS + 10 > HBOUND(KEYWORD, 1)
+              THEN I = HBOUND(KEYWORD, 1);
+              ELSE I = POS + 10;
+          IF POS - 10 < 1
+              THEN POS = 1;
+              ELSE POS = POS - 10;
+          SEQUENTIAL_SEARCH:
+          DO POS = POS TO I WHILE(ªFOUND);
+              IF OBJECT = ABREVIATION(POS)
+                  THEN FOUND = YES;
+              END SEQUENTIAL_SEARCH;
+          POS = POS - 1;
+          END;
+
+ RETURN(FOUND);
+
+ END TABSEARCH;
+1TEXT:  PROCEDURE(MSG);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE LISTS ANY TEXT INFORMATION FOR THE USER.           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  MSG(*)   CHAR(*);
+
+ DO I = 1 TO HBOUND(MSG, 1);
+     PUT SKIP EDIT(MSG(I)) (A);
+     END;
+
+ END TEXT;
+1DECLARE  COMMANDS_TEXT(35)  CHAR(68) STATIC INIT(
+ '    Command:         Help Cmd:         Parm:                        ',
+ '    ==========       ==========        =====                        ',
+ '    ABR              TABLES                                         ',
+ '    ALTINDENT        EXPLAIN           AI                           ',
+ '    CANCEL           CONTROL                                        ',
+ '    COMMANDS         HELP                                           ',
+ '    COMPRESS         EXPLAIN           CS                           ',
+ '    CONTROL          HELP                                           ',
+ '    COUNT            EXPLAIN           CO                           ',
+ '    DOUBLESP         TABLES                                         ',
+ '    END              CONTROL                                        ',
+ '    EJECT            TABLES                                         ',
+ '    EXPLAIN          HELP                                           ',
+ '    FUNCTION         HELP                                           ',
+ '    HELP             HELP                                           ',
+ '    HELPS            HELP                                           ',
+ '    INDENTOR         TABLES                                         ',
+ '    JCL              CONTROL                                        ',
+ '    KEEP             TABLES                                         ',
+ '    KEY              TABLES                                         ',
+ '    LIST             CONTROL                                        ',
+ '    LISTOUT          EXPLAIN           LI                           ',
+ '    LISTONLY         EXPLAIN           LO                           ',
+ '    NEXTLINE         TABLES                                         ',
+ '    NOSUB            EXPLAIN           NS                           ',
+ '    SEQ              EXPLAIN                                        ',
+ '    SPACE0           TABLES                                         ',
+ '    SPACE1           TABLES                                         ',
+ '    SPACE2           TABLES                                         ',
+ '    STATE            CONTROL                                        ',
+ '    TABLES           HELP                                           ',
+ '    TRIPLESP         TABLES                                         ',
+ '    TSO              CONTROL                                        ',
+ '    VARYOUT          EXPLAIN           VO                           ',
+ ' ');
+1DECLARE  CONTROL_TEXT(31)  CHAR(68) STATIC INIT(
+ 'Control Commands                                                    ',
+ '================                                                    ',
+ 'CANCEL                                                              ',
+ '    Cancel execution.  The IN and OUT files are never opened for    ',
+ '    processing.                                                     ',
+ '                                                                    ',
+ 'END                                                                 ',
+ '    End sysin control loop and begin processing.                    ',
+ '                                                                    ',
+ 'JCL                                                                 ',
+ '    Display information on how to run the formatter in the          ',
+ '    background using JCL.                                           ',
+ '                                                                    ',
+ 'LIST keyword                                                        ',
+ '    List the control table information for a PL/I keyword in order  ',
+ '    to determine what action will be performed when the keyword is  ',
+ '    encountered in the source text.  If a keyword is non-alphabetic ',
+ '    it should be entered with an @ preceding it (ex:  @2).  Note    ',
+ '    that structural levels and operators are considered keywords for',
+ '    processing purposes.  If LIST KEYWORDS is entered all keywords  ',
+ '    and their values will be listed.  The commands listed under     ',
+ '    the TABLES help may also be substituted for keyword and will    ',
+ '    limit the list to the keywords with the value in the table.     ',
+ '                                                                    ',
+ 'STATE                                                               ',
+ '    List the options in effect at the time the command is entered.  ',
+ '                                                                    ',
+ 'TSO                                                                 ',
+ '    Display information on how to run the formatter in the          ',
+ '    forground under TSO.                                            ',
+ ' ');
+1DECLARE  EXPLAIN_TEXT(36)  CHAR(68) STATIC INIT(
+ 'Processing Options                                                  ',
+ '==================                                                  ',
+ 'ALTINDENT                                                           ',
+ '    Select an alternate indentation method where the THEN and ELSE  ',
+ '    keywords are not indented under the IF but merely start on new  ',
+ '    lines.  (Other formats may be obtained by using the INDENTOR    ',
+ '    command.)                                                       ',
+ '                                                                    ',
+ 'COMPRESS                                                            ',
+ '    Output the source program in the least amount of space removing ',
+ '    all blanks.  Normal execution may be used to restore the source ',
+ '    to an acceptable form.                                          ',
+ '                                                                    ',
+ 'COUNT                                                               ',
+ '    Display a record count of IN and OUT file processing.           ',
+ '                                                                    ',
+ 'LISTOUT                                                             ',
+ '    In addition to normal processing print the contents of the OUT  ',
+ '    file to SYSPRINT.                                               ',
+ '                                                                    ',
+ 'LISTONLY                                                            ',
+ '    Instead of normal processing, the result of formatting should   ',
+ '    be only printed to the SYSPRINT file.                           ',
+ '                                                                    ',
+ 'NOSUB                                                               ',
+ '    Set the keyword control tables to prohibit the substitution of  ',
+ '    keywords and abreviations.                                      ',
+ '                                                                    ',
+ 'SEQ number                                                          ',
+ '    Set the sequence number increment to a value other than 10.     ',
+ '                                                                    ',
+ 'VARYOUT                                                             ',
+ '    The OUT file will be set to RECFM=VB,LRECL=104 instead of the   ',
+ '    default RECFM=FB,LRECL=80.  In either case BLKSIZE is determined',
+ '    by the user by dataset allocation.                              ',
+ ' ');
+1DECLARE  FUNCTION_TEXT(19)  CHAR(68) STATIC INIT(
+ '    Pliform is a source formatter for PL/I programs.  Indentation   ',
+ 'and line spacing are performed to make the source more readable and ',
+ 'understandable.  The input source program may be either in fixed    ',
+ '80 byte records or variable 100 byte records (LRECL=104).  The      ',
+ 'output may be either fixed or variable also with fixed being the    ',
+ 'default.  There is no connection between the input and output format',
+ 'as the source is entirely broken down into its smallest elements and',
+ 'reassembled according to the processing options selected by the     ',
+ 'user.  Pliform contains control tables which determine any special  ',
+ 'processing considerations for PL/I keywords and operators.  For this',
+ 'reason identifiers which are the same as keywords may not be handled',
+ 'in the appropriate manner.                                          ',
+ '    When IF statements are used in a CASE (SELECT) construct format,',
+ 'such as in macro procedures where there is no SELECT, and it is     ',
+ 'desirable to have the ELSE IF aligned with the first IF the input   ',
+ 'may be modified to cause this temporarily.  A "(" should be placed  ',
+ 'in the control character column (Col 1 FB, Col 9 VB) preceding the  ',
+ 'CASE construct and a ")" following it.                              ',
+ ' ');
+1DECLARE  HELP_TEXT(42)  CHAR(68) STATIC INIT(
+ 'PLIFORM  by Clyde Thomas Zuber                                      ',
+ '                                                                    ',
+ '    A number of commands may be entered through the SYSIN control   ',
+ 'file in the same manner in which HELP was entered.  A few commands  ',
+ 'take an object which immediately follows the command.  An example of',
+ 'this is the SEQ command which requires a number to be entered after ',
+ 'it:   SEQ  100   This would set the line sequence increment to 100. ',
+ 'In the helps an object is represented with lower case letters:      ',
+ 'SEQ number   Lower case explainations require the user to make the  ',
+ 'appropriate substitution.                                           ',
+ '                                                                    ',
+ '    In order to simplify explaining the available commands the      ',
+ 'help facility has been split into a number of different commands    ',
+ 'which each provide an aspect of the available information.          ',
+ '                                                                    ',
+ 'Help Facility Commands                                              ',
+ '======================                                              ',
+ 'COMMANDS                                                            ',
+ '    Displays a list of available commands and a cross reference for ',
+ '    for the help facility command to use for more information.      ',
+ '                                                                    ',
+ 'CONTROL                                                             ',
+ '    Help for commands which are informational or for manipulating   ',
+ '    the control loop.  These commands are not processing options.   ',
+ '                                                                    ',
+ 'EXPLAIN                                                             ',
+ '    Explains commands which will affect the processing options of   ',
+ '    the input and thus change the output received.                  ',
+ '                                                                    ',
+ 'FUNCTION                                                            ',
+ '    Informational analysis of the function of PLIFORM.              ',
+ '                                                                    ',
+ 'HELP                                                                ',
+ '    Displays this text.                                             ',
+ '                                                                    ',
+ 'HELPS                                                               ',
+ '    Issues the help facility commands in progressive order.         ',
+ '                                                                    ',
+ 'TABLES                                                              ',
+ '    Describes commands which allow user to alter control tables by  ',
+ '    keyword.                                                        ',
+ ' ');
+1DECLARE  JCL_TEXT(18)  CHAR(68) STATIC INIT(
+ 'Sample JCL for batch execution:                                     ',
+ '                                                                    ',
+ '      //PLIFORM  EXEC PGM=PLIFORM                                   ',
+ '      //STEPLIB   DD DSN=library which contains pliform,DISP=SHR    ',
+ '      //SYSPRINT  DD SYSOUT=*                                       ',
+ '      //IN        DD DSN=describe input data set                    ',
+ '      //OUT       DD DSN=describe output data set                   ',
+ '      //SYSIN     DD *                                              ',
+ '        commands may be entered here if desired                     ',
+ '      /*                                                            ',
+ '      //                                                            ',
+ '                                                                    ',
+ 'Instead of using sysin as above most of the commands listed under   ',
+ 'the EXPLAIN help have parameter representation which may be used.   ',
+ '      //PLIFORM  EXEC PGM=PLIFORM,PARM=''/parameters''              ',
+ 'The "/" should precede the parameters to avoid a warning message.   ',
+ ' ');
+1DECLARE  TABLES_TEXT(56)  CHAR(68) STATIC INIT(
+ '    Under most circumstances it should not be necessary to change   ',
+ 'table values.  The following commands should allow a high degree of ',
+ 'customization.                                                      ',
+ '                                                                    ',
+ 'IMPORTANT:                                                          ',
+ '1)  In the following commands where "keyword" must have a value     ',
+ 'substituted, the keyword or its abreviation is valid.               ',
+ '2)  Those command which have "*keyword" set the value off if the    ',
+ 'keyword is preceded by a "ª" (ex:  ªPROCEDURE), otherwise the       ',
+ 'command sets the value on.                                          ',
+ '3)  For an explanation of "@" see the LIST command in the CONTROL   ',
+ 'help.  It may be need for some circumstances in the following.      ',
+ '                                                                    ',
+ 'Table Commands                                                      ',
+ '==============                                                      ',
+ 'ABR keyword                                                         ',
+ '    Whenever the keyword appears in the source program its          ',
+ '    abreviation will be substituted for it.                         ',
+ '                                                                    ',
+ 'DOUBLESP *keyword                                                   ',
+ '    Before the next logical statement after the one in which this   ',
+ '    keyword appears there will be a blank line.                     ',
+ '                                                                    ',
+ 'EJECT *keyword                                                      ',
+ '    On the statement in which this keyword appears the indentation  ',
+ '    will be returned to the left margin and a page eject will be    ',
+ '    made.                                                           ',
+ '                                                                    ',
+ 'INDENTOR *keyword                                                   ',
+ '    This keyword indicates special processing for the indentation   ',
+ '    of this keyword.  Not for general use.                          ',
+ '                                                                    ',
+ 'KEEP keyword                                                        ',
+ '    Prevents any substitution between keyword and its abreviation.  ',
+ '                                                                    ',
+ 'KEY keyword                                                         ',
+ '    Whenever the abreviation appears in the source program its      ',
+ '    full keyword will be substituted for it.                        ',
+ '                                                                    ',
+ 'NEXTLINE *keyword                                                   ',
+ '    Indicates when this keyword is encountered that this is the end ',
+ '    of a logical statement (see DOUBLESP and TRIPLESP also).        ',
+ '                                                                    ',
+ 'SPACE0 *keyword                                                     ',
+ '    No space will precede the keyword.                              ',
+ '                                                                    ',
+ 'SPACE1 *keyword                                                     ',
+ '    One space will precede the keyword.                             ',
+ '                                                                    ',
+ 'SPACE2 *keyword                                                     ',
+ '    two spaces will precede the keyword.                            ',
+ '                                                                    ',
+ 'TRIPLESP *keyword                                                   ',
+ '    Before the next logical statement after the one in which this   ',
+ '    keyword appears there will be two blank lines.                  ',
+ ' ');
+1DECLARE  TSO_TEXT(17)  CHAR(68) STATIC INIT(
+ 'In TSO forground enter following commands or equivalent:            ',
+ '                                                                    ',
+ '      ALLOC DA(*) F(SYSIN)                                          ',
+ '      ALLOC DA(*) F(SYSPRINT)                                       ',
+ '      ALLOC DA(input data set name) F(IN) SHR                       ',
+ '      ATTR PLIF BLKSIZE(6160)                                       ',
+ '      ALLOC DA(REFORM.PLI) F(OUT) SP(5,5) TRA US(PLIF) REL          ',
+ '      CALL library which contains pliform(PLIFORM)                  ',
+ '                                                                    ',
+ 'Instead of using the sysin control loop to enter commands a         ',
+ 'parameter may be passed which will use full screen interaction for  ',
+ 'option selection.  Another parameter bypasses all control.          ',
+ '      CALL library which contains pliform(PLIFORM) ''/SCREEN''      ',
+ '      CALL library which contains pliform(PLIFORM) ''/DEFAULT''     ',
+ 'The "/" should precede the parameter to avoid a warning message.    ',
+ 'Each of these parameters is exclusive of all other parameters.      ',
+ ' ');
+
+ END PLIFCNT;
+

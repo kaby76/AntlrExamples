@@ -1,0 +1,826 @@
+*PROCESS NM;
+ WINDOW:  PROCEDURE(PARM) OPTIONS(MAIN, REENTRANT) REORDER;
+
+ DECLARE  PGMID   CHAR(34) VARYING STATIC EXTERNAL
+    INIT('WINDOW V2.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ISASIZE SHOULD BE SPECIFIED AS A PARAMETER DEPENDENT ON THE       */
+ /* PROGRAM'S SIZE PARM.  (SEE THE CLIST AT THE END OF THE LISTING).  */
+ /* THE SIZE PARM MUST OCCUR FIRST FOLLOWED BY ANY KEYWORD PARMS.     */
+ /* KEYWORD PARMS CONSIST OF ANY COMMANDS WHICH MAY BE USED ON THE    */
+ /* COMMAND INPUT LINE OF THE SCREEN.  THEIR PURPOSE IS TO SELECT     */
+ /* PROGRAM INITIALIZATION DEFAULTS.  ANY KEYWORD WHICH TAKES AN      */
+ /* OPERAND SHOULD INCLOSE THE OPERAND WITHIN PARENTHESES.            */
+ /* PARM EXAMPLE:  'ISA(64K)/16K,B(1C6000),STATIC,HEX'                */
+ /*                                                                   */
+ /* THIS PROGRAM PROVIDES A WINDOW TO A VIRTUAL ADDRESS' MAIN MEMORY  */
+ /* UNDER ISPF.  ISPF PROVIDES FULL SCREEN DISPLAY CAPABILITY. THE    */
+ /* EFFECT IS SOMEWHAT SIMILAR TO ISPF'S BROWSE CAPABILITY FOR DATA   */
+ /* SETS.  THE FIRST PANEL DISPLAYED UPON INVOKING THE PROGRAM        */
+ /* EXPLAINS THE FUNCTIONS AND COMMANDS OF THE PROGRAM.  SEE THE      */
+ /* INITIALIZATION AREA FOR THE IDENTIFIER "LINE" BELOW FOR THIS      */
+ /* INFORMATION.                                                      */
+ /*                                                                   */
+ /* PROGRAM STRUCTURE:                                                */
+ /* (WINDOW                                                           */
+ /*    /SCOPE (BASE_SCOPE) (DUAL_PANEL) (HEX_PANEL) (CHAR_PANEL)      */
+ /*       (EXEC_CMD (SCROLL_UP) (SCROLL_DOWN) (FIND_CHAR) (FIND_HEX)  */
+ /*          (PARSE_CMD (LIST_ADDR) ) ) \ )                           */
+ /*                                                                   */
+ /* () - INDICATES PROCEDURE BOUNDARIES                               */
+ /* /\ - INDICATES BEGIN BLOCK BOUNDARIES                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PARM  CHAR(100) VARYING;
+1/* COPYMEM MOVES MAIN MEMORY TO THE PROGRAM BUFFER AREA.
+    INTOHEX TRANSFORMS EBCDIC TO HEXIDECIMAL REPRESENTATION.
+    PRTABLE TRANSLATES UNPRINTABLE CHARACTERS TO ".".
+    ALL OF THESE ROUTINES ARE ASSEMBLER DESPITE THE DCL. */
+ DECLARE  (COPYMEM, INTOHEX, PRTABLE)  ENTRY;
+
+ /* ISPLINK IS REQUIRED FOR ACCESS TO ISPF */
+ DECLARE  ISPLINK  ENTRY OPTIONS(ASM, INTER, RETCODE);
+
+ /* STRPTR TAKES TERMINAL HEX INPUT AND PRODUCES PTR REPRESENTATION */
+ DECLARE  STRPTR   ENTRY(CHAR(8)) RETURNS(FIXED BINARY(31));
+
+ /* COMPILER IMPLEMENTED ROUTINES */
+ DECLARE  (ADDR, INDEX, LENGTH, PLIRETV,
+           STRING, SUBSTR, VERIFY)  BUILTIN;
+
+
+ /* ISPF PANEL IDENTIFIERS */
+ DECLARE  CMD    CHAR(45) INIT(' ');
+ DECLARE  L_CMD  FIXED BINARY(31) INIT(LENGTH(CMD));
+ DECLARE  N_CMD  CHAR(6) STATIC INIT('(CMD)');
+
+ DECLARE  SCROLL    CHAR(8) INIT('PAGE');
+ DECLARE  L_SCROLL  FIXED BINARY(31) INIT(LENGTH(SCROLL));
+ DECLARE  N_SCROLL  CHAR(8) STATIC INIT('(SCROLL)');
+
+ DECLARE  LINE1     CHAR(79) INIT(' ');
+ DECLARE  L_LINE    FIXED BINARY(31) INIT(LENGTH(LINE1));
+ DECLARE  N_LINE1   CHAR(8) STATIC INIT('(LINE1)');
+1DECLARE  /* WORK AREA FOR LINE1 */
+     1  TOP_LINE,
+        2  MODE     CHAR(10)  INIT('DYNAMIC'),
+        2  BEGADDR  CHAR(9)   INIT((8)'0'),
+        2  FILLER1  CHAR(2)   INIT('-'),
+        2  ENDADDR  CHAR(10)  INIT((8)'0'),
+        2  FILLER2  CHAR(5)   INIT((5)'-'),
+        2  MSGAREA  CHAR(34)  INIT(' ERROR MESSAGE FIELD'),
+        2  FILLER3  CHAR(1)   INIT(' '),
+        2  DISTYPE  CHAR(8)   INIT('DUMP');
+
+ DECLARE  LINE(3:24)    CHAR(79) INIT(
+ ' The 1st line has mode, address range, error, and display type      ',
+ ' fields.  The range limits most commands, the first number being the',
+ ' base or start of the window.  *- below indicates a default setting.',
+ '                                                                    ',
+ ' MODES:                                                             ',
+ '    *-DYNAMIC      - Refresh the display each time enter is pressed ',
+ '      STATIC (pf6) - Refresh the display only if window base changes',
+ ' DISPLAY TYPES:                                                     ',
+ '      CHAR  (pf10) - The total display is in EBCDIC                 ',
+ '      HEX   (pf11) - The total display is in hexidecimal format     ',
+ '      DUAL  (pf12) - 7 lines of CHAR and 14 lines of HEX            ',
+ '    *-DUMP  (pf4)  - Formatted dump display                         ',
+ ' OTHER COMMANDS:  The following may have an operand as illustrated. ',
+ '      F F01D       - Find the HEX string indicated (without quotes) ',
+ '      F ''A9YZ''     - Find the CHAR string indicated (with quotes) ',
+ '      RFIND (pf5)  - Repeat find command starting with next line    ',
+ '      L A93FB      - List the line which includes indicated address ',
+ '      B 0A92FC     - Set the window base to indicated address       ',
+ '      UP    (pf7)  - Move display UP or DOWN amount on command line ',
+ '      DOWN  (pf8)        or in SCROLL field:  *-PAGE, HALF, MAX, 12 ',
+ '                                                                    ',
+ '**COLS**    ]---]---]---]---]---]---]---]---]---]---]---]---]---]---]-
+ --]---');
+ DECLARE  N_LINE(3:24)  CHAR(8) STATIC INIT('(LINE3)', '(LINE4)',
+     '(LINE5)',  '(LINE6)',  '(LINE7)', '(LINE8)',  '(LINE9)',
+     '(LINE10)', '(LINE11)', '(LINE12)', '(LINE13)', '(LINE14)',
+     '(LINE15)', '(LINE16)', '(LINE17)', '(LINE18)', '(LINE19)',
+     '(LINE20)', '(LINE21)', '(LINE22)', '(LINE23)', '(LINE24)');
+1/* CHARACTER IDENTIFIERS (STATIC) */
+ DECLARE  B              CHAR(1)  STATIC INIT('B');
+ DECLARE  BASE           CHAR(4)  STATIC INIT('BASE');
+ DECLARE  BLANK          CHAR(1)  STATIC INIT(' ');
+ DECLARE  CHAR           CHAR(4)  STATIC INIT('CHAR');
+ DECLARE  D_QUOTE        CHAR(1)  STATIC INIT('"');
+ DECLARE  DISPLAY        CHAR(8)  STATIC INIT('DISPLAY');
+ DECLARE  DOWN           CHAR(4)  STATIC INIT('DOWN');
+ DECLARE  DYNAMIC        CHAR(7)  STATIC INIT('DYNAMIC');
+ DECLARE  F              CHAR(1)  STATIC INIT('F');
+ DECLARE  FIND           CHAR(4)  STATIC INIT('FIND');
+ DECLARE  FOUND_MSG      CHAR(8)  STATIC INIT(' FOUND: ');
+ DECLARE  HALF           CHAR(4)  STATIC INIT('HALF');
+ DECLARE  HEX            CHAR(3)  STATIC INIT('HEX');
+ DECLARE  HEX_CHARS      CHAR(16) STATIC INIT('0123456789ABCDEF');
+ DECLARE  LIST           CHAR(4)  STATIC INIT('LIST');
+ DECLARE  MAX            CHAR(3)  STATIC INIT('MAX');
+ DECLARE  MSG_RESET      CHAR(34) STATIC INIT((34)'-');
+ DECLARE  NO_COPY        CHAR(32) STATIC
+                         INIT('--- UNABLE TO OBTAIN ADDRESS ---');
+ DECLARE  NOT_FOUND_MSG  CHAR(12) STATIC INIT(' NOT FOUND: ');
+ DECLARE  NUM_CHARS      CHAR(10) STATIC INIT('0123456789');
+ DECLARE  PAGE           CHAR(4)  STATIC INIT('PAGE');
+ DECLARE  PARSE_ERR_MSG  CHAR(14) STATIC INIT(' PARSE ERROR: ');
+ DECLARE  QUOTE          CHAR(1)  STATIC INIT('''');
+ DECLARE  RFIND          CHAR(5)  STATIC INIT('RFIND');
+ DECLARE  SPACE2         CHAR(2)  STATIC INIT('  ');
+ DECLARE  SPACE4         CHAR(4)  STATIC INIT('    ');
+ DECLARE  DUAL           CHAR(4)  STATIC INIT('DUAL');
+ DECLARE  DUMP           CHAR(4)  STATIC INIT('DUMP');
+ DECLARE  STATIC         CHAR(6)  STATIC INIT('STATIC');
+ DECLARE  UP             CHAR(2)  STATIC INIT('UP');
+ DECLARE  VDEFINE        CHAR(8)  STATIC INIT('VDEFINE');
+ DECLARE  WINDOW         CHAR(8)  STATIC INIT('WINDOW');
+1/* ARITHMETIC IDENTIFIERS */
+ DECLARE  BASELOC  FIXED BINARY(31) INIT(0);
+ DECLARE  POS      FIXED BINARY(31);
+ DECLARE  L        FIXED BINARY;
+ DECLARE  S        FIXED BINARY INIT(0);
+ DECLARE  SIZE     FIXED BINARY;
+
+ /* BIT IDENTIFIERS */
+ DECLARE  HEXFIND  BIT(1) INIT('1'B);
+ DECLARE  NO       BIT(1) STATIC INIT('0'B);
+ DECLARE  YES      BIT(1) STATIC INIT('1'B);
+
+ /* CHARACTER IDENTIFIERS (AUTOMATIC) */
+ DECLARE  COMMAND        CHAR(6)  VARYING INIT('');
+ DECLARE  FORMAT_LINE    CHAR(79) VARYING INIT('');
+ DECLARE  KEY_PARMS      CHAR(98) VARYING INIT('');
+ DECLARE  OPERAND        CHAR(36) VARYING INIT('');
+ DECLARE  REQ_SIZE       CHAR(6)  VARYING INIT('NOTVAL');
+ DECLARE  SAVE_OPERAND   CHAR(36) VARYING INIT('');
+ DECLARE  SCR            CHAR(8)          INIT(' ');
+
+
+ /* DEFINE IDENTIFIERS TO ISPF */
+ CALL ISPLINK(VDEFINE, N_CMD, CMD, CHAR, L_CMD);
+ CALL ISPLINK(VDEFINE, N_SCROLL, SCROLL, CHAR, L_SCROLL);
+ CALL ISPLINK(VDEFINE, N_LINE1, LINE1, CHAR, L_LINE);
+ DO L = 3 TO 24;
+     CALL ISPLINK(VDEFINE, N_LINE(L), LINE(L), CHAR, L_LINE);
+     END;
+
+ /* DETERMINE THE SIZE OF THE WINDOW BY INTERIGATING THE PROGRAM PARM.
+    EACH K BYTES IS 32 ON SIZE (WHICH STARTS WITH 0). */
+ POS = INDEX(PARM, 'K');
+ IF POS = 0
+     THEN KEY_PARMS = PARM;
+     ELSE DO;
+          REQ_SIZE = SUBSTR(PARM, 1, POS-1);
+          KEY_PARMS = SUBSTR(PARM, POS+2);
+          END;
+ IF  VERIFY(REQ_SIZE, NUM_CHARS) = 0
+     THEN SIZE = REQ_SIZE * 32 - 1;
+     ELSE SIZE = 511;
+
+ LINE1 = STRING(TOP_LINE);
+ IF INDEX(KEY_PARMS, B) = 0  &  INDEX(KEY_PARMS, BASE) = 0
+     THEN KEY_PARMS = KEY_PARMS ]] ',B(0)';
+1SCOPE:  BEGIN;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS BEGIN BLOCK ALLOCATES THE DYNAMIC WINDOW SCOPE ACCORDING TO  */
+ /* THE PROGRAM PARM SPECIFICATION.  ALL INTERNAL PROCEDURES ARE ALSO */
+ /* INTERNAL TO THIS BEGIN BLOCK.                                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  BIN_ADDR(0:SIZE)    FIXED BINARY(31);
+ DECLARE  HEX_ADDR(0:SIZE)    CHAR(8);
+ DECLARE  HEX_ADPLUS(0:SIZE)  CHAR(8);
+ DECLARE  CHAR_SCOPE(0:SIZE)  CHAR(32);
+ DECLARE  HEX_SCOPE(0:SIZE)   CHAR(64);
+
+
+ /* PROCESS KEYWORD PARMS */
+ DO WHILE(KEY_PARMS ^= '');
+     POS = INDEX(KEY_PARMS, ',');
+     IF POS = 0
+         THEN DO;
+              CMD = KEY_PARMS;
+              KEY_PARMS = '';
+              END;
+         ELSE DO;
+              CMD = SUBSTR(KEY_PARMS, 1, POS-1);
+              KEY_PARMS = SUBSTR(KEY_PARMS, POS+1);
+              END;
+     POS = INDEX(CMD, '(');
+     IF POS ^= 0
+         THEN DO;
+              SUBSTR(CMD, POS, 1) = BLANK;
+              POS = INDEX(CMD, ')');
+              IF POS ^= 0
+                  THEN SUBSTR(CMD, POS, 1) = BLANK;
+              END;
+     CALL EXEC_CMD(CMD);
+     END;
+
+ /* DISPLAY INITIAL EXPLANATION PANEL */
+ CALL ISPLINK(DISPLAY, WINDOW);
+ MSGAREA = MSG_RESET;
+1CONTROL:  /* MAIN CONTROL LOOPS UNTIL USER ENTERS END KEY (PF3) */
+ DO WHILE(PLIRETV = 0);
+     CALL EXEC_CMD(CMD);
+
+     /* GET A NEW COPY OF MAIN MEMORY IF IN DYNAMIC MODE */
+     IF MODE = DYNAMIC
+         THEN CALL BASE_SCOPE((BASELOC));
+
+     /* FORMAT THE SCREEN FOR DISPLAY */
+     SELECT(DISTYPE);
+         WHEN(CHAR) CALL CHAR_PANEL((S));
+         WHEN(HEX)  CALL HEX_PANEL((S));
+         WHEN(DUAL) CALL DUAL_PANEL((S));
+         OTHERWISE DO;
+             DISTYPE = DUMP;
+             CALL DUMP_PANEL((S));
+             END;
+         END;
+     LINE1 = STRING(TOP_LINE);
+
+     CALL ISPLINK(DISPLAY, WINDOW);
+     MSGAREA = MSG_RESET;
+     END CONTROL;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW.                                      */
+ /*********************************************************************/
+1BASE_SCOPE:  PROCEDURE(BASELOC);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* SET THE BASE OF THE WINDOW RANGE OR AREA TO THE SPECIFIED         */
+ /* ADDRESS.  THIS REQUIRES COPYING THE MAIN MEMORY INTO THE BUFFER   */
+ /* AREA AND TRANSLATING IT INTO HEX FORMAT FOR LATER USE.            */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  BASELOC  FIXED BINARY(31);
+ DECLARE  BASESTR  CHAR(4) BASED(ADDR(BASELOC));
+ DECLARE  S  FIXED BINARY;
+
+
+ DO S = 0 TO SIZE;
+     CALL COPYMEM(BASELOC, CHAR_SCOPE(S));
+     IF CHAR_SCOPE(S) = NO_COPY
+         THEN HEX_SCOPE(S) = NO_COPY;
+         ELSE CALL INTOHEX(CHAR_SCOPE(S), HEX_SCOPE(S));
+     BIN_ADDR(S) = BASELOC;
+     CALL INTOHEX(BASESTR, HEX_ADDR(S));
+     BASELOC = BASELOC + 16;
+     BIN_ADDR(S) = BASELOC;
+     CALL INTOHEX(BASESTR, HEX_ADPLUS(S));
+     BASELOC = BASELOC + 16;
+     END;
+
+ /* PRODUCE NUMBERS FOR TOP LINE OF PANELS */
+ BEGADDR = HEX_ADDR(0);
+ BASELOC = BASELOC - 1;
+ CALL INTOHEX(BASESTR, ENDADDR);
+
+ END BASE_SCOPE;
+1DUMP_PANEL:  PROCEDURE(X);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DUMP_PANEL FORMATS THE DISPLAY TO LOOK LIKE A FORMATTED DUMP.     */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  X  FIXED BINARY;
+
+
+ DO L = 3 TO 22 BY 2;
+     IF X <= SIZE
+         THEN DO;
+              FORMAT_LINE = HEX_ADDR(X) ]] SPACE4 ]]
+                  SUBSTR(HEX_SCOPE(X), 1, 8) ]] BLANK ]]
+                  SUBSTR(HEX_SCOPE(X), 9, 8) ]] SPACE2 ]]
+                  SUBSTR(HEX_SCOPE(X), 17, 8) ]] BLANK ]]
+                  SUBSTR(HEX_SCOPE(X), 25, 8) ]] SPACE4 ]] '*' ]]
+                  SUBSTR(CHAR_SCOPE(X), 1, 16) ]] '*';
+              CALL PRTABLE(FORMAT_LINE);
+              IF HEX_SCOPE(X) = NO_COPY
+                  THEN SUBSTR(FORMAT_LINE, 13, 36) = BLANK;
+              LINE(L) = FORMAT_LINE;
+              FORMAT_LINE = HEX_ADPLUS(X) ]] SPACE4 ]]
+                  SUBSTR(HEX_SCOPE(X), 33, 8) ]] BLANK ]]
+                  SUBSTR(HEX_SCOPE(X), 41, 8) ]] SPACE2 ]]
+                  SUBSTR(HEX_SCOPE(X), 49, 8) ]] BLANK ]]
+                  SUBSTR(HEX_SCOPE(X), 57, 8) ]] SPACE4 ]] '*' ]]
+                  SUBSTR(CHAR_SCOPE(X), 17, 16) ]] '*';
+              CALL PRTABLE(FORMAT_LINE);
+              LINE(L+1) = FORMAT_LINE;
+              END;
+         ELSE DO;
+              LINE(L) = BLANK;
+              LINE(L+1) = BLANK;
+              END;
+     X = X + 1;
+     END;
+
+ LINE(23) = (70)'*';
+
+ END DUMP_PANEL;
+1DUAL_PANEL:  PROCEDURE(S);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DUAL_PANEL FORMATS THE DISPLAY INTO 1/3 CHAR AND 2/3 HEX WHICH    */
+ /* IS AN EQUAL AMOUNT OF MEMORY.  THE TWO FORMATS ALWAYS DISPLAY THE */
+ /* SAME AREA OF MEMORY.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  S  FIXED BINARY;
+ DECLARE  C  FIXED BINARY;
+
+
+ /* FORMAT THE CHAR PORTION OF THE SCREEN */
+ C = S;
+ DO L = 3 TO 9;
+     IF C <= SIZE
+         THEN FORMAT_LINE = HEX_ADDR(C) ]] SPACE4 ]] CHAR_SCOPE(C);
+         ELSE FORMAT_LINE = BLANK;
+     C = C + 1;
+     IF C <= SIZE
+         THEN FORMAT_LINE = FORMAT_LINE ]] CHAR_SCOPE(C);
+     C = C + 1;
+     CALL PRTABLE(FORMAT_LINE);
+     LINE(L) = FORMAT_LINE;
+     END;
+
+ /* FORMAT THE HEX PORTION OF THE SCREEN */
+ DO L = 10 TO 23;
+     IF S <= SIZE
+         THEN LINE(L) = HEX_ADDR(S) ]] SPACE4 ]] HEX_SCOPE(S);
+         ELSE LINE(L) = BLANK;
+     S = S + 1;
+     END;
+
+ END DUAL_PANEL;
+1HEX_PANEL:   PROCEDURE(S);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* HEX_PANEL FORMATS THE DISPLAY TOTALLY IN HEX.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  S  FIXED BINARY;
+
+
+ DO L = 3 TO 23;
+     IF S <= SIZE
+         THEN LINE(L) = HEX_ADDR(S) ]] SPACE4 ]] HEX_SCOPE(S);
+         ELSE LINE(L) = BLANK;
+     S = S + 1;
+     END;
+
+ END HEX_PANEL;
+1CHAR_PANEL:   PROCEDURE(C);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CHAR_PANEL FORMATS THE DISPLAY TOTALLY IN CHAR.                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  C  FIXED BINARY;
+
+
+ DO L = 3 TO 23;
+     IF C <= SIZE
+         THEN FORMAT_LINE = HEX_ADDR(C) ]] SPACE4 ]] CHAR_SCOPE(C);
+         ELSE FORMAT_LINE = BLANK;
+     C = C + 1;
+     IF C <= SIZE
+         THEN FORMAT_LINE = FORMAT_LINE ]] CHAR_SCOPE(C);
+     C = C + 1;
+     CALL PRTABLE(FORMAT_LINE);
+     LINE(L) = FORMAT_LINE;
+     END;
+
+ END CHAR_PANEL;
+1EXEC_CMD:   PROCEDURE(CMD);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS THE COMMAND LINE FROM THE ISPF SCREEN.  ALL KEYWORD       */
+ /* COMMANDS ARE HANDLED WITHIN THIS PROCEDURE.  ANY COMMAND WHICH    */
+ /* REQUIRES PARSING IS PASSED ON TO PARSE_CMD.                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  CMD  CHAR(*);
+
+
+ SELECT(CMD);
+     WHEN(BLANK);
+     WHEN(UP) CALL SCROLL_UP(S, SCROLL);
+     WHEN(DOWN) CALL SCROLL_DOWN(S, SCROLL);
+     WHEN(CHAR) DISTYPE = CHAR;
+     WHEN(HEX)  DISTYPE = HEX;
+     WHEN(DUAL) DISTYPE = DUAL;
+     WHEN(DUMP) DISTYPE = DUMP;
+     WHEN(DYNAMIC) MODE = DYNAMIC;
+     WHEN(STATIC) MODE = STATIC;
+     WHEN(RFIND) DO;
+         IF S < SIZE
+             THEN S = S + 1;
+         IF HEXFIND
+             THEN CALL FIND_HEX(OPERAND);
+             ELSE CALL FIND_CHAR(OPERAND);
+         END;
+     OTHERWISE CALL PARSE_CMD(CMD);
+     END;
+1SCROLL_UP:   PROCEDURE(S, SCROLL);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* MOVE THE DISPLAY UP THE APPROPRIATE NUMBER OF LINES.  THIS        */
+ /* PROCEDURE IS INTERNAL TO EXEC_CMD.                                */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  S  FIXED BINARY;
+ DECLARE  SCROLL  CHAR(*);
+
+
+ SELECT(SCROLL);
+     WHEN(PAGE)
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = S - 42;
+             WHEN(HEX)  S = S - 21;
+             WHEN(DUAL) S = S - 14;
+             OTHERWISE  S = S - 10;
+             END;
+     WHEN(HALF)
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = S - 21;
+             WHEN(HEX)  S = S - 11;
+             WHEN(DUAL) S = S - 7;
+             OTHERWISE  S = S - 5;
+             END;
+     WHEN(MAX) DO;
+         S = 0;
+         SCROLL = PAGE;
+         END;
+     OTHERWISE
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = S - SCROLL*2;
+             WHEN(DUMP) S = S - SCROLL/2;
+             OTHERWISE  S = S - SCROLL;
+             END;
+     END;
+
+ IF S < 0
+     THEN S = 0;
+
+ END SCROLL_UP;
+1SCROLL_DOWN:   PROCEDURE(S, SCROLL);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* MOVE THE DISPLAY DOWN THE APPROPRIATE NUMBER OF LINES.  THIS      */
+ /* PROCEDURE IS INTERNAL TO EXEC_CMD.                                */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  S  FIXED BINARY;
+ DECLARE  SCROLL  CHAR(*);
+
+
+ SELECT(SCROLL);
+     WHEN(PAGE)
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = S + 42;
+             WHEN(HEX)  S = S + 21;
+             WHEN(DUAL) S = S + 14;
+             OTHERWISE  S = S + 10;
+             END;
+     WHEN(HALF)
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = S + 21;
+             WHEN(HEX)  S = S + 11;
+             WHEN(DUAL) S = S + 7;
+             OTHERWISE  S = S + 5;
+             END;
+     WHEN(MAX) DO;
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = SIZE - 41;
+             WHEN(HEX)  S = SIZE - 20;
+             WHEN(DUAL) S = SIZE - 13;
+             OTHERWISE  S = SIZE - 9;
+             END;
+         SCROLL = PAGE;
+         END;
+     OTHERWISE
+         SELECT(DISTYPE);
+             WHEN(CHAR) S = S + SCROLL*2;
+             WHEN(DUMP) S = S + SCROLL/2;
+             OTHERWISE  S = S + SCROLL;
+             END;
+     END;
+
+ IF S > SIZE
+     THEN S = SIZE;
+
+ END SCROLL_DOWN;
+1FIND_CHAR:  PROCEDURE(OPERAND);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* FIND A CHARATER STRING IN CHAR FORMAT WITHIN WINDOW RANGE.  ALLOW */
+ /* FOR THE STRING TO BE SPLIT OVER TWO LINES.  THIS PROCEDURE IS     */
+ /* INTERNAL TO EXEC_CMD.                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  OPERAND  CHAR(*) VARYING;
+ DECLARE  WRAPER   CHAR(64);
+ DECLARE  C  FIXED BINARY;
+
+
+ DO C = S TO SIZE-1  UNTIL(POS ^= 0);
+     WRAPER = CHAR_SCOPE(C) ]] CHAR_SCOPE(C+1);
+     POS = INDEX(WRAPER, OPERAND);
+     END;
+
+ IF POS = 0
+     THEN MSGAREA = NOT_FOUND_MSG ]] OPERAND;
+     ELSE DO;
+          IF INDEX(CHAR_SCOPE(C), OPERAND) ^= 0 ]
+             INDEX(CHAR_SCOPE(C+1), OPERAND) = 0
+              THEN S = C;
+              ELSE S = C + 1;
+          MSGAREA = FOUND_MSG ]] OPERAND;
+          END;
+
+ HEXFIND = NO;
+
+ END FIND_CHAR;
+1FIND_HEX:  PROCEDURE(OPERAND);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* FIND A HEXIDECIMAL STRING IN HEX FORMAT WITHIN WINDOW RANGE.      */
+ /* ALLOW FOR THE STRING TO BE SPLIT OVER TWO LINES.  THIS PROCEDURE  */
+ /* IS INTERNAL TO EXEC_CMD.                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  OPERAND  CHAR(*) VARYING;
+ DECLARE  WRAPER   CHAR(128);
+ DECLARE  H  FIXED BINARY;
+
+
+ DO H = S TO SIZE-1  UNTIL(POS ^= 0);
+     WRAPER = HEX_SCOPE(H) ]] HEX_SCOPE(H+1);
+     POS = INDEX(WRAPER, OPERAND);
+     END;
+
+ IF POS = 0
+     THEN MSGAREA = NOT_FOUND_MSG ]] OPERAND;
+     ELSE DO;
+          IF INDEX(HEX_SCOPE(H), OPERAND) ^= 0 ]
+             INDEX(HEX_SCOPE(H+1), OPERAND) = 0
+              THEN S = H;
+              ELSE S = H + 1;
+          MSGAREA = FOUND_MSG ]] OPERAND;
+          END;
+
+ HEXFIND = YES;
+
+ END FIND_HEX;
+1PARSE_CMD:   PROCEDURE(CMD);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCEDURE PARSE_CMD PROCESSES THE COMMAND LINE WHEN IT CONTAINS   */
+ /* MORE THAN ONE WORD.  IT RECEIVES CONTROL ONLY FROM EXEC_CMD AND   */
+ /* IS INTERNAL TO EXEC_CMD.                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  CMD  CHAR(*);
+
+
+ /* BREAK DOWN CMD TO COMMAND AND OPERAND PARTS */
+ SAVE_OPERAND = OPERAND;
+ POS = INDEX(CMD, BLANK);
+ IF POS = 0
+     THEN DO;
+          MSGAREA = PARSE_ERR_MSG ]] CMD;
+          RETURN;
+          END;
+
+ COMMAND = SUBSTR(CMD, 1, POS-1);
+ OPERAND = SUBSTR(CMD, POS+1);
+
+ POS = VERIFY(OPERAND, BLANK);
+ IF POS = 0
+     THEN DO;
+          MSGAREA = PARSE_ERR_MSG ]] COMMAND;
+          RETURN;
+          END;
+
+ OPERAND = SUBSTR(OPERAND, POS);
+1/* DETERMINE IF THE OPERAND IS QUOTED AND PROCESS ACCORDINGLY */
+ SELECT(SUBSTR(OPERAND, 1, 1));
+
+     /* QUOTED CHARACTER STRING, MUST BE A FIND COMMAND */
+     WHEN(QUOTE) DO;
+         OPERAND = SUBSTR(OPERAND, 2);
+         POS = INDEX(OPERAND, QUOTE);
+         IF POS = 0
+             THEN DO;
+                  MSGAREA = PARSE_ERR_MSG]]COMMAND]]BLANK]]OPERAND;
+                  RETURN;
+                  END;
+         OPERAND = SUBSTR(OPERAND, 1, POS-1);
+         IF COMMAND = F ] COMMAND = FIND ] COMMAND = RFIND
+             THEN CALL FIND_CHAR(OPERAND);
+             ELSE DO;
+                  MSGAREA = PARSE_ERR_MSG]]COMMAND]]BLANK]]OPERAND;
+                  RETURN;
+                  END;
+         END;
+
+     WHEN(D_QUOTE) DO;
+         OPERAND = SUBSTR(OPERAND, 2);
+         POS = INDEX(OPERAND, D_QUOTE);
+         IF POS = 0
+             THEN DO;
+                  MSGAREA = PARSE_ERR_MSG]]COMMAND]]BLANK]]OPERAND;
+                  RETURN;
+                  END;
+         OPERAND = SUBSTR(OPERAND, 1, POS-1);
+         IF COMMAND = F ] COMMAND = FIND ] COMMAND = RFIND
+             THEN CALL FIND_CHAR(OPERAND);
+             ELSE DO;
+                  MSGAREA = PARSE_ERR_MSG]]COMMAND]]BLANK]]OPERAND;
+                  RETURN;
+                  END;
+         END;
+1    /* NON-QUOTED OPERAND */
+     OTHERWISE DO;
+         POS = INDEX(OPERAND, BLANK);
+         IF POS ^= 0
+             THEN OPERAND = SUBSTR(OPERAND, 1, POS-1);
+         IF COMMAND = UP ] COMMAND = DOWN
+             THEN DO;
+                  SELECT(OPERAND);
+                      WHEN('M', 'MA') SCR = MAX;
+                      WHEN('P', 'PA', 'PAG') SCR = PAGE;
+                      WHEN('H', 'HA', 'HAL') SCR = HALF;
+                      OTHERWISE SCR = OPERAND;
+                      END;
+                  IF SCR > '0       '
+                      THEN DO WHILE(SUBSTR(SCR, 8, 1) = ' ');
+                               SCR = '0' ]] SCR;
+                               END;
+                  IF SCR ^= PAGE  &  SCR ^= HALF  &  SCR ^= MAX  &
+                     SCR < '00000000'
+                      THEN DO;
+                           MSGAREA = PARSE_ERR_MSG ]] COMMAND ]]
+                               BLANK ]] OPERAND;
+                           RETURN;
+                           END;
+                  END;
+             ELSE IF VERIFY(OPERAND, HEX_CHARS) ^= 0
+                      THEN DO;
+                           MSGAREA = PARSE_ERR_MSG ]] COMMAND ]]
+                               BLANK ]] OPERAND;
+                           RETURN;
+                           END;
+1        SELECT(COMMAND);
+             WHEN(UP) DO;
+                 CALL SCROLL_UP(S, SCR);
+                 OPERAND = SAVE_OPERAND;
+                 END;
+             WHEN(DOWN) DO;
+                 CALL SCROLL_DOWN(S, SCR);
+                 OPERAND = SAVE_OPERAND;
+                 END;
+             WHEN(F, FIND, RFIND) CALL FIND_HEX(OPERAND);
+             WHEN(SUBSTR(LIST,1,1), LIST) DO;
+                 IF LENGTH(OPERAND) > 8
+                     THEN DO;
+                          MSGAREA = PARSE_ERR_MSG ]] COMMAND ]] BLANK ]]
+                              OPERAND;
+                          RETURN;
+                          END;
+                     ELSE CALL LIST_ADDR(OPERAND);
+                 OPERAND = SAVE_OPERAND;
+                 END;
+             WHEN(B, BASE) DO;
+                 IF LENGTH(OPERAND) > 8
+                     THEN DO;
+                          MSGAREA = PARSE_ERR_MSG ]] COMMAND ]] BLANK ]]
+                              OPERAND;
+                          RETURN;
+                          END;
+                     ELSE BASELOC = STRPTR(OPERAND);
+                 CALL BASE_SCOPE((BASELOC));
+                 S = 0;
+                 OPERAND = SAVE_OPERAND;
+                 END;
+             OTHERWISE DO;
+                 MSGAREA = PARSE_ERR_MSG ]] COMMAND ]] BLANK ]] OPERAND;
+                 RETURN;
+                 END;
+             END;
+         END;
+     END;
+1LIST_ADDR:  PROCEDURE(OPERAND);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* BRING DISPLAY TO THE LINE WHICH CONTAINS THE SPECIFIED ADDRESS.   */
+ /* THIS PROCEDURE IS INTERNAL TO PARSE_CMD.                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  OPERAND  CHAR(*) VARYING;
+
+
+ POS = STRPTR(OPERAND);
+ DO S = 0 TO SIZE-1  WHILE(POS >= BIN_ADDR(S+1));
+     END;
+
+
+ END LIST_ADDR;
+1/*********************************************************************/
+ /*                                                                   */
+ /* THE FOLLOWING IS A COPY OF THE ISPF SCREEN USED WITH THIS PGM.    */
+ /* THIS IS INCLUDED FOR DOCUMENTATIONAL PURPOSES.  THE SECOND LINE   */
+ /* HAS SOME SPACES REMOVED.                                          */
+ /*                                                                   */
+ /*********************************************************************/
+ /*
+ %&LINE1
+ %COMMAND ===>_CMD                                 %SCROLL ===>_SCROLL
+ +&LINE3
+ +&LINE4
+ +&LINE5
+ +&LINE6
+ +&LINE7
+ +&LINE8
+ +&LINE9
+ +&LINE10
+ +&LINE11
+ +&LINE12
+ +&LINE13
+ +&LINE14
+ +&LINE15
+ +&LINE16
+ +&LINE17
+ +&LINE18
+ +&LINE19
+ +&LINE20
+ +&LINE21
+ +&LINE22
+ +&LINE23
+ %&LINE24
+ )INIT
+  &CMD = ' '
+ )PROC
+   IF (&SCROLL = 'P','H','M','MAXE','MAXF')
+       &SCROLL = TRANS(&SCROLL P,PAGE
+                               M,MAX MAXE,MAX MAXF,MAX
+                               H,HALF)
+   IF (&SCROLL ^= 'PAGE','HALF','MAX')
+       VER (&SCROLL,NUM)
+ )END
+               */
+1/*********************************************************************/
+ /*                                                                   */
+ /* THE FOLLOWING IS A COPY OF THE ISPF CLIST USED WITH THIS PROGRAM. */
+ /* THIS IS INCLUDED FOR DOCUMENTATIONAL PURPOSES AS AN EXAMPLE.      */
+ /*                                                                   */
+ /* WITH ISPF/PDF USE NEWAPPL(WIND) AND SET UP WINDCMDS AND WINDPROF  */
+ /* FOR PRIMARY COMMANDS AND PFKEYS.                                  */
+ /*                                                                   */
+ /*********************************************************************/
+ /*
+ PROC 0 SIZE(16) BASE(0) STATIC CHAR HEX DUAL
+ SET &ISASIZE = (3456 * &SIZE + 1023)/1024 + 8
+ ISPEXEC SELECT PGM(WINDOW) NEWAPPL(WIND) +
+  PARM('ISA(&ISASIZE.K)/&SIZE.K,&STATIC,&CHAR,&HEX,&DUAL,BASE(&BASE.)')
+               */
+
+ END PARSE_CMD;
+ END EXEC_CMD;
+ END SCOPE;
+ END WINDOW;
+

@@ -4,8 +4,8 @@
 
 grammar pl1_parser;
 
-pl1pgm  : pl1stmtlist
-  |
+pl1pgm  : pl1stmtlist EOF
+  | EOF
   ;
 pl1stmtlist  : pl1stmt ';'
   | pl1stmtlist pl1stmt ';'
@@ -1546,7 +1546,7 @@ END : [eE] [nN] [dD];
 ENDFILE		: [eE] [nN] [dD] [fF] [iI] [lL] [eE];
 ENDPAGE		: [eE] [nN] [dD] [pP] [aA] [gG] [eE];
 ENTRY : [eE] [nN] [tT] [rR] [yY]; //		specialKeyWord(ENTRY,ENTRY,ENTRY);
-ENVIRONMENT  : [eE] [nN] [vV] ([iI] [rR] [oO] [nN] [mM] [eE] [nN] [tT]);
+ENVIRONMENT  : [eE] [nN] [vV] ([iI] [rR] [oO] [nN] [mM] [eE] [nN] [tT])?;
 ERROR           : [eE] [rR] [rR] [oO] [rR];
 EVENT           : [eE] [vV] [eE] [nN] [tT];
 EXCLUSIVE    : [eE] [xX] [cC] [lL] ([uU] [sS] [iI] [vV] [eE])?;
@@ -1779,7 +1779,7 @@ NUM : Nbr ;
 fragment Nbr : [0-9] [0-9_]* ;
 fragment Nbree : [DEFSQ] [+-]? Nbr;
 STR_CONSTANT : '"' (~["\\])* '"' | '\'' (~['\\])* '\'' ;
-NOT : '^' | '~';
+NOT : [\u00AA] | [\uFFFD] | '^' | '~';
 AND : '&';
 POWER: '**';
 CONCAT : '||' | '!!';
@@ -1796,11 +1796,13 @@ PTR : '->';
 HANDLEPTR : '=>';
 SELFOP : ('+' | '-' | '*' | '|' | '!' | '&') '=';
 OR : '|' | '!';
-LE : '^>' | '~>' | '<=';
-GE : '^<' | '~<' | '>=';
-NE : '<>' | '^=' | '~=';
+LE : [\u00AA] '>' | [\uFFFD] '>' | '^>' | '~>' | '<=';
+GE : [\u00AA] '<' | [\uFFFD] '<' | '^<' | '~<' | '>=';
+NE : [\u00AA] '=' | [\uFFFD] '=' | '<>' | '^=' | '~=';
 VARNAME : (Chr | Let) (Chr | Let | [0-9])*;
 fragment Chr : [_$#@]+;
 fragment Let : [a-zA-Z]+;
 COMMENT : '/*' .*? '*/' -> Skip;
-WS : (' ' | '\t' | '\n' | '\r') -> Skip;
+fragment Ws : (' ' | '\t' | '\n' | '\r'); 
+WS : Ws -> Skip;
+PROCESS : [Pp][Rr][Oo][Cc][Ee][Ss][Ss] ~[\n\r]* -> Skip;

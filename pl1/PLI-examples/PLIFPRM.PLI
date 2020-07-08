@@ -1,0 +1,120 @@
+*PROCESS NM;
+ PLIFPRM:  PROCEDURE(KEYWORD, ABREVIATION, CHOICE, SPACING, PLIFID,
+     OPTIONS, PARM) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PLIFPRM V2.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PROCESSES PLIFORM PARAMETERS WHICH WILL ALTER      */
+ /* THE PROCESSING OPTIONS OF THE PLIFEXC PROCEDURE.  THE PARAMETERS  */
+ /* ARE DIRECTLY EQUIVALENT TO A SUBSET OF THE COMMANDS AVAILABLE TO  */
+ /* THE USER THROUGH PLIFCNT AND THE SYSIN CONTROL FILE.              */
+ /*                                                                   */
+ /* PARM  COMMAND                                                     */
+ /* ====  =======                                                     */
+ /*  AI   ALTINDENT                                                   */
+ /*  CO   COUNT                                                       */
+ /*  CS   COMPRESS                                                    */
+ /*  LI   LISTOUT                                                     */
+ /*  LO   LISTONLY                                                    */
+ /*  NS   NOSUB                                                       */
+ /*  VO   VARYOUT                                                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  KEYWORD(*)      CHAR(*) VARYING;
+ DECLARE  ABREVIATION(*)  CHAR(*) VARYING;
+ DECLARE  CHOICE(*)       BIT(*);
+
+ DECLARE
+     1  SPACING(*),
+        2  MARGIN,
+           3  NO_SPACE          BIT(*),
+           3  SPACE_ONCE        BIT(*),
+           3  SPACE_TWICE       BIT(*),
+           3  INDENT_CONSTRUCT  BIT(*),
+        2  LINE,
+           3  NEXT_LINE         BIT(*),
+           3  DOUBLE_SPACE      BIT(*),
+           3  TRIPLE_SPACE      BIT(*),
+           3  EJECT             BIT(*);
+1DECLARE  PLIFID  CHAR(*) VARYING;
+
+ DECLARE
+     1  OPTIONS,
+        2  SEQ_INCR      FIXED BINARY(31),
+        2  FLAGS,
+           3  VARYOUT    BIT(*),
+           3  LISTOUT    BIT(*),
+           3  LISTONLY   BIT(*),
+           3  COUNT      BIT(*),
+           3  ALTINDENT  BIT(*),
+           3  UNUSED6    BIT(*),
+           3  UNUSED7    BIT(*),
+           3  UNUSED8    BIT(*);
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ DECLARE  (I, POS)  FIXED BINARY;
+ DECLARE  PARM_SEL  CHAR(10);
+ DECLARE  NO        BIT(1) STATIC INIT('0'B);
+ DECLARE  YES       BIT(1) STATIC INIT('1'B);
+ DECLARE  (INDEX, LENGTH, SUBSTR)  BUILTIN;
+ DECLARE  SYSPRINT  FILE STREAM OUTPUT PRINT;
+1PUT SKIP EDIT(PLIFID) (A);
+
+ DO WHILE(PARM ª= '');
+     POS = INDEX(PARM, ',');
+     IF POS = 0
+         THEN DO;
+              PARM_SEL = PARM;
+              PARM = '';
+              END;
+         ELSE DO;
+              PARM_SEL = SUBSTR(PARM, 1, POS-1);
+              PARM = SUBSTR(PARM, POS+1);
+              END;
+     SELECT(PARM_SEL);
+         WHEN ('AI') ALTINDENT = YES;
+         WHEN ('CO') COUNT = YES;
+         WHEN ('CS') CALL COMPRESS;
+         WHEN ('LI') LISTOUT = YES;
+         WHEN ('LO') LISTONLY = YES;
+         WHEN ('NS') CHOICE = '110'B;
+         WHEN ('VO') VARYOUT = YES;
+         OTHERWISE PUT SKIP(2) EDIT('***** ', PARM_SEL,
+             ' IS AN INVALID PARM.') (A);
+         END;
+     END;
+1COMPRESS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CHANGE TABLE TO CAUSE ALL BLANKS TO BE LEFT OUT OF OUTPUT.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DO I = 1 BY 1 WHILE(KEYWORD(I) < 'A');
+     IF LENGTH(KEYWORD(I)) > 1
+         THEN IF SUBSTR(KEYWORD(I), 2, 1) < 'A'
+                  THEN NO_SPACE(I) = YES;
+                  ELSE;
+         ELSE NO_SPACE(I) = YES;
+     END;
+
+ SPACE_ONCE = YES;
+ SPACE_TWICE = NO;
+ INDENT_CONSTRUCT = NO;
+
+ NEXT_LINE = NO;
+ DOUBLE_SPACE = NO;
+ TRIPLE_SPACE = NO;
+ EJECT = NO;
+
+ END COMPRESS;
+
+ END PLIFPRM;
+

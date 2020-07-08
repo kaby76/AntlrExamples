@@ -1,0 +1,159 @@
+*PROCESS NM;
+ RCLIST:  PROCEDURE(PARMS) OPTIONS(MAIN) REORDER;
+
+ DECLARE  PARMS  CHAR(100) VARYING;
+ DECLARE  (BEGNUM, INCNUM)  FIXED BINARY(15);
+ DECLARE  FOREVER  BIT(1) STATIC INIT('1'B);
+ DECLARE  (INCLIST, OCLIST)  FILE RECORD ENV(CONSECUTIVE);
+ DECLARE  (INAREA, OAREA)  CHAR(255) VARYING;
+ DECLARE  END_STRING  CHAR(4) VARYING STATIC INIT('END');
+ DECLARE  DATA_SWITCH  BIT(1) STATIC INIT('0'B);
+ DECLARE  SET_SWITCH  BIT(1) STATIC INIT('0'B);
+ DECLARE  (REPEAT, INDEX, SUBSTR, LENGTH)  BUILTIN;
+ DECLARE  (SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB9)  FIXED BINARY(15);
+
+
+ ON ENDFILE(INCLIST)  BEGIN;
+     CLOSE FILE(INCLIST);
+     CLOSE FILE(OCLIST);
+     OPEN FILE(OCLIST) INPUT;
+     OPEN FILE(INCLIST) OUTPUT;
+     GO TO RECOPY;
+     END;
+
+ GET STRING(PARMS) LIST(BEGNUM, INCNUM);
+ SUB4 = 0;
+ SUB5 = 0;
+ OPEN FILE(INCLIST) INPUT;
+ OPEN FILE(OCLIST) OUTPUT;
+
+ INLOOP:  READ FILE(INCLIST) INTO(INAREA);
+ IF SET_SWITCH
+     THEN GOTO WRIT1;
+
+ /* FIND FIRST NON BLANK CHAR AFTER LINE NO. */
+ DO SUB2 = 9 TO LENGTH(INAREA) WHILE(SUBSTR(INAREA, SUB2, 1) = ' ');
+      END;
+
+ INAREA = SUBSTR(INAREA, 1, 8) ||
+     SUBSTR(INAREA, SUB2, LENGTH(INAREA)-SUB2+1);
+
+ IF SUBSTR(INAREA, SUB2, 2) = '/*'
+     THEN GO TO WRIT1;
+
+ IF SUB4 + SUB5 ª= 0
+     /* MOVE OVER TO COLUMN SUB4+SUB5 */
+     THEN INAREA = SUBSTR(INAREA, 1, 8) || REPEAT(' ', SUB4 + SUB5) ||
+              SUBSTR(INAREA, 9, LENGTH(INAREA) - 8);
+
+ SUB1 = INDEX(INAREA, 'DATA');
+ IF (SUB1 ª= 0)  &  (SUB1 + 3 = LENGTH(INAREA))  &
+    (SUB1 = 9 | SUBSTR(INAREA, 9, SUB1-9) = ' ')
+     THEN DATA_SWITCH = '1'B;
+
+ SUB1 = INDEX(INAREA, 'ENDDATA');
+ IF (SUB1 ª= 0)  &  (SUB1 + 6 = LENGTH(INAREA))  &
+    (SUB1 = 9  |  SUBSTR(INAREA, 9 , SUB1 - 9) = ' ')
+     THEN DATA_SWITCH = '0'B;
+ IF DATA_SWITCH
+     THEN GO TO WRIT1;
+
+ SUB1 = INDEX(INAREA, 'CONTROL ');
+ IF SUB1 ª= 0
+     THEN DO;
+          SUB2 = INDEX(INAREA, 'END(');
+          IF SUB2 ª= 0
+              THEN DO;
+                   SUB3 = INDEX(SUBSTR(INAREA, SUB2 + 5, 5), ')');
+                   END_STRING = SUBSTR(INAREA, SUB2 + 4, SUB3);
+                   END;
+          END;
+
+ /* FIND DO STATEMENT */
+ SUB1 = INDEX(INAREA, 'DO');
+ SUB9 = SUB1;
+
+ IF SUB1 ª= 0
+     THEN DO;
+          IF SUB1 + 1 ª= LENGTH(INAREA)
+              THEN DO SUB2 = SUB1 + 2 TO LENGTH(INAREA)
+                   WHILE(SUBSTR(INAREA, SUB2, 1) = ' ');
+                       END;
+              ELSE SUB2 = LENGTH(INAREA);
+
+          IF SUB2 = LENGTH(INAREA) | SUBSTR(INAREA, SUB2, 5) = 'WHILE'
+              THEN DO;
+                   IF SUB1 ª= 9
+                       THEN DO;
+                            SUB1 = INDEX(INAREA, ' DO');
+                            IF SUB1 = 0
+                                THEN DO;
+                                     SUB3 = INDEX(INAREA, ':');
+                                     IF SUB3 = 0 | SUB3 > SUB9
+                                         THEN GO TO SKIP1;
+                                     IF SUB3 + 1 ª= SUB9
+                                         THEN IF SUBSTR(INAREA, SUB3+1,
+                                              SUB9-SUB3) ª= ' '
+                                                  THEN GO TO SKIP1;
+                                     END;
+                            END;
+                   IF SUB4 = 0
+                       THEN SUB4 = BEGNUM;
+                       ELSE SUB4 = SUB4 + INCNUM;
+                   END;
+          END;
+
+ SKIP1:  SUB1 = INDEX(INAREA, END_STRING);
+ IF SUB1 ª= 0
+     THEN DO;
+          IF SUB1 ª= 9
+              THEN DO;
+                   IF SUBSTR(INAREA, 9, SUB1 - 9) ª= ' '
+                       THEN DO;
+                            SUB3 = INDEX(INAREA, ':');
+                            IF SUB3 = 0 | SUB3 > SUB1
+                                THEN GO TO WRIT1;
+                            IF SUB3 + 1 ª= SUB1
+                                THEN IF SUBSTR(INAREA, SUB3+1,
+                                     SUB1-SUB3-1) ª= ' '
+                                         THEN GO TO WRIT1;
+                            END;
+                   END;
+
+          IF SUB4 = BEGNUM
+              THEN SUB4 = 0;
+              ELSE IF SUB4 >= INCNUM
+                       THEN SUB4 = SUB4 - INCNUM;
+          END;
+
+ WRIT1:  WRITE FILE(OCLIST) FROM(INAREA);
+ IF SUBSTR(INAREA, LENGTH(INAREA)) = '+' |
+    SUBSTR(INAREA, LENGTH(INAREA)) = '-'
+     THEN DO;
+          SUB6 = INDEX(INAREA, 'SET');
+          IF SUB6 ª= 0
+              THEN SET_SWITCH = '1'B;
+          IF ªSET_SWITCH
+              THEN IF SUB4 = 0 & SUB5 = 0
+                       THEN SUB5 = BEGNUM;
+                       ELSE SUB5 = INCNUM;
+          END;
+     ELSE DO;
+          SUB5 = 0;
+          SET_SWITCH = '0'B;
+          END;
+ GO TO INLOOP;
+
+ RECOPY:  ON ENDFILE(OCLIST)  BEGIN;
+     CLOSE FILE(OCLIST);
+     CLOSE FILE(INCLIST);
+     STOP;
+     END;
+
+ DO WHILE(FOREVER);
+     READ FILE(OCLIST) INTO(INAREA);
+     WRITE FILE(INCLIST) FROM(INAREA);
+     END;
+
+ END RCLIST;
+

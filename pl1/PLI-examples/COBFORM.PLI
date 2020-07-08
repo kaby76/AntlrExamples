@@ -1,0 +1,2678 @@
+*PROCESS M;
+ COBFORM:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('COBFORM V3.1  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*COBFORM IS THE CONTROL PROCEDURE FOR PROCESSING AN INPUT COBOL     */
+ /*PROGRAM.  THE OUTPUT PRODUCED IS THE SAME SOURCE PROGRAM FORMATTED */
+ /*ACCORDING TO AN EASY TO READ FORMAT USING INDENTATION AND BLANK    */
+ /*LINES.  IT MAY BE USED TO REFORMAT OLD SOURCE TEXT WHICH WAS NEVER */
+ /*EXTENSIVELY FORMATED OR A NEWLY INPUTED SOURCE IN WHICH THE PROGRAM*/
+ /*WAS "RANDOMLY" TYPED IN COLS 8 THROUGH 72 WITHOUT REGARD TO PROPER */
+ /*COBOL MARGINS.  THE ONLY CONSIDERATION IS THAT COMMENTS BE DENOTED */
+ /*BY AN ASTERISK IN COLUMN SEVEN AND CONTINUATION FOLLOW STANDARD    */
+ /*COBOL RULES.                                                       */
+ /*                                                                   */
+ /*INPUT:   FILE NAME IS 'IN', DATA SET IS COBOL SOURCE TEXT.         */
+ /*OUTPUT:  FILE NAME IS 'OUT', DATA SET IS REFORMATTED COBOL SOURCE  */
+ /*         TEXT.                                                     */
+ /*METHOD:  PROGRAM IS ANALYZED BY ITS UNITS OF MEANING CALLED TOKENS.*/
+ /*         TOKENS ARE OBTAINED BY "CUTTING OUT" NON-BLANK SECTIONS   */
+ /*         (IE. USUALLY DIVIDING INTO WORDS).  AFTER CHECKING FOR    */
+ /*         KEY WORDS THE TOKENS ARE RECONSTRUCTED INTO THE CHOSEN    */
+ /*         FORMAT.                                                   */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* TABLE OF CONTENTS                                                 */
+ /* =================                                                 */
+ /*                                                                   */
+ /*                                                                   */
+ /* PROCEDURE NAME             USED BY              SOURCE  INSOURCE  */
+ /* ==============             =======              ======  ========  */
+ /* CHECK_FOR_PERIOD           FOURTH               109     40        */
+ /* COBFORM                    -MAIN PROC-          73      2         */
+ /* COMMENT                    COBFORM              85      16        */
+ /* CONTROL_TABLES             PROCESS_TOKENS       89      20        */
+ /*                            TOKENIZE                               */
+ /* FIRST                      CONTROL_TABLES       92      23        */
+ /* FOURTH                     CONTROL_TABLES       95      26        */
+ /* GET_INPUT                  COBFORM              127     58        */
+ /*                            COMMENT                                */
+ /*                            SKIP                                   */
+ /*                            TOKENIZE                               */
+ /* MIDDLE_INSERT              THIRD                126     57        */
+ /* OPTION_LIST                COBFORM              128     59        */
+ /* PROCESS_TOKENS             COBFORM              130     61        */
+ /*                            TOKENIZE                               */
+ /* PUTOUT                     COBFORM              134     65        */
+ /*                            COMMENT                                */
+ /*                            SKIP                                   */
+ /*                            PROCESS_TOKENS                         */
+ /*                            SPACER                                 */
+ /*                            TOKENIZE                               */
+ /* SECOND                     CONTROL_TABLES       110     41        */
+ /* SKIP                       COMMENT              88      19        */
+ /* SPACER                     PROCESS_TOKENS       131     62        */
+ /* TAB                        SPACER               135     66        */
+ /*                            COMMENT                                */
+ /*                            TOKENIZE                               */
+ /* THIRD                      CONTROL_TABLES       115     46        */
+ /* TOKENIZE (RECURSIVE)       COBFORM              136     67        */
+ /* WARNING                    COBFORM              141     72        */
+ /*                            CONTROL_TABLES                         */
+ /*                            TOKENIZE                               */
+ /*                                                                   */
+ /* IF LISTING IS WITHOUT INSOURCE THEN THE SOURCE PAGE IS TWO LESS   */
+ /* THAN THE PAGE LISTED FOR INSOURCE.                                */
+ /*                                                                   */
+ /*********************************************************************/
+1%DECLARE FIRST_HIGH   FIXED;
+ %DECLARE SECOND_HIGH  FIXED;
+ %DECLARE THIRD_HIGH   FIXED;
+ %DECLARE FOURTH_HIGH  FIXED;
+ %;
+ %FIRST_HIGH  = 12;
+ %SECOND_HIGH = 34;
+ %THIRD_HIGH  = 51;
+ %FOURTH_HIGH = 84;
+ %;
+ %DECLARE A_MARGIN          FIXED;
+ %DECLARE B_MARGIN          FIXED;
+ %DECLARE C_MARGIN          FIXED;
+ %DECLARE INDENT_ONCE       FIXED;
+ %DECLARE INDENT_TWICE      FIXED;
+ %DECLARE SAME_LEVEL        FIXED;
+ %DECLARE ONCE_NOW_LATER    FIXED;
+ %;
+ %A_MARGIN             = 0;
+ %B_MARGIN             = 1;
+ %C_MARGIN             = 2;
+ %INDENT_ONCE          = 3;
+ %INDENT_TWICE         = 4;
+ %SAME_LEVEL           = 5;
+ %ONCE_NOW_LATER       = 6;
+ %;
+ %DECLARE SPECIAL_PROCESS   FIXED;
+ %DECLARE DO_NOTHING        FIXED;
+ %DECLARE SPACE_TWICE       FIXED;
+ %DECLARE NEXT_LINE         FIXED;
+ %DECLARE DOUBLE_SPACE      FIXED;
+ %DECLARE TRIPLE_SPACE      FIXED;
+ %DECLARE EJECT             FIXED;
+ %DECLARE IF_STMT           FIXED;
+ %DECLARE ELSE_OTHERWISE    FIXED;
+ %DECLARE SKIP1_SET_PERIOD  FIXED;
+ %;
+ %SPECIAL_PROCESS      = 0;
+ %DO_NOTHING           = 1;
+ %SPACE_TWICE          = 2;
+ %NEXT_LINE            = 3;
+ %DOUBLE_SPACE         = 4;
+ %TRIPLE_SPACE         = 5;
+ %EJECT                = 6;
+ %IF_STMT              = 7;
+ %ELSE_OTHERWISE       = 8;
+ %SKIP1_SET_PERIOD     = 9;
+1%DECLARE DUMMY             FIXED;
+ %DECLARE SHORT             FIXED;
+ %DECLARE CHANGE            FIXED;
+ %DECLARE PIC_SUB           FIXED;
+ %DECLARE COMP_SUB          FIXED;
+ %DECLARE SYNC_SUB          FIXED;
+ %DECLARE ZEROS_SUB         FIXED;
+ %DECLARE DELETE            FIXED;
+ %DECLARE DATA_FLAG         FIXED;
+ %DECLARE RESET             FIXED;
+ %;
+ %DUMMY                = 0;
+ %SHORT                = 1;
+ %CHANGE               = 2;
+ %PIC_SUB              = 3;
+ %COMP_SUB             = 4;
+ %SYNC_SUB             = 5;
+ %ZEROS_SUB            = 6;
+ %DELETE               = 7;
+ %DATA_FLAG            = 8;
+ %RESET                = 9;
+1DECLARE
+  1  CARD_DECK,
+     2  SEQ_NO       CHAR(6),
+     2  COL_7        CHAR(1),
+     2  SOURCE_AREA  CHAR(65),
+     2  PGM_ID       CHAR(8);
+
+ DECLARE
+  1  NEW_SOURCE  DEFINED CARD_DECK,
+     2  FILLER           CHAR(7),
+     2  NEW_SOURCE_AREA  CHAR(73);
+
+ DECLARE
+  1  REDO_CARD_DECK  DEFINED CARD_DECK,
+     2  FILLER         CHAR(7),
+     2  CK_INCLUDE     CHAR(2),
+     2  FILLER2        CHAR(71);
+
+ DECLARE
+  1  OUTPUT_CARD,
+     2  OUT_SEQ_NO   PIC '(6)9',
+     2  OUT_COL_7    CHAR(1),
+     2  OUT_AREA     CHAR(65),
+     2  OUT_PGM_ID   CHAR(8);
+
+ /*TABLE OF SWITCHES USED WITH THE COBMSG PROCEDURE*/
+ DECLARE
+    1  MESSAGE_SELECTORS  STATIC,
+       2  CASE_SELECTOR      BIT(1) INIT('0'B),
+       2  FUNCTION_SELECTOR  BIT(1) INIT('0'B),
+       2  HELP_SELECTOR      BIT(1) INIT('0'B),
+       2  HELPS_SELECTOR     BIT(1) INIT('0'B),
+       2  INV_ANSW_SELECTOR  BIT(1) INIT('0'B),
+       2  JCL_SELECTOR       BIT(1) INIT('0'B),
+       2  LIST_CMD_SELECTOR  BIT(1) INIT('0'B),
+       2  PARMS_SELECTOR     BIT(1) INIT('0'B),
+       2  SYNTAX_SELECTOR    BIT(1) INIT('0'B),
+       2  TERM_SELECTOR      BIT(1) INIT('0'B),
+       2  TSO_SELECTOR       BIT(1) INIT('0'B);
+1/**************************************************************/
+ /*THESE IDENTIFIERS ARE CONCERNED WITH THE CONTROL FILE SYSIN*/
+ DECLARE  ALT_INDENT         CHAR(10) INIT('ALT INDENT') STATIC;
+ DECLARE  ALTERNATE_INDENT   BIT(1)   INIT('0'B) STATIC;
+ DECLARE  ANSW               CHAR(30);
+ DECLARE  BEGIN_EX           CHAR(5)  INIT('BEGIN') STATIC;
+ DECLARE  CANCEL             CHAR(6)  INIT('CANCEL') STATIC;
+ DECLARE  CAPITAL_LETTERS    CHAR(28)
+                         INIT('ABCDEFGHIJKLMNOPQRSTUVWXYZ  ') STATIC;
+ DECLARE  CASE_CONSTRUCT     CHAR(14) INIT('CASE CONSTRUCT') STATIC;
+ DECLARE  CMDS               CHAR(8)  INIT('COMMANDS') STATIC;
+ DECLARE  COL_PIC            BIT(1)   INIT('0'B) STATIC;
+ DECLARE  COMPRESS           BIT(1)   INIT('0'B) STATIC;
+ DECLARE  COMPRESS_SOURCE    CHAR(15) INIT('COMPRESS SOURCE') STATIC;
+ DECLARE  COUNT              CHAR(5)  INIT('COUNT') STATIC;
+ DECLARE  DATA_ONLY          BIT(1)   INIT('0'B) STATIC;
+ DECLARE  DATA_DIV_ONLY      CHAR(18) INIT('DATA DIVISION ONLY') STATIC;
+ DECLARE  DROP_COMMAS        BIT(1)   INIT('1'B) STATIC;
+ DECLARE  DUP_OUT            BIT(1)   INIT('0'B) STATIC;
+ DECLARE  END_CONTROL_LOOP   CHAR(3)  INIT('END') STATIC;
+ DECLARE  FUNCTION_HELP      CHAR(8)  INIT('FUNCTION') STATIC;
+ DECLARE  GETNEXT            BIT(1)   INIT('1'B) STATIC;
+ DECLARE  HELP_HELP          CHAR(4)  INIT('HELP') STATIC;
+ DECLARE  HELPS_HELP         CHAR(5)  INIT('HELPS') STATIC;
+ DECLARE  JCL_HELP           CHAR(3)  INIT('JCL') STATIC;
+ DECLARE  KEEP_COMMAS        CHAR(11) INIT('KEEP COMMAS') STATIC;
+ DECLARE  KEEP_SPACERS       BIT(1)   INIT('0'B) STATIC;
+ DECLARE  LEAVE_SPACERS      CHAR(12) INIT('KEEP SPACERS') STATIC;
+ DECLARE  LIST_ONLY          CHAR(9)  INIT('LIST ONLY') STATIC;
+ DECLARE  LIST_OUTPUT        CHAR(11) INIT('LIST OUTPUT') STATIC;
+1DECLARE  MAKE_COLUMN        BIT(1)   INIT('0'B) STATIC;
+ DECLARE  MORE_IN            BIT(1)   INIT('1'B) STATIC;
+ DECLARE  NEW_PROGRAM        BIT(1)   INIT('0'B) STATIC;
+ DECLARE  NNN                FIXED BINARY;
+ DECLARE  NO_REMARKS         CHAR(10) INIT('NO REMARKS') STATIC;
+ DECLARE  NO_SUBSTITUTIONS   CHAR(16) INIT('NO SUBSTITUTIONS') STATIC;
+ DECLARE  OMIT_THENS         CHAR(10) INIT('OMIT THENS') STATIC;
+ DECLARE  OUT_PRIM           BIT(1)   INIT('1'B) STATIC;
+ DECLARE  PARMS_HELP         CHAR(5)  INIT('PARMS') STATIC;
+ DECLARE  PGM_ID_DEFINE      CHAR(6)  INIT('PGM ID') STATIC;
+ DECLARE  PIC_COL            CHAR(7)  INIT('PIC COL') STATIC;
+ DECLARE  PROC_ONLY          BIT(1)   INIT('0'B) STATIC;
+ DECLARE  PROCEDURE_ONLY     CHAR(23) INIT('PROCEDURE DIVISION ONLY')
+                                      STATIC;
+ DECLARE  SECOND_OUT         CHAR(4)  INIT('OUT2') STATIC;
+ DECLARE  SEQ_DEFINE         CHAR(3)  INIT('SEQ') STATIC;
+ DECLARE  SHOW_COUNT         BIT(1)   INIT('0'B) STATIC;
+ DECLARE  SKIP_COMMENTS      BIT(1)   INIT('0'B) STATIC;
+ DECLARE  SKIP_COM           CHAR(11) INIT('NO COMMENTS') STATIC;
+ DECLARE  SKIP_REMARKS       BIT(1)   INIT('0'B) STATIC;
+ DECLARE  SMALL_LETTERS      CHAR(28)
+                         INIT('abcdefghijklmnopqrstuvwxyz_-') STATIC;
+ DECLARE  STATE_OPS          CHAR(5)  INIT('STATE') STATIC;
+ DECLARE  STOP_CONTROL_LOOP  CHAR(4)  INIT('STOP') STATIC;
+ DECLARE  SYNTAX_HELP        CHAR(6)  INIT('SYNTAX') STATIC;
+ DECLARE  SUBSTITUTE         BIT(1)   INIT('1'B) STATIC;
+ DECLARE  SYS_LIST           BIT(1)   INIT('0'B) STATIC;
+ DECLARE  THENS              BIT(1)   INIT('1'B) STATIC;
+ DECLARE  TSO_HELP           CHAR(3)  INIT('TSO') STATIC;
+ DECLARE  USING_COLUMN       CHAR(12) INIT('USING COLUMN') STATIC;
+ DECLARE  WIDE_MARGINS       CHAR(12) INIT('WIDE MARGINS') STATIC;
+ /**************************************************************/
+1/*REGULAR PROGRAM IDENTIFIERS*/
+ DECLARE  ACTION  FIXED DECIMAL(1);
+ DECLARE  BLANK  CHAR(1) INIT(' ') STATIC;
+ DECLARE  COMMA  CHAR(1) INIT(',') STATIC;
+ DECLARE  DATA_DIV  CHAR(15) INIT('DATA DIVISION.') STATIC;
+ DECLARE  FLAG_REMARKS  FIXED DECIMAL(1) INIT(-5) STATIC;
+ DECLARE  FOUR  CHAR(4) INIT(' ') STATIC;
+ DECLARE  FINAL  CHAR(1);
+ DECLARE  FIVE  CHAR(5) INIT(' ') STATIC;
+ DECLARE  GIVE_MSG  BIT(1) INIT('1'B) STATIC;
+ DECLARE  (HIGH, I, J, K, LOW, POS)  FIXED BINARY;
+ DECLARE  IN_COUNT  FIXED BINARY(31) INIT(0) STATIC;
+ DECLARE  INPUT_WORK_AREA  CHAR(73);
+ DECLARE  NEST  FIXED DECIMAL(2);
+ DECLARE  NO  BIT(1) INIT('0'B) STATIC;
+ DECLARE  NEW_PGM_ID  CHAR(8) INIT(' ');
+ DECLARE  OUT_COUNT  FIXED BINARY(31) INIT(0);
+ DECLARE  PARM  CHAR(100) VARYING;
+ DECLARE  PERIOD  CHAR(1) INIT('.') VARYING STATIC;
+ DECLARE  PERIOD_SWITCH  BIT(1) INIT('1'B) STATIC;
+ DECLARE  PIC_COL_NO  FIXED BINARY;
+ DECLARE  PLUS_PLUS  CHAR(2) INIT('++') STATIC;
+ DECLARE  PROC_DIV  CHAR(20) INIT('PROCEDURE DIVISION.') STATIC;
+ DECLARE  PROCESS_AREA  BIT(1) INIT('1'B) STATIC;
+ DECLARE  SEL  CHAR(2);
+ DECLARE  SEQ_INCREMENT  FIXED DECIMAL(5) INIT(10) STATIC;
+ DECLARE  SEQ_VALUE  FIXED DECIMAL(15) INIT(0) STATIC;
+ DECLARE  STAR  CHAR(1) INIT('*') STATIC;
+ DECLARE  STMT  CHAR(65) VARYING;
+ DECLARE  MORE_SYSIN  BIT(1) INIT('1'B) STATIC;
+ DECLARE  THEN_KEYWORD  CHAR(5) INIT('THEN ') STATIC;
+ DECLARE  THREE  CHAR(3) INIT(' ') STATIC;
+ DECLARE  TOKEN(35)  CHAR(30) VARYING;
+ DECLARE  TWO  CHAR(2) INIT(' ') STATIC;
+ DECLARE  WORD  CHAR(30) VARYING;
+ DECLARE  YES  BIT(1) INIT('1'B) STATIC;
+
+ DECLARE  (ADDR, HBOUND, INDEX, LENGTH, ONSOURCE, SUBSTR, STRING,
+           TRANSLATE, VERIFY)  BUILTIN;
+
+ /*EXTERNAL DECLARATION*/
+ DECLARE  COBMSG  ENTRY;
+
+ /*FILE DECLARATIONS*/
+ DECLARE  IN       FILE INPUT  STREAM ENVIRONMENT(FB RECSIZE(80));
+ DECLARE  OUT      FILE OUTPUT STREAM ENVIRONMENT(FB RECSIZE(80));
+ DECLARE  OUT2     FILE OUTPUT STREAM ENVIRONMENT(FB RECSIZE(80));
+ DECLARE  SYSIN    FILE INPUT  STREAM;
+ DECLARE  SYSPRINT FILE OUTPUT STREAM PRINT;
+1ON UNDEFINEDFILE(SYSIN) BEGIN; /*BYPASS CONTROL LOOP*/
+    PUT FILE(SYSPRINT) SKIP(3) EDIT('SYSIN FILE NOT ALLOCATED,',
+        ' DEFAULT OPTIONS ASSUMED.') (A);
+    GO TO SKIP_LOOP;
+    END;
+
+ ON CONVERSION BEGIN; /*RECOVER FROM CONVERSION ERROR OBTAINING INPUT*/
+     ANSW = ONSOURCE;
+     ANSW = TRANSLATE(ANSW, CAPITAL_LETTERS, SMALL_LETTERS);
+     ONSOURCE = (16) '0';
+     END;
+
+ ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+ ON ENDFILE(IN)    MORE_IN  = NO;
+
+ OUT_COL_7 = BLANK;
+ NEST = A_MARGIN;
+ PUT FILE(SYSPRINT) PAGE;
+
+ IF PARM ^= ''
+     THEN DO;
+          I = INDEX(PARM, COMMA);
+          IF I = 0
+              THEN DO;
+                   SEL = PARM;
+                   PARM = '';
+                   END;
+              ELSE DO;
+                   SEL = SUBSTR(PARM, 1, 2);
+                   PARM = SUBSTR(PARM, I+1);
+                   END;
+1         DO WHILE(SEL ^= '');
+              SELECT(SEL);
+                  WHEN ('AI')  ALTERNATE_INDENT = YES;
+                  WHEN ('CO')  SHOW_COUNT = YES;
+                  WHEN ('CS') DO;
+                       ACTION = DO_NOTHING;
+                       COMPRESS = YES;
+                       KEEP_SPACERS = YES;
+                       DROP_COMMAS = NO;
+                       END;
+                  WHEN ('DO') DO;
+                       PROCESS_AREA = NO;
+                       DATA_ONLY = YES;
+                       END;
+                  WHEN ('GD') DO;
+                       ALTERNATE_INDENT = YES;
+                       THENS = NO;
+                       PIC_COL_NO = 37;
+                       COL_PIC = YES;
+                       MAKE_COLUMN = YES;
+                       END;
+                  WHEN ('KC')  DROP_COMMAS = NO;
+                  WHEN ('KS')  KEEP_SPACERS = YES;
+                  WHEN ('LI')  SYS_LIST = YES;
+                  WHEN ('LO') DO;
+                       SYS_LIST = YES;
+                       OUT_PRIM = NO;
+                       DUP_OUT = NO;
+                       END;
+                  WHEN ('NC')  SKIP_COMMENTS = YES;
+                  WHEN ('NR')  SKIP_REMARKS = YES;
+                  WHEN ('NS')  SUBSTITUTE = NO;
+                  WHEN ('OT')  THENS = NO;
+                  WHEN ('O2')  DUP_OUT = YES;
+                  WHEN ('PC') DO;
+                       PIC_COL_NO = 37;
+                       COL_PIC = YES;
+                       END;
+                  WHEN ('PO') DO;
+                       PROCESS_AREA = NO;
+                       PROC_ONLY = YES;
+                       END;
+                  WHEN ('UC')  MAKE_COLUMN = YES;
+                  WHEN ('WM')  NEW_PROGRAM = YES;
+                  OTHERWISE  PUT FILE(SYSPRINT) SKIP(1)
+                      EDIT(SEL, ' IS NOT RECOGNIZED AS A VALID ',
+                          'PARAMETER.  IT IS IGNORED.') (A);
+                  END;
+1             I = INDEX(PARM, COMMA);
+              IF I = 0
+                  THEN DO;
+                       SEL = PARM;
+                       PARM = '';
+                       END;
+                  ELSE DO;
+                       SEL = SUBSTR(PARM, 1, 2);
+                       PARM = SUBSTR(PARM, I+1);
+                       END;
+              END;
+          ANSW = BEGIN_EX;
+          END;
+     ELSE DO;
+          FETCH COBMSG;
+          TERM_SELECTOR = YES;
+          CALL COBMSG(MESSAGE_SELECTORS);
+          GET FILE(SYSIN) LIST(NNN);
+          IF NNN ^= 0
+              THEN ANSW = BLANK;
+
+          CONTROL_LOOP:  /*ALLOW USER TO SPECIFY OPTIONS AS DESIRED*/
+          DO WHILE (MORE_SYSIN & ANSW ^= BEGIN_EX &
+            ANSW ^= END_CONTROL_LOOP & ANSW ^= STOP_CONTROL_LOOP);
+              SELECT (ANSW);
+                  WHEN (ALT_INDENT) ALTERNATE_INDENT = YES;
+                  WHEN (CANCEL) RETURN;
+                  WHEN (CASE_CONSTRUCT) CASE_SELECTOR = YES;
+                  WHEN (CMDS)  LIST_CMD_SELECTOR = YES;
+                  WHEN (COMPRESS_SOURCE) DO;
+                       ACTION = DO_NOTHING;
+                       COMPRESS = YES;
+                       KEEP_SPACERS = YES;
+                       DROP_COMMAS = NO;
+                       END;
+                  WHEN (COUNT) SHOW_COUNT = YES;
+                  WHEN (DATA_DIV_ONLY) DO;
+                       PROCESS_AREA = NO;
+                       DATA_ONLY = YES;
+                       END;
+                  WHEN (FUNCTION_HELP) FUNCTION_SELECTOR = YES;
+                  WHEN (HELP_HELP) HELP_SELECTOR = YES;
+                  WHEN (HELPS_HELP) HELPS_SELECTOR = YES;
+                  WHEN (JCL_HELP) JCL_SELECTOR = YES;
+                  WHEN (KEEP_COMMAS) DROP_COMMAS = NO;
+                  WHEN (LEAVE_SPACERS) KEEP_SPACERS = YES;
+                  WHEN (LIST_ONLY) DO;
+                       SYS_LIST = YES;
+                       OUT_PRIM = NO;
+                       DUP_OUT = NO;
+                       END;
+1                 WHEN (LIST_OUTPUT) SYS_LIST = YES;
+                  WHEN (NO_REMARKS) SKIP_REMARKS = YES;
+                  WHEN (NO_SUBSTITUTIONS) SUBSTITUTE = NO;
+                  WHEN (OMIT_THENS) THENS = NO;
+                  WHEN (PARMS_HELP) PARMS_SELECTOR = YES;
+                  WHEN (PGM_ID_DEFINE) DO;
+                       GET FILE(SYSIN) LIST(NNN);
+                       NEW_PGM_ID = ANSW;
+                       END;
+                  WHEN (PIC_COL) DO;
+                       GET FILE(SYSIN) LIST(PIC_COL_NO);
+                       IF PIC_COL_NO = 0
+                           THEN GETNEXT = NO;
+                       IF PIC_COL_NO < 12  ]  PIC_COL_NO > 70
+                           THEN PIC_COL_NO = 37;
+                       COL_PIC = YES;
+                       END;
+                  WHEN (PROCEDURE_ONLY) DO;
+                       PROCESS_AREA = NO;
+                       PROC_ONLY = YES;
+                       END;
+                  WHEN (SECOND_OUT) DUP_OUT = YES;
+                  WHEN (SEQ_DEFINE) DO;
+                       GET FILE(SYSIN) LIST(SEQ_INCREMENT);
+                       IF SEQ_INCREMENT = 0
+                           THEN GETNEXT = NO;
+                       IF SEQ_INCREMENT > 100  ]  SEQ_INCREMENT < 1
+                           THEN SEQ_INCREMENT = 10;
+                       END;
+                  WHEN (SKIP_COM) SKIP_COMMENTS = YES;
+                  WHEN (STATE_OPS) CALL OPTION_LIST;
+                  WHEN (SYNTAX_HELP) SYNTAX_SELECTOR = YES;
+                  WHEN (TSO_HELP) TSO_SELECTOR = YES;
+                  WHEN (USING_COLUMN) MAKE_COLUMN = YES;
+                  WHEN (WIDE_MARGINS) NEW_PROGRAM = YES;
+                  OTHERWISE INV_ANSW_SELECTOR = YES;
+                  END;
+
+              IF STRING(MESSAGE_SELECTORS) > NO
+                  THEN CALL COBMSG(MESSAGE_SELECTORS);
+
+              IF GETNEXT
+                  THEN DO;
+                       GET FILE(SYSIN) LIST(NNN);
+                       IF NNN ^= 0
+                            THEN ANSW = BLANK;
+                       END;
+                  ELSE GETNEXT = YES;
+              END CONTROL_LOOP;
+          RELEASE COBMSG;
+          END;
+ ON CONVERSION SYSTEM;
+1SKIP_LOOP:  /* COME HERE IF SYSIN UNDEFINED FILE */
+ IF ^THENS
+     THEN THEN_KEYWORD = BLANK;
+ OUT_PGM_ID = NEW_PGM_ID;
+
+ IF ANSW ^= BEGIN_EX
+     THEN CALL OPTION_LIST;
+
+ CALL GET_INPUT;
+
+ READ_LOOP:
+ DO WHILE (MORE_IN);
+     IF COL_7 = STAR
+         THEN CALL COMMENT;
+         ELSE DO;
+              SELECT;
+                  WHEN (DATA_ONLY)
+                       SELECT;
+                           WHEN (INPUT_WORK_AREA = DATA_DIV)
+                                PROCESS_AREA = YES;
+                           WHEN (INPUT_WORK_AREA = PROC_DIV)
+                                PROCESS_AREA = NO;
+                           OTHERWISE;
+                           END;
+                  WHEN (PROC_ONLY)
+                       IF INPUT_WORK_AREA = PROC_DIV
+                           THEN PROCESS_AREA = YES;
+                  OTHERWISE;
+                  END;
+              IF PROCESS_AREA
+                  THEN IF CK_INCLUDE = PLUS_PLUS
+                           THEN DO;
+                                IF STMT ^= ''
+                                    THEN CALL PUTOUT;
+                                STMT = INPUT_WORK_AREA;
+                                CALL PUTOUT;
+                                END;
+                           ELSE DO;
+                                CALL TOKENIZE(1);
+                                CALL PROCESS_TOKENS;
+                                END;
+                  ELSE DO;
+                       IF STMT ^= ''
+                           THEN CALL PUTOUT;
+                       STMT = INPUT_WORK_AREA;
+                       CALL PUTOUT;
+                       END;
+              CALL GET_INPUT;
+              END;
+     END READ_LOOP;
+ CALL PUTOUT;
+1GIVE_MSG = NO;
+ SEQ_VALUE = 0;
+ CALL WARNING; /* PUT OUT LAST LINE OF WARNING IF ANY */
+
+ IF SHOW_COUNT
+     THEN DO;
+          IN_COUNT = IN_COUNT -1;
+          PUT FILE(SYSPRINT) SKIP(3)
+              EDIT('TOTAL NUMBER OF RECORDS READ IN IS ',IN_COUNT)
+              (A,F(5));
+          PUT FILE(SYSPRINT) SKIP(2)
+              EDIT('TOTAL NUMBER OF RECORDS OUTPUT IS  ',OUT_COUNT)
+              (A,F(5));
+          END;
+     ELSE IF ^SYS_LIST
+              THEN PUT FILE(SYSPRINT) SKIP(3)
+                       EDIT('COBFORM NORMAL TERMINATION') (A);
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1COMMENT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*PROCEDURE INTERNAL TO COBFORM WHICH PROCESSES COMMENT INPUT        */
+ /*STATEMENTS.                                                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PUT_BLANK  BIT(1);
+ DECLARE  TOKEN(35) CHAR(73) VARYING;
+
+
+ IF STMT ^= ''
+     THEN CALL PUTOUT;
+ OUT_COL_7 = STAR;
+ IF SKIP_COMMENTS
+     THEN DO WHILE (COL_7 = STAR & MORE_IN);
+              CALL SKIP;
+              END;
+     ELSE DO;
+          IF NEST ^= A_MARGIN  & SUBSTR(INPUT_WORK_AREA, 65, 1) = BLANK
+              THEN IF VERIFY(INPUT_WORK_AREA, BLANK) = 0
+                       THEN CALL SKIP;
+                       ELSE DO;
+                            CALL TAB;
+                            J = LENGTH(STMT);
+                            SUBSTR(STMT, J, 1) = STAR;
+                            PUT_BLANK = NO;
+                            END;
+              ELSE PUT_BLANK = YES;
+1         STAR_LOOP:  /*LOOP AS LONG AS THERE ARE COMMENTS*/
+          DO WHILE (COL_7 = STAR & MORE_IN);
+              IF SUBSTR(INPUT_WORK_AREA, 65, 1) = STAR
+                  THEN CALL SKIP;
+              ELSE DO;
+                   POS = VERIFY(INPUT_WORK_AREA, BLANK);
+                   IF POS = 0
+                       THEN CALL SKIP;
+                   ELSE DO;
+                        DEBLANK: /*TOKENINZE TO REFORMAT*/
+                        DO I = 1 BY 1 WHILE (POS ^= 0);
+                            INPUT_WORK_AREA =
+                                SUBSTR(INPUT_WORK_AREA, POS);
+                            POS = INDEX(INPUT_WORK_AREA, BLANK);
+                            IF POS = 0
+                                THEN POS = 66;
+                            TOKEN(I) =
+                                SUBSTR(INPUT_WORK_AREA, 1, POS-1);
+                            IF POS = 66
+                                THEN INPUT_WORK_AREA = BLANK;
+                                ELSE INPUT_WORK_AREA =
+                                         SUBSTR(INPUT_WORK_AREA, POS+1);
+                            POS = VERIFY(INPUT_WORK_AREA, BLANK);
+                            END DEBLANK;
+                        TOKEN(I) = BLANK;
+1                       CONSTRUCT: /*REFORMAT FOR OUTPUT*/
+                        DO I = 1 BY 1 WHILE (TOKEN(I) ^= BLANK);
+                            J = LENGTH(STMT);
+                            K = LENGTH(TOKEN(I));
+                            SELECT;
+                                WHEN (J = 0);
+                                WHEN (J + K > 64) DO;
+                                     CALL PUTOUT;
+                                     IF NEST ^= A_MARGIN
+                                         THEN DO;
+                                              CALL TAB;
+                                              J = LENGTH(STMT);
+                                              SUBSTR(STMT, J, 1) = STAR;
+                                              END;
+                                     PUT_BLANK = NO;
+                                     END;
+                                 OTHERWISE;
+                                 END;
+                            IF PUT_BLANK ] STMT ^= ''
+                                THEN STMT = STMT ]] BLANK ]] TOKEN(I);
+                                ELSE STMT = STMT ]] TOKEN(I);
+                            PUT_BLANK = NO;
+                            END CONSTRUCT;
+                        CALL GET_INPUT;
+                        END;
+                   END;
+              END STAR_LOOP;
+              END;
+ IF STMT ^= ''
+     THEN CALL PUTOUT;
+ OUT_COL_7 = BLANK;
+1SKIP:  PROCEDURE;
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO THE COMMENT PROCEDURE.  ITS PURPOSE  */
+ /*IS TO OUTPUT COMMENTS WITHOUT REFORMATING THEM AT ALL.  THIS IS    */
+ /*DONE IF THE NO COMMENTS OPTION IS SPECIFIED OR FOR A BLOCK COMMENT.*/
+ /*                                                                   */
+ /*********************************************************************/
+
+ IF STMT ^= ''
+     THEN CALL PUTOUT;
+ STMT = INPUT_WORK_AREA;
+ CALL PUTOUT;
+ CALL GET_INPUT;
+ END SKIP;
+
+ END COMMENT;
+1CONTROL_TABLES:  PROCEDURE(TOKEN);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*INPUT A TOKEN AND THE VALUES RETURNED ARE CODES TELLING WHAT ACTION*/
+ /*SHOULD BE TAKEN FOR THE TOKEN IN PUTING IT OUT.  THIS PROCEDURE IS */
+ /*INTERNAL TO COBFORM.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+ /*                                                                   */
+ /*                                                                   */
+ /* ACTION/DIRECTION TABLE OF CODES                                   */
+ /* 0  SPECIAL PROCESSING INDICATOR                                   */
+ /* 1  NO SPECIAL ACTION                                              */
+ /* 2  SKIP TWO SPACES                                                */
+ /* 3  NEXT LINE                                                      */
+ /* 4  DOUBLE SPACE                                                   */
+ /* 5  TRIPLE SPACE                                                   */
+ /* 6  PAGE EJECT                                                     */
+ /* 7  IF STATEMENT                                                   */
+ /* 8  ELSE OTHERWISE                                                 */
+ /* 9  DELETE KEY WORD SET PERIOD                                     */
+ /*                                                                   */
+ /*                                                                   */
+ /* MARGIN TABLE OF CODES                                             */
+ /* 0  A MARGIN                                                       */
+ /* 1  B MARGIN                                                       */
+ /* 2  C MARGIN                                                       */
+ /* 3  ONE INDENTATION                                                */
+ /* 4  TWO INDENTATION                                                */
+ /* 5  SAME LEVEL OF INDENTATION                                      */
+ /* 6  INDENT ONCE FOR THIS KEYWORD AND ONCE FOR THE NEXT ONE         */
+ /*                                                                   */
+ /* NEST VALUES ARE RELATIVE VALUES                                   */
+ /*    _______________________________________________________________*/
+ /*   / COLS: 8   12  16   21  25   30  34   39  43   48  52          */
+ /*  /                                                                */
+ /*  ]  NEST VALUE:                                                   */
+ /*  ]        0    1   2    3   4    5   6    7   8    9  10          */
+ /*                                                                   */
+ /* LEVELS 2, 5, 7 AND 9 ARE INDENTED FIVE SPACES FOR IF STATEMENTS   */
+ /* LEVEL 10 REPRESENTS THE MAXIMUM LEVEL OF INDENTATION PROVIDED     */
+ /* ALTHOUGH EXTREME CASES MAY CAUSE EXTRA INDENTATIONS OF TWO        */
+ /* SPACES.  LEVEL 6 IS THE MAXIMUM FULLY SUPPORTED LEVEL, ANYTHING   */
+ /* HIGHER CAUSES A WARNING MESSAGE.                                  */
+ /*                                                                   */
+ /* INPUT:   TOKEN, NEST                                              */
+ /* OUTPUT:  NEST, ACTION                                             */
+ /* METHOD:  CALLS THE APPROPRIATE PROCEDURE BY DIVISION              */
+ /*                                                                   */
+ /*********************************************************************/
+1DECLARE  TOKEN  CHAR(*) VARYING;
+
+ DECLARE  ID  CHAR(2) INIT('ID') STATIC;
+ DECLARE  IDENTIFICATION  CHAR(14) INIT('IDENTIFICATION') STATIC;
+ DECLARE  ENVIRONMENT  CHAR(11) INIT('ENVIRONMENT') STATIC;
+ DECLARE  DATA  CHAR(4) INIT('DATA') STATIC;
+ DECLARE  PROCEDR  CHAR(9) INIT('PROCEDURE') STATIC;
+ DECLARE  DIVN  FIXED DECIMAL(1) INIT(0) STATIC;
+
+ /*SET THE DIVISION TO CALL BY THE INPUT DIVISION STATEMENT*/
+ SELECT;
+     WHEN ((DIVN = 0) & (TOKEN = ID ] TOKEN = IDENTIFICATION)) DO;
+          IF SUBSTITUTE
+              THEN TOKEN = IDENTIFICATION;
+          DIVN = 1;
+          IF ^SYS_LIST
+              THEN PUT FILE(SYSPRINT) SKIP(3)
+                       EDIT('COBFORM IN PROGRESS') (A);
+          END;
+     WHEN ((DIVN = 1 ] DIVN = 0) & TOKEN = ENVIRONMENT)  DIVN = 2;
+     WHEN ((DIVN = 2 ] DIVN = 0) & TOKEN = DATA)  DIVN = 3;
+     WHEN ((DIVN = 3 ] DIVN = 0) & TOKEN = PROCEDR) DO;
+          PERIOD_SWITCH = YES;
+          DIVN = 4;
+          END;
+     OTHERWISE;
+     END;
+1/*CALL THE APPROPRIATE PROCEDURE FOR THE DIVISION*/
+ IF COMPRESS
+     THEN;
+     ELSE SELECT (DIVN);
+              WHEN (4) CALL FOURTH;
+              WHEN (3) CALL THIRD;
+              WHEN (2) CALL SECOND;
+              WHEN (1) CALL FIRST;
+              OTHERWISE DO;
+                  PUT FILE(SYSPRINT) PAGE
+                      EDIT('MISSING COBOL DIVISIONS, COBFORM ABEND')(A);
+                  STOP;
+                  END;
+              END;
+
+ IF NEST > 6
+     THEN DO;
+          CALL WARNING;
+          IF NEST > 11
+              THEN NEST = 11;
+          END;
+1FIRST:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE ANALYZES THE INPUT FROM THE IDENTIFICATION DIVISION */
+ /*A TOKEN AT A TIME IN ORDER TO DETERMINE WHAT THE INDENTATION AND   */
+ /*LINE SPACING CONSIDERATIONS ARE.  THIS PROCEDURE IS INTERNAL TO    */
+ /*CONTROL_TABLES.                                                    */
+ /*                                                                   */
+ /*INPUT:   TOKEN, NEST                                               */
+ /*OUTPUT:  NEST, ACTION                                              */
+ /*METHOD:  TABLE OF IDENTIFICATION DIVISION KEY WORDS IS SEARCHED    */
+ /*         SEQUENTIALLY.  KEY WORD AND DIRECTION TABLES CORRESPOND   */
+ /*         BY POSITION.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FOUND  BIT(1)  INIT('0'B);
+1DECLARE
+    1  FIRST_TABLES  STATIC,
+       2  KEYWORD(FIRST_HIGH)  CHAR(14) VARYING INIT(
+       /*COBOL KEY WORDS WHICH MAY BE USED TO DETERMINE PROCESSING*/
+          /*  1 */    'AUTHOR',
+          /*  2 */    'DATE-COMPILED',
+          /*  3 */    'DATE-WRITTEN',
+          /*  4 */    'EJECT',
+          /*  5 */    'IDENTIFICATION',
+          /*  6 */    'INSTALLATION',
+          /*  7 */    'PROGRAM-ID',
+          /*  8 */    'REMARKS',
+          /*  9 */    'SECURITY',
+          /* 10 */    'SKIP1',
+          /* 11 */    'SKIP2',
+          /* 12 */    'SKIP3'),
+       2  DIRECTION(FIRST_HIGH)  FIXED DECIMAL(1) INIT(
+       /*DIRECTION SWITCHES INDICATE LINE SPACING FOR THE ACTION VALUE*/
+          /*  1 */     DOUBLE_SPACE,
+          /*  2 */     NEXT_LINE,
+          /*  3 */     NEXT_LINE,
+          /*  4 */     SKIP1_SET_PERIOD,
+          /*  5 */     DO_NOTHING,
+          /*  6 */     NEXT_LINE,
+          /*  7 */     DOUBLE_SPACE,
+          /*  8 */     DOUBLE_SPACE,
+          /*  9 */     NEXT_LINE,
+          /* 10 */     SKIP1_SET_PERIOD,
+          /* 11 */     SKIP1_SET_PERIOD,
+          /* 12 */     SKIP1_SET_PERIOD);
+1HIGH = FIRST_HIGH;
+ LOW  = 1;
+
+ /*IF THE LAST CHARACTER IS PUNCTUATION THEN REMOVE IT */
+ /*FOR TABLE SEARCH*/
+ I = LENGTH(TOKEN);
+ FINAL = SUBSTR(TOKEN, I, 1);
+ IF FINAL = COMMA ] FINAL = PERIOD
+     THEN WORD = SUBSTR(TOKEN, 1, I-1);
+     ELSE WORD = TOKEN;
+
+ IF DROP_COMMAS & FINAL = COMMA
+     THEN DO;
+          TOKEN = WORD;
+          FINAL = BLANK;
+          END;
+
+ BINARY_SEARCH:
+ DO WHILE (HIGH >= LOW & ^FOUND);
+     POS = (LOW + HIGH) / 2;
+     IF WORD = KEYWORD(POS)
+         THEN FOUND = YES;
+         ELSE IF WORD > KEYWORD(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+
+ IF ^FOUND
+     THEN ACTION = DO_NOTHING;
+     ELSE DO;
+          ACTION = DIRECTION(POS);
+          IF KEYWORD(POS) = 'REMARKS'
+              THEN NEST = FLAG_REMARKS; /*FLAG BEGINNING OF REMARKS*/
+              ELSE IF DIRECTION(POS) ^= SKIP1_SET_PERIOD
+                       THEN NEST = A_MARGIN;
+          END;
+ END FIRST;
+1FOURTH:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE ANALYZES THE INPUT FROM THE PROCEDURE DIVISION A    */
+ /*TOKEN AT A TIME IN ORDER TO DETERMINE WHAT THE INDENTATION AND     */
+ /*LINE SPACING CONSIDERATIONS ARE.  THIS PROCEDURE IS INTERNAL TO    */
+ /*CONTROL_TABLES.                                                    */
+ /*                                                                   */
+ /*INPUT:   TOKEN, NEST                                               */
+ /*OUTPUT:  NEST, ACTION                                              */
+ /*METHOD:  TABLE OF PROCEDURE DIVISION KEY WORDS IS SEARCH USING     */
+ /*         BINARY SEARCH.  KEY WORD, MARGIN, DIRECTION AND FLAG      */
+ /*         TABLES CORRESPOND BY POSITION.  THEN, ELSE MATCHING IS    */
+ /*         CONTROLED BY A STACK AS EXTREME CONDITIONS WOULD          */
+ /*         OTHERWISE THROW IT OFF.                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  CASE_CONSTRUCT  CHAR(1) INIT('C') STATIC;
+ DECLARE  FOUND  BIT(2) INIT('0'B);
+ DECLARE  LENGTHEN  CHAR(28) INIT(' ') STATIC;
+ DECLARE  REGULAR_CONSTRUCT  CHAR(1) INIT('R') STATIC;
+ DECLARE  YES  BIT(2) INIT('11'B) STATIC;
+
+ /*SWITCHES WHICH MAY AFFECT PROCESSING ONE OR MORE CALLS LATER*/
+ DECLARE  CASE_STMT  BIT(2) INIT('00'B) STATIC;
+ DECLARE  COLUMNIZE  BIT(2) INIT('00'B) STATIC;
+ DECLARE  HOLD_IN  BIT(2) INIT('01'B) STATIC;
+ DECLARE  HOLDING  BIT(2) INIT('10'B) STATIC;
+ DECLARE  IF_SWITCH  BIT(2) INIT('00'B) STATIC;
+ DECLARE  INDENT_SWITCH  BIT(2) INIT('00'B) STATIC;
+ DECLARE  INSIDE_CASE  BIT(2) INIT('00'B) STATIC;
+ DECLARE  PERIOD_SWITCH  BIT(2) INIT('11'B) STATIC;
+ DECLARE  RESET_SWITCH  BIT(2) INIT('00'B) STATIC;
+ DECLARE  NEST_STACK(50)  FIXED DECIMAL(2) INIT((50)0) STATIC;
+ DECLARE  STACK_POINTER  FIXED BINARY INIT(1) STATIC;
+
+1DECLARE
+    1  FOURTH_TABLES  STATIC,
+       2  KEYWORD(FOURTH_HIGH)  CHAR(12) VARYING INIT(
+       /*COBOL KEY WORDS WHICH MAY BE USED TO DETERMINE PROCESSING*/
+          /*  1 */    'ACCEPT',
+          /*  2 */    'ADD',
+          /*  3 */    'AFTER',
+          /*  4 */    'ALTER',
+          /*  5 */    'AT',
+          /*  6 */    'BASIS',
+          /*  7 */    'CALL',
+          /*  8 */    'CANCEL',
+          /*  9 */    'CLOSE',
+          /* 10 */    'COMPUTE',
+          /* 11 */    'COPY',
+          /* 12 */    'DEBUG',
+          /* 13 */    'DECLARATIVES',
+          /* 14 */    'DELETE',
+          /* 15 */    'DELIMITED',
+          /* 16 */    'DISABLE',
+          /* 17 */    'DISPLAY',
+          /* 18 */    'DIVIDE',
+          /* 19 */    'EJECT',
+          /* 20 */    'ELSE',
+          /* 21 */    'ENABLE',
+          /* 22 */    'ENHIBIT',
+          /* 23 */    'ENTER',
+          /* 24 */    'ENTRY',
+          /* 25 */    'EQUAL',
+          /* 26 */    'EXAMINE',
+          /* 27 */    'EXIT',
+          /* 28 */    'GENERATE',
+          /* 29 */    'GO',
+          /* 30 */    'GOBACK',
+          /* 31 */    'GREATER',
+          /* 32 */    'IF',
+          /* 33 */    'INITIATE',
+          /* 34 */    'INSERT',
+          /* 35 */    'INVALID',
+          /* 36 */    'IS',
+          /* 37 */    'LESS',
+          /* 38 */    'MERGE',
+          /* 39 */    'MESSAGE',
+          /* 40 */    'MOVE',
+          /* 41 */    'MULTIPLY',
+          /* 42 */    'NEGATIVE',
+1         /* 43 */    'NEXT',
+          /* 44 */    'NO',
+          /* 45 */    'NOTE',
+          /* 46 */    'ON',
+          /* 47 */    'OPEN',
+          /* 48 */    'OTHERWISE',
+          /* 49 */    'PERFORM',
+          /* 50 */    'POSITIVE',
+          /* 51 */    'PROCEDURE',
+          /* 52 */    'READ',
+          /* 53 */    'READY',
+          /* 54 */    'RECEIVE',
+          /* 55 */    'RELEASE',
+          /* 56 */    'REPLACING',
+          /* 57 */    'RESET',
+          /* 58 */    'RETURN',
+          /* 59 */    'REWRITE',
+          /* 60 */    'SEARCH',
+          /* 61 */    'SEEK',
+          /* 62 */    'SEND',
+          /* 63 */    'SET',
+          /* 64 */    'SKIP1',
+          /* 65 */    'SKIP2',
+          /* 66 */    'SKIP3',
+          /* 67 */    'SORT',
+          /* 68 */    'START',
+          /* 69 */    'STOP',
+          /* 70 */    'STRING',
+          /* 71 */    'SUBTRACT',
+          /* 72 */    'TALLYING',
+          /* 73 */    'TERMINATE',
+          /* 74 */    'THAN',
+          /* 75 */    'THEN',
+          /* 76 */    'TRANSFORM',
+          /* 77 */    'UNSTRING',
+          /* 78 */    'UNTIL',
+          /* 79 */    'USE',
+          /* 80 */    'USING',
+          /* 81 */    'VARYING',
+          /* 82 */    'WHEN',
+          /* 83 */    'WRITE',
+          /* 84 */    'ZEROES'),
+1      2  MARGIN(FOURTH_HIGH)  FIXED DECIMAL(1)  INIT(
+       /*THE MARGIN SWITCHES INDICATE HOW TO MODIFY THE VALUE OF NEST*/
+          /*  1 */     SAME_LEVEL,
+          /*  2 */     SAME_LEVEL,
+          /*  3 */     INDENT_ONCE,
+          /*  4 */     SAME_LEVEL,
+          /*  5 */     ONCE_NOW_LATER,
+          /*  6 */     A_MARGIN,
+          /*  7 */     SAME_LEVEL,
+          /*  8 */     SAME_LEVEL,
+          /*  9 */     SAME_LEVEL,
+          /* 10 */     SAME_LEVEL,
+          /* 11 */     SAME_LEVEL,
+          /* 12 */     A_MARGIN,
+          /* 13 */     A_MARGIN,
+          /* 14 */     SAME_LEVEL,
+          /* 15 */     INDENT_ONCE,
+          /* 16 */     SAME_LEVEL,
+          /* 17 */     SAME_LEVEL,
+          /* 18 */     SAME_LEVEL,
+          /* 19 */     SAME_LEVEL,
+          /* 20 */     SAME_LEVEL,
+          /* 21 */     SAME_LEVEL,
+          /* 22 */     SAME_LEVEL,
+          /* 23 */     SAME_LEVEL,
+          /* 24 */     SAME_LEVEL,
+          /* 25 */     SAME_LEVEL,
+          /* 26 */     SAME_LEVEL,
+          /* 27 */     B_MARGIN,
+          /* 28 */     SAME_LEVEL,
+          /* 29 */     SAME_LEVEL,
+          /* 30 */     SAME_LEVEL,
+          /* 31 */     SAME_LEVEL,
+          /* 32 */     SAME_LEVEL,
+          /* 33 */     SAME_LEVEL,
+          /* 34 */     A_MARGIN,
+          /* 35 */     ONCE_NOW_LATER,
+          /* 36 */     SAME_LEVEL,
+          /* 37 */     SAME_LEVEL,
+          /* 38 */     SAME_LEVEL,
+          /* 39 */     SAME_LEVEL,
+          /* 40 */     SAME_LEVEL,
+          /* 41 */     SAME_LEVEL,
+          /* 42 */     SAME_LEVEL,
+1         /* 43 */     SAME_LEVEL,
+          /* 44 */     INDENT_ONCE,
+          /* 45 */     SAME_LEVEL,
+          /* 46 */     ONCE_NOW_LATER,
+          /* 47 */     SAME_LEVEL,
+          /* 48 */     SAME_LEVEL,
+          /* 49 */     SAME_LEVEL,
+          /* 50 */     SAME_LEVEL,
+          /* 51 */     A_MARGIN,
+          /* 52 */     SAME_LEVEL,
+          /* 53 */     SAME_LEVEL,
+          /* 54 */     SAME_LEVEL,
+          /* 55 */     SAME_LEVEL,
+          /* 56 */     INDENT_ONCE,
+          /* 57 */     SAME_LEVEL,
+          /* 58 */     SAME_LEVEL,
+          /* 59 */     SAME_LEVEL,
+          /* 60 */     SAME_LEVEL,
+          /* 61 */     SAME_LEVEL,
+          /* 62 */     SAME_LEVEL,
+          /* 63 */     SAME_LEVEL,
+          /* 64 */     SAME_LEVEL,
+          /* 65 */     SAME_LEVEL,
+          /* 66 */     SAME_LEVEL,
+          /* 67 */     SAME_LEVEL,
+          /* 68 */     SAME_LEVEL,
+          /* 69 */     SAME_LEVEL,
+          /* 70 */     SAME_LEVEL,
+          /* 71 */     SAME_LEVEL,
+          /* 72 */     SAME_LEVEL,
+          /* 73 */     SAME_LEVEL,
+          /* 74 */     SAME_LEVEL,
+          /* 75 */     INDENT_ONCE,
+          /* 76 */     SAME_LEVEL,
+          /* 77 */     SAME_LEVEL,
+          /* 78 */     INDENT_ONCE,
+          /* 79 */     SAME_LEVEL,
+          /* 80 */     INDENT_ONCE,
+          /* 81 */     INDENT_ONCE,
+          /* 82 */     ONCE_NOW_LATER,
+          /* 83 */     SAME_LEVEL,
+          /* 84 */     SAME_LEVEL),
+1      2  DIRECTION(FOURTH_HIGH)  FIXED DECIMAL(1)  INIT(
+       /*DIRECTION SWITCHES INDICATE LINE SPACING FOR THE ACTION VALUE*/
+          /*  1 */     NEXT_LINE,
+          /*  2 */     NEXT_LINE,
+          /*  3 */     NEXT_LINE,
+          /*  4 */     NEXT_LINE,
+          /*  5 */     NEXT_LINE,
+          /*  6 */     NEXT_LINE,
+          /*  7 */     NEXT_LINE,
+          /*  8 */     NEXT_LINE,
+          /*  9 */     NEXT_LINE,
+          /* 10 */     NEXT_LINE,
+          /* 11 */     NEXT_LINE,
+          /* 12 */     NEXT_LINE,
+          /* 13 */     DOUBLE_SPACE,
+          /* 14 */     NEXT_LINE,
+          /* 15 */     NEXT_LINE,
+          /* 16 */     NEXT_LINE,
+          /* 17 */     NEXT_LINE,
+          /* 18 */     NEXT_LINE,
+          /* 19 */     SKIP1_SET_PERIOD,
+          /* 20 */     ELSE_OTHERWISE,
+          /* 21 */     NEXT_LINE,
+          /* 22 */     NEXT_LINE,
+          /* 23 */     NEXT_LINE,
+          /* 24 */     NEXT_LINE,
+          /* 25 */     SPECIAL_PROCESS,
+          /* 26 */     NEXT_LINE,
+          /* 27 */     DO_NOTHING,
+          /* 28 */     NEXT_LINE,
+          /* 29 */     NEXT_LINE,
+          /* 30 */     NEXT_LINE,
+          /* 31 */     SPECIAL_PROCESS,
+          /* 32 */     IF_STMT,
+          /* 33 */     NEXT_LINE,
+          /* 34 */     NEXT_LINE,
+          /* 35 */     NEXT_LINE,
+          /* 36 */     SPECIAL_PROCESS,
+          /* 37 */     SPECIAL_PROCESS,
+          /* 38 */     NEXT_LINE,
+          /* 39 */     NEXT_LINE,
+          /* 40 */     NEXT_LINE,
+          /* 41 */     NEXT_LINE,
+          /* 42 */     SPECIAL_PROCESS,
+1         /* 43 */     NEXT_LINE,
+          /* 44 */     NEXT_LINE,
+          /* 45 */     DOUBLE_SPACE,
+          /* 46 */     NEXT_LINE,
+          /* 47 */     NEXT_LINE,
+          /* 48 */     ELSE_OTHERWISE,
+          /* 49 */     NEXT_LINE,
+          /* 50 */     SPECIAL_PROCESS,
+          /* 51 */     EJECT,
+          /* 52 */     NEXT_LINE,
+          /* 53 */     NEXT_LINE,
+          /* 54 */     NEXT_LINE,
+          /* 55 */     NEXT_LINE,
+          /* 56 */     NEXT_LINE,
+          /* 57 */     NEXT_LINE,
+          /* 58 */     NEXT_LINE,
+          /* 59 */     NEXT_LINE,
+          /* 60 */     NEXT_LINE,
+          /* 61 */     NEXT_LINE,
+          /* 62 */     NEXT_LINE,
+          /* 63 */     NEXT_LINE,
+          /* 64 */     SKIP1_SET_PERIOD,
+          /* 65 */     SKIP1_SET_PERIOD,
+          /* 66 */     SKIP1_SET_PERIOD,
+          /* 67 */     NEXT_LINE,
+          /* 68 */     NEXT_LINE,
+          /* 69 */     NEXT_LINE,
+          /* 70 */     NEXT_LINE,
+          /* 71 */     NEXT_LINE,
+          /* 72 */     DO_NOTHING,
+          /* 73 */     NEXT_LINE,
+          /* 74 */     SPECIAL_PROCESS,
+          /* 75 */     NEXT_LINE,
+          /* 76 */     NEXT_LINE,
+          /* 77 */     NEXT_LINE,
+          /* 78 */     NEXT_LINE,
+          /* 79 */     NEXT_LINE,
+          /* 80 */     NEXT_LINE,
+          /* 81 */     NEXT_LINE,
+          /* 82 */     NEXT_LINE,
+          /* 83 */     NEXT_LINE,
+          /* 84 */     SPECIAL_PROCESS),
+1      2  FLAG(FOURTH_HIGH)  FIXED DECIMAL(1)  INIT(
+       /*FLAG SWITCHES INDICATE ADDITIONAL PROCESSING CONSIDERATIONS*/
+          /*  1 */     DUMMY,
+          /*  2 */     DUMMY,
+          /*  3 */     RESET,
+          /*  4 */     DUMMY,
+          /*  5 */     DUMMY,
+          /*  6 */     DUMMY,
+          /*  7 */     DUMMY,
+          /*  8 */     DUMMY,
+          /*  9 */     DUMMY,
+          /* 10 */     DUMMY,
+          /* 11 */     DUMMY,
+          /* 12 */     DUMMY,
+          /* 13 */     DUMMY,
+          /* 14 */     DUMMY,
+          /* 15 */     DUMMY,
+          /* 16 */     DUMMY,
+          /* 17 */     DUMMY,
+          /* 18 */     DUMMY,
+          /* 19 */     DUMMY,
+          /* 20 */     DUMMY,
+          /* 21 */     DUMMY,
+          /* 22 */     DUMMY,
+          /* 23 */     DUMMY,
+          /* 24 */     DUMMY,
+          /* 25 */     DUMMY,
+          /* 26 */     DUMMY,
+          /* 27 */     DUMMY,
+          /* 28 */     DUMMY,
+          /* 29 */     DUMMY,
+          /* 30 */     DUMMY,
+          /* 31 */     DUMMY,
+          /* 32 */     DUMMY,
+          /* 33 */     DUMMY,
+          /* 34 */     DUMMY,
+          /* 35 */     DUMMY,
+          /* 36 */     DUMMY,
+          /* 37 */     DUMMY,
+          /* 38 */     DUMMY,
+          /* 39 */     DUMMY,
+          /* 40 */     DUMMY,
+          /* 41 */     DUMMY,
+          /* 42 */     DUMMY,
+1         /* 43 */     DUMMY,
+          /* 44 */     DUMMY,
+          /* 45 */     DUMMY,
+          /* 46 */     DUMMY,
+          /* 47 */     DUMMY,
+          /* 48 */     DUMMY,
+          /* 49 */     DUMMY,
+          /* 50 */     DUMMY,
+          /* 51 */     DUMMY,
+          /* 52 */     DUMMY,
+          /* 53 */     DUMMY,
+          /* 54 */     DUMMY,
+          /* 55 */     DUMMY,
+          /* 56 */     RESET,
+          /* 57 */     DUMMY,
+          /* 58 */     DUMMY,
+          /* 59 */     DUMMY,
+          /* 60 */     DUMMY,
+          /* 61 */     DUMMY,
+          /* 62 */     DUMMY,
+          /* 63 */     DUMMY,
+          /* 64 */     DUMMY,
+          /* 65 */     DUMMY,
+          /* 66 */     DUMMY,
+          /* 67 */     DUMMY,
+          /* 68 */     DUMMY,
+          /* 69 */     DUMMY,
+          /* 70 */     DUMMY,
+          /* 71 */     DUMMY,
+          /* 72 */     DUMMY,
+          /* 73 */     DUMMY,
+          /* 74 */     DUMMY,
+          /* 75 */     DUMMY,
+          /* 76 */     DUMMY,
+          /* 77 */     DUMMY,
+          /* 78 */     RESET,
+          /* 79 */     DUMMY,
+          /* 80 */     RESET,
+          /* 81 */     RESET,
+          /* 82 */     RESET,
+          /* 83 */     DUMMY,
+          /* 84 */     DUMMY);
+1HIGH = FOURTH_HIGH;
+ LOW  = 1;
+
+ /*IF LAST CHARACTER IS PUNCTUATION THEN REMOVE IT FOR TABLE SEARCH*/
+ I = LENGTH(TOKEN);
+ FINAL = SUBSTR(TOKEN, I, 1);
+ IF FINAL = COMMA  ]  FINAL = PERIOD
+     THEN WORD = SUBSTR(TOKEN, 1, I-1);
+     ELSE WORD = TOKEN;
+
+ IF DROP_COMMAS & FINAL = COMMA
+     THEN DO;
+          TOKEN = WORD;
+          FINAL = BLANK;
+          END;
+
+ BINARY_SEARCH:
+ DO WHILE (HIGH >= LOW & ^FOUND);
+     POS = (LOW + HIGH) / 2;
+     IF WORD = KEYWORD(POS)
+         THEN FOUND = YES;
+         ELSE IF WORD > KEYWORD(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+
+ IF ^FOUND
+     THEN DO;
+          IF COLUMNIZE = YES
+              THEN IF ALTERNATE_INDENT
+                       THEN IF LENGTH(STMT) > 35
+                                THEN TOKEN = TWO ]] TOKEN ]] LENGTHEN;
+                                ELSE TOKEN = TOKEN ]] LENGTHEN;
+                       ELSE IF LENGTH(STMT) > 35
+                                THEN TOKEN = BLANK ]] TOKEN ]] LENGTHEN;
+                                ELSE TOKEN = TOKEN ]] LENGTHEN;
+          IF PERIOD_SWITCH = YES
+              THEN DO;
+                   IF NEST = A_MARGIN
+                       THEN ACTION = NEXT_LINE;
+                       ELSE ACTION = DOUBLE_SPACE;
+                   NEST = A_MARGIN;
+                   END;
+              ELSE ACTION = DO_NOTHING;
+          CALL CHECK_FOR_PERIOD;
+          RETURN;
+          END;
+1COLUMNIZE = NO;
+
+ IF DIRECTION(POS) = SPECIAL_PROCESS
+     THEN DO;
+          IF SUBSTITUTE
+              THEN SELECT (WORD);
+                       WHEN ('IS')       TOKEN = '';
+                       WHEN ('THAN')     TOKEN = '';
+                       WHEN ('GREATER')  TOKEN = '>';
+                       WHEN ('LESS')     TOKEN = '<';
+                       WHEN ('ZEROES')
+                            IF TOKEN = WORD
+                                THEN TOKEN = 'ZEROS';
+                                ELSE TOKEN = 'ZEROS' ]] FINAL;
+                       WHEN ('EQUAL')    TOKEN = '=';
+                       WHEN ('POSITIVE') TOKEN = '> ZERO';
+                       WHEN ('NEGATIVE') TOKEN = '< ZERO';
+                       OTHERWISE;
+                       END;
+          ACTION = DO_NOTHING;
+          RETURN;
+          END;
+
+ SELECT (RESET_SWITCH);
+     WHEN (NO);
+     WHEN (YES) DO;
+          NEST = NEST - 1;
+          RESET_SWITCH = NO;
+          END;
+     WHEN (HOLDING)
+          IF KEYWORD(POS) = 'WHEN'
+              THEN DO;
+                   NEST = NEST - 1;
+                   RESET_SWITCH = NO;
+                   END;
+     OTHERWISE;
+     END;
+
+ SELECT (FLAG(POS));
+     WHEN (DUMMY);
+     WHEN (RESET)
+          SELECT (KEYWORD(POS));
+              WHEN ('WHEN') RESET_SWITCH = HOLDING;
+              WHEN ('USING') DO;
+                   IF MAKE_COLUMN
+                       THEN COLUMNIZE = YES;
+                   RESET_SWITCH = YES;
+                   END;
+              OTHERWISE RESET_SWITCH = YES;
+              END;
+     OTHERWISE;
+     END;
+1IF IF_SWITCH = YES
+     THEN IF ALTERNATE_INDENT
+              THEN DO; /*ON FIRST KEY WORD AFTER AN IF*/
+                   IF INDENT_SWITCH = YES
+                       THEN NEST = NEST + 1;
+                   IF CASE_STMT = YES
+                       THEN NEST_STACK(STACK_POINTER) = NEST - 1;
+                       ELSE NEST_STACK(STACK_POINTER) = NEST;
+                   STACK_POINTER = STACK_POINTER + 1;
+                   IF KEYWORD(POS) = 'THEN'
+                       THEN DO;
+                            IF ^THENS
+                                THEN TOKEN = '';
+                            ACTION = DIRECTION(POS);
+                            INDENT_SWITCH = YES;
+                            IF_SWITCH = NO;
+                            END;
+                       ELSE DO; /* THEN MAY BE ADDED LATER */
+                            ACTION = SPECIAL_PROCESS;
+                            IF DIRECTION(POS) ^= IF_STMT
+                                THEN IF_SWITCH = NO;
+                            END;
+                    CALL CHECK_FOR_PERIOD;
+                    RETURN;
+                    END;
+              ELSE DO; /*ON FIRST KEY WORD AFTER AN IF*/
+                   IF INDENT_SWITCH = YES
+                       THEN NEST = NEST + 1;
+                   IF KEYWORD(POS) = 'THEN'
+                       THEN DO;
+                            IF ^THENS
+                                THEN TOKEN = FOUR;
+                            INDENT_SWITCH = HOLDING;
+                            END;
+                       ELSE DO;
+                            INDENT_SWITCH = YES;
+                            TOKEN = THEN_KEYWORD ]] TOKEN;
+                            END;
+                   IF INSIDE_CASE = NO
+                       THEN NEST = NEST + 1;
+                   IF CASE_STMT = YES
+                       THEN NEST_STACK(STACK_POINTER) = NEST - 1;
+                       ELSE NEST_STACK(STACK_POINTER) = NEST;
+                   STACK_POINTER = STACK_POINTER + 1;
+                   IF DIRECTION(POS) = IF_STMT /*NESTED IF*/
+                       THEN ACTION = NEXT_LINE;
+                       ELSE DO;
+                            IF_SWITCH = NO;
+                            ACTION = DIRECTION(POS);
+                            END;
+                    CALL CHECK_FOR_PERIOD;
+                    RETURN;
+                    END;
+1IF DIRECTION(POS) = SKIP1_SET_PERIOD
+     /*ACT AS IF THIS HAD A PERIOD ONLY IF PREVIOUS STATEMENT DID*/
+     THEN DO;
+          ACTION = DIRECTION(POS);
+          RETURN;
+          END;
+
+ IF DIRECTION(POS) = ELSE_OTHERWISE
+     THEN DO; /*THIS IS AN ELSE STATEMENT*/
+          IF SUBSTITUTE
+              THEN TOKEN = 'ELSE';
+          IF CASE_STMT = YES
+              THEN INSIDE_CASE = YES;
+          IF STACK_POINTER > 1
+              THEN STACK_POINTER = STACK_POINTER - 1;
+          IF NEST_STACK(STACK_POINTER) > A_MARGIN
+              THEN NEST = NEST_STACK(STACK_POINTER);
+              ELSE NEST = B_MARGIN;
+          ACTION = NEXT_LINE;
+          IF ALTERNATE_INDENT
+              THEN INDENT_SWITCH = YES;
+              ELSE INDENT_SWITCH = HOLDING;
+          RETURN;
+          END;
+
+ /*SET SPECIAL INDENTATION*/
+ IF PERIOD_SWITCH
+     THEN DO;
+          NEST= B_MARGIN;
+          INDENT_SWITCH = NO;
+          END;
+     ELSE IF NEST <= A_MARGIN
+              THEN NEST = B_MARGIN;
+
+ CALL CHECK_FOR_PERIOD;
+
+ IF INDENT_SWITCH = YES
+     THEN DO;
+          NEST = NEST + 1;
+          INDENT_SWITCH = NO;
+          END;
+
+1SELECT (MARGIN(POS));
+     WHEN (INDENT_ONCE) NEST = NEST + 1;
+     WHEN (INDENT_TWICE) NEST = NEST + 2;
+     WHEN (ONCE_NOW_LATER) DO;
+          NEST = NEST + 1;
+          INDENT_SWITCH = HOLD_IN;
+          END;
+     OTHERWISE IF MARGIN(POS) ^= SAME_LEVEL
+                   THEN NEST = MARGIN(POS);
+     END;
+
+ ACTION = DIRECTION(POS);
+
+ IF DIRECTION(POS) = IF_STMT
+     THEN DO; /*THIS IS THE BEGINNING OF AN IF STATEMENT*/
+          IF_SWITCH = YES;
+          ACTION = NEXT_LINE;
+          IF CASE_STMT = HOLDING
+              THEN DO;
+                   CASE_STMT = YES;
+                   INSIDE_CASE = YES;
+                   END;
+          SELECT;
+              WHEN (COL_7 = CASE_CONSTRUCT) DO;
+                   CASE_STMT = YES;
+                   COL_7 = BLANK;
+                   END;
+              WHEN (COL_7 = REGULAR_CONSTRUCT) DO;
+                   CASE_STMT = HOLDING;
+                   COL_7 = BLANK;
+                   END;
+              OTHERWISE;
+              END;
+          END;
+
+ /*DELAY INDENTATION UNTIL NEXT KEY WORD*/
+ SELECT (INDENT_SWITCH);
+     WHEN (HOLDING) DO;
+          ACTION = DO_NOTHING;
+          INDENT_SWITCH = YES;
+          END;
+     WHEN (HOLD_IN) INDENT_SWITCH = HOLDING;
+     OTHERWISE;
+     END;
+1CHECK_FOR_PERIOD:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CHECKS IF THE TOKEN ENDED IN A PERIOD.  IF IT DID  */
+ /* THEN THE PROPER FLAGS ARE SET OR RESET FOR END OF SENTENCE.       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ IF FINAL = PERIOD
+     THEN DO;
+          COLUMNIZE = NO;
+          INSIDE_CASE = NO;
+          PERIOD_SWITCH = YES;
+          RESET_SWITCH = NO;
+          STACK_POINTER = 1;
+          CASE_STMT = NO;
+          END;
+     ELSE PERIOD_SWITCH = NO;
+
+ END CHECK_FOR_PERIOD;
+ END FOURTH;
+1SECOND:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE ANALYZES THE INPUT FROM THE ENVIRONMENT DIVISION A  */
+ /*TOKEN AT A TIME IN ORDER TO DETERMINE WHAT THE INDENTATION AND LINE*/
+ /*SPACING CONSIDERATIONS ARE.                                        */
+ /*                                                                   */
+ /*INPUT:   TOKEN, NEST                                               */
+ /*OUTPUT:  NEST, ACTION                                              */
+ /*METHOD:  TABLE OF ENVIRONMENT DIVISION KEY WORDS IS SEARCHED USING */
+ /*         BINARY SEARCH. KEY WORD, MARGIN AND DIRECTION TABLES      */
+ /*         CORRESPOND BY POSITION.                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FOUND  BIT(1) INIT('0'B);
+
+1DECLARE
+    1  SECOND_TABLES  STATIC,
+       2  KEYWORD(SECOND_HIGH)  CHAR(15) VARYING INIT(
+       /*COBOL KEY WORDS WHICH MAY BE USED TO DETERMINE PROCESSING*/
+          /*  1 */    'ACCESS',
+          /*  2 */    'ACTUAL',
+          /*  3 */    'APPLY',
+          /*  4 */    'ASSIGN',
+          /*  5 */    'CONFIGURATION',
+          /*  6 */    'CURRENCY',
+          /*  7 */    'DECIMAL-POINT',
+          /*  8 */    'EJECT',
+          /*  9 */    'ENVIRONMENT',
+          /* 10 */    'FILE',
+          /* 11 */    'FILE-CONTROL',
+          /* 12 */    'FILE-LIMIT',
+          /* 13 */    'FILE-LIMITS',
+          /* 14 */    'I-O-CONTROL',
+          /* 15 */    'INPUT-OUTPUT',
+          /* 16 */    'MULTIPLE',
+          /* 17 */    'NOMINAL',
+          /* 18 */    'OBJECT-COMPUTER',
+          /* 19 */    'ORGANIZATION',
+          /* 20 */    'PASSWORD',
+          /* 21 */    'PROCESSING',
+          /* 22 */    'RECORD',
+          /* 23 */    'RESERVE',
+          /* 24 */    'RERUN',
+          /* 25 */    'SAME',
+          /* 26 */    'SEGMENT-LPOSMIT',
+          /* 27 */    'SELECT',
+          /* 28 */    'SKIP1',
+          /* 29 */    'SKIP2',
+          /* 30 */    'SKIP3',
+          /* 31 */    'SOURCE-COMPUTER',
+          /* 32 */    'SPECIAL-NAMES',
+          /* 33 */    'TRACK-AREA',
+          /* 34 */    'TRACK-LIMIT'),
+1      2  MARGIN(SECOND_HIGH) FIXED DECIMAL(1) INIT(
+       /*THE MARGIN SWITCHES INDICATE HOW TO MODIFY THE VALUE OF NEST*/
+          /*  1 */     C_MARGIN,
+          /*  2 */     C_MARGIN,
+          /*  3 */     B_MARGIN,
+          /*  4 */     SAME_LEVEL,
+          /*  5 */     A_MARGIN,
+          /*  6 */     B_MARGIN,
+          /*  7 */     B_MARGIN,
+          /*  8 */     SAME_LEVEL,
+          /*  9 */     A_MARGIN,
+          /* 10 */     C_MARGIN,
+          /* 11 */     A_MARGIN,
+          /* 12 */     C_MARGIN,
+          /* 13 */     C_MARGIN,
+          /* 14 */     A_MARGIN,
+          /* 15 */     A_MARGIN,
+          /* 16 */     B_MARGIN,
+          /* 17 */     C_MARGIN,
+          /* 18 */     A_MARGIN,
+          /* 19 */     C_MARGIN,
+          /* 20 */     C_MARGIN,
+          /* 21 */     C_MARGIN,
+          /* 22 */     C_MARGIN,
+          /* 23 */     C_MARGIN,
+          /* 24 */     B_MARGIN,
+          /* 25 */     B_MARGIN,
+          /* 26 */     B_MARGIN,
+          /* 27 */     B_MARGIN,
+          /* 28 */     SAME_LEVEL,
+          /* 29 */     SAME_LEVEL,
+          /* 30 */     SAME_LEVEL,
+          /* 31 */     A_MARGIN,
+          /* 32 */     A_MARGIN,
+          /* 33 */     C_MARGIN,
+          /* 34 */     C_MARGIN),
+1      2  DIRECTION(SECOND_HIGH) FIXED DECIMAL(1) INIT(
+       /*DIRECTION SWITCHES INDICATE LINE SPACING FOR THE ACTION VALUE*/
+          /*  1 */     NEXT_LINE,
+          /*  2 */     NEXT_LINE,
+          /*  3 */     NEXT_LINE,
+          /*  4 */     SPACE_TWICE,
+          /*  5 */     DOUBLE_SPACE,
+          /*  6 */     NEXT_LINE,
+          /*  7 */     NEXT_LINE,
+          /*  8 */     SKIP1_SET_PERIOD,
+          /*  9 */     TRIPLE_SPACE,
+          /* 10 */     NEXT_LINE,
+          /* 11 */     DOUBLE_SPACE,
+          /* 12 */     NEXT_LINE,
+          /* 13 */     NEXT_LINE,
+          /* 14 */     NEXT_LINE,
+          /* 15 */     DOUBLE_SPACE,
+          /* 16 */     NEXT_LINE,
+          /* 17 */     NEXT_LINE,
+          /* 18 */     NEXT_LINE,
+          /* 19 */     NEXT_LINE,
+          /* 20 */     NEXT_LINE,
+          /* 21 */     NEXT_LINE,
+          /* 22 */     NEXT_LINE,
+          /* 23 */     NEXT_LINE,
+          /* 24 */     NEXT_LINE,
+          /* 25 */     NEXT_LINE,
+          /* 26 */     NEXT_LINE,
+          /* 27 */     NEXT_LINE,
+          /* 28 */     SKIP1_SET_PERIOD,
+          /* 29 */     SKIP1_SET_PERIOD,
+          /* 30 */     SKIP1_SET_PERIOD,
+          /* 31 */     NEXT_LINE,
+          /* 32 */     DOUBLE_SPACE,
+          /* 33 */     NEXT_LINE,
+          /* 34 */     NEXT_LINE);
+1HIGH = SECOND_HIGH;
+ LOW  = 1;
+
+ /*IF THE LAST CHARACTER IS PUNCTUATION THEN REMOVE IT*/
+ /*FOR THE TABLE SEARCH*/
+ I = LENGTH(TOKEN);
+ FINAL = SUBSTR(TOKEN, I, 1);
+ IF FINAL = COMMA ] FINAL = PERIOD
+     THEN WORD = SUBSTR(TOKEN, 1, I-1);
+     ELSE WORD = TOKEN;
+
+ IF DROP_COMMAS & FINAL = COMMA
+     THEN DO;
+          TOKEN = WORD;
+          FINAL = BLANK;
+          END;
+
+ BINARY_SEARCH:
+ DO WHILE (HIGH >= LOW & ^FOUND);
+     POS = (LOW + HIGH) / 2;
+     IF WORD = KEYWORD(POS)
+         THEN FOUND = YES;
+         ELSE IF WORD > KEYWORD(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+
+ IF ^FOUND
+     THEN DO;
+          IF SUBSTITUTE & SUBSTR(TOKEN, 1, 5) = 'IBM-3'
+              THEN TOKEN = 'IBM-370.';
+          ACTION = DO_NOTHING;
+          RETURN;
+          END;
+ IF MARGIN(POS) < 3
+     THEN NEST = MARGIN(POS);
+ ACTION = DIRECTION(POS);
+ END SECOND;
+1THIRD:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE ANALYZES THE INPUT FROM THE DATA DIVISION A TOKEN   */
+ /*AT A TIME IN ORDER TO DETERMINE WHAT THE INDENTATION AND LINE      */
+ /*SPACING CONSIDERATIONS ARE.  THIS PROCEDURE IS INTERNAL TO         */
+ /*CONTROL_TABLES.                                                    */
+ /*                                                                   */
+ /*INPUT:   TOKEN, NEST                                               */
+ /*OUTPUT:  NEST, ACTION                                              */
+ /*METHOD:  TABLE OF KEY WORDS FOR DATA DIVISION IS SEARCHED USING    */
+ /*         BINARY SEARCH.  KEY WORD, MARGIN, DIRECTION AND FLAG      */
+ /*         TABLES CORRESPOND BY POSITION.  DATA_FIRST_TIME,          */
+ /*         RD_SWITCH, DATA_FLAG, DATA_SWITCH, AND PERIOD_SWITCH      */
+ /*         ARE STATIC SWITCHES WHICH INFLUENCE PROCESSING            */
+ /*         ON THE NEXT CALL OF THIS PROCEDURE.  IN THE CASE OF THE   */
+ /*         DATA_SWITCH, HOWEVER, IT CHANGES AFTER THE FIRST TIME     */
+ /*         DATA IS FOUND AND THEN REMAINS OFF.                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  CONDITION_LEVEL BIT(1) INIT('0'B) STATIC;
+ DECLARE  DATA_FIRST_TIME BIT(1) INIT('1'B) STATIC;
+ DECLARE  DATA_SWITCH   BIT(1) INIT('0'B) STATIC;
+ DECLARE  FOUND  BIT(1) INIT('0'B);
+ DECLARE  RD_SWITCH BIT(1) INIT('0'B) STATIC;
+ DECLARE  LEVEL_POS  FIXED BINARY INIT(1) STATIC;
+ DECLARE
+   1  STACK STATIC,
+      2  LEVEL_STACK(20) CHAR(2) INIT('01', ' ', ' ', ' ', ' ', ' ',
+  ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '),
+      2  LEVEL_NEST(20) FIXED DECIMAL(2)
+             INIT(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                  16, 17, 18, 19);
+
+1DECLARE
+    1  THIRD_TABLES  STATIC,
+       2  KEYWORD(THIRD_HIGH)  CHAR(15) VARYING  INIT(
+       /*COBOL KEY WORDS WHICH MAY BE USED TO DETERMINE PROCESSING*/
+          /*  1 */    'BLOCK',
+          /*  2 */    'CD',
+          /*  3 */    'COMPUTATIONAL',
+          /*  4 */    'COMPUTATIONAL-1',
+          /*  5 */    'COMPUTATIONAL-2',
+          /*  6 */    'COMPUTATIONAL-3',
+          /*  7 */    'COMPUTATIONAL-4',
+          /*  8 */    'CONTROL',
+          /*  9 */    'CONTROLS',
+          /* 10 */    'DATA',
+          /* 11 */    'DESTINATION',
+          /* 12 */    'EJECT',
+          /* 13 */    'END',
+          /* 14 */    'ERROR',
+          /* 15 */    'FD',
+          /* 16 */    'FILE',
+          /* 17 */    'FIRST',
+          /* 18 */    'FOOTING',
+          /* 19 */    'HEADING',
+          /* 20 */    'IS',
+          /* 21 */    'LABEL',
+          /* 22 */    'LAST',
+          /* 23 */    'LINKAGE',
+          /* 24 */    'MESSAGE',
+1         /* 25 */    'PAGE',
+          /* 26 */    'PIC',
+          /* 27 */    'PICTURE',
+          /* 28 */    'QUEUE',
+          /* 29 */    'RD',
+          /* 30 */    'RECORD',
+          /* 31 */    'RECORDING',
+          /* 32 */    'REDEFINES',
+          /* 33 */    'RENAMES',
+          /* 34 */    'REPORT',
+          /* 35 */    'REPORTS',
+          /* 36 */    'SD',
+          /* 37 */    'SKIP1',
+          /* 38 */    'SKIP2',
+          /* 39 */    'SKIP3',
+          /* 40 */    'STATUS',
+          /* 41 */    'SYMBOLIC',
+          /* 42 */    'SYNCRONIZED',
+          /* 43 */    'TEXT',
+          /* 44 */    'USAGE',
+          /* 45 */    'VALUE',
+          /* 46 */    'WORKING-STORAGE',
+          /* 47 */    'ZEROES',
+          /* 48 */    '01',
+          /* 49 */    '66',
+          /* 50 */    '77',
+          /* 51 */    '88'),
+1      2  MARGIN(THIRD_HIGH) FIXED DECIMAL(1) INIT(
+       /*THE MARGIN SWITCHES INDICATE HOW TO MODIFY THE VALUE OF NEST*/
+          /*  1 */     B_MARGIN,
+          /*  2 */     A_MARGIN,
+          /*  3 */     SAME_LEVEL,
+          /*  4 */     SAME_LEVEL,
+          /*  5 */     SAME_LEVEL,
+          /*  6 */     SAME_LEVEL,
+          /*  7 */     SAME_LEVEL,
+          /*  8 */     SAME_LEVEL,
+          /*  9 */     B_MARGIN,
+          /* 10 */     A_MARGIN,
+          /* 11 */     B_MARGIN,
+          /* 12 */     SAME_LEVEL,
+          /* 13 */     B_MARGIN,
+          /* 14 */     B_MARGIN,
+          /* 15 */     A_MARGIN,
+          /* 16 */     A_MARGIN,
+          /* 17 */     B_MARGIN,
+          /* 18 */     SAME_LEVEL,
+          /* 19 */     SAME_LEVEL,
+          /* 20 */     SAME_LEVEL,
+          /* 21 */     B_MARGIN,
+          /* 22 */     B_MARGIN,
+          /* 23 */     A_MARGIN,
+          /* 24 */     B_MARGIN,
+          /* 25 */     SAME_LEVEL,
+          /* 26 */     SAME_LEVEL,
+          /* 27 */     SAME_LEVEL,
+          /* 28 */     B_MARGIN,
+          /* 29 */     A_MARGIN,
+          /* 30 */     B_MARGIN,
+          /* 31 */     B_MARGIN,
+          /* 32 */     SAME_LEVEL,
+          /* 33 */     SAME_LEVEL,
+          /* 34 */     B_MARGIN,
+          /* 35 */     B_MARGIN,
+          /* 36 */     A_MARGIN,
+          /* 37 */     SAME_LEVEL,
+          /* 38 */     SAME_LEVEL,
+          /* 39 */     SAME_LEVEL,
+          /* 40 */     B_MARGIN,
+          /* 41 */     B_MARGIN,
+          /* 42 */     SAME_LEVEL,
+          /* 43 */     B_MARGIN,
+          /* 44 */     SAME_LEVEL,
+          /* 45 */     SAME_LEVEL,
+          /* 46 */     A_MARGIN,
+          /* 47 */     SAME_LEVEL,
+          /* 48 */     A_MARGIN,
+          /* 49 */     A_MARGIN,
+          /* 50 */     A_MARGIN,
+          /* 51 */     INDENT_ONCE),
+1      2  DIRECTION(THIRD_HIGH)  FIXED DECIMAL(1)  INIT(
+       /*DIRECTION SWITCHES INDICATE LINE SPACING FOR THE ACTION VALUE*/
+          /*  1 */     NEXT_LINE,
+          /*  2 */     DOUBLE_SPACE,
+          /*  3 */     DO_NOTHING,
+          /*  4 */     DO_NOTHING,
+          /*  5 */     DO_NOTHING,
+          /*  6 */     DO_NOTHING,
+          /*  7 */     DO_NOTHING,
+          /*  8 */     DO_NOTHING,
+          /*  9 */     NEXT_LINE,
+          /* 10 */     TRIPLE_SPACE,
+          /* 11 */     NEXT_LINE,
+          /* 12 */     SKIP1_SET_PERIOD,
+          /* 13 */     NEXT_LINE,
+          /* 14 */     NEXT_LINE,
+          /* 15 */     DOUBLE_SPACE,
+          /* 16 */     DOUBLE_SPACE,
+          /* 17 */     NEXT_LINE,
+          /* 18 */     DO_NOTHING,
+          /* 19 */     DO_NOTHING,
+          /* 20 */     DO_NOTHING,
+          /* 21 */     NEXT_LINE,
+          /* 22 */     NEXT_LINE,
+          /* 23 */     EJECT,
+          /* 24 */     NEXT_LINE,
+          /* 25 */     DO_NOTHING,
+          /* 26 */     SPACE_TWICE,
+          /* 27 */     SPACE_TWICE,
+          /* 28 */     NEXT_LINE,
+          /* 29 */     DOUBLE_SPACE,
+          /* 30 */     NEXT_LINE,
+          /* 31 */     NEXT_LINE,
+          /* 32 */     SPACE_TWICE,
+          /* 33 */     SPACE_TWICE,
+          /* 34 */     NEXT_LINE,
+          /* 35 */     NEXT_LINE,
+          /* 36 */     DOUBLE_SPACE,
+          /* 37 */     SKIP1_SET_PERIOD,
+          /* 38 */     SKIP1_SET_PERIOD,
+          /* 39 */     SKIP1_SET_PERIOD,
+          /* 40 */     NEXT_LINE,
+          /* 41 */     NEXT_LINE,
+          /* 42 */     DO_NOTHING,
+          /* 43 */     NEXT_LINE,
+          /* 44 */     DO_NOTHING,
+          /* 45 */     SPACE_TWICE,
+          /* 46 */     EJECT,
+          /* 47 */     DO_NOTHING,
+          /* 48 */     DOUBLE_SPACE,
+          /* 49 */     NEXT_LINE,
+          /* 50 */     NEXT_LINE,
+          /* 51 */     NEXT_LINE),
+1      2  FLAG(THIRD_HIGH)  FIXED DECIMAL(1)  INIT(
+       /*FLAG SWITCHES INDICATE ADDITIONAL PROCESSING CONSIDERATIONS*/
+          /*  1 */     DUMMY,
+          /*  2 */     SHORT,
+          /*  3 */     COMP_SUB,
+          /*  4 */     COMP_SUB,
+          /*  5 */     COMP_SUB,
+          /*  6 */     COMP_SUB,
+          /*  7 */     COMP_SUB,
+          /*  8 */     CHANGE,
+          /*  9 */     DUMMY,
+          /* 10 */     DATA_FLAG,
+          /* 11 */     DUMMY,
+          /* 12 */     DUMMY,
+          /* 13 */     DUMMY,
+          /* 14 */     DUMMY,
+          /* 15 */     SHORT,
+          /* 16 */     DUMMY,
+          /* 17 */     DUMMY,
+          /* 18 */     CHANGE,
+          /* 19 */     CHANGE,
+          /* 20 */     DELETE,
+          /* 21 */     DUMMY,
+          /* 22 */     DUMMY,
+          /* 23 */     DUMMY,
+          /* 24 */     DUMMY,
+          /* 25 */     CHANGE,
+          /* 26 */     DUMMY,
+          /* 27 */     PIC_SUB,
+          /* 28 */     DUMMY,
+          /* 29 */     SHORT,
+          /* 30 */     DUMMY,
+          /* 31 */     DUMMY,
+          /* 32 */     DUMMY,
+          /* 33 */     DUMMY,
+          /* 34 */     DUMMY,
+          /* 35 */     DUMMY,
+          /* 36 */     SHORT,
+          /* 37 */     DUMMY,
+          /* 38 */     DUMMY,
+          /* 39 */     DUMMY,
+          /* 40 */     DUMMY,
+          /* 41 */     DUMMY,
+          /* 42 */     SYNC_SUB,
+          /* 43 */     DUMMY,
+          /* 44 */     DELETE,
+          /* 45 */     DUMMY,
+          /* 46 */     DUMMY,
+          /* 47 */     ZEROS_SUB,
+          /* 48 */     SHORT,
+          /* 49 */     SHORT,
+          /* 50 */     SHORT,
+          /* 51 */     SHORT);
+1IF CONDITION_LEVEL
+     THEN DO;
+          NEST = NEST - 1;
+          CONDITION_LEVEL = NO;
+          END;
+
+ HIGH = THIRD_HIGH;
+ LOW  = 1;
+
+ /*IF THE LAST CHARACTER IS PUNCTUATION THEN REMOVE IT*/
+ /*FOR TABLE SEARCH*/
+ I = LENGTH(TOKEN);
+ FINAL = SUBSTR(TOKEN, I, 1);
+ SELECT (FINAL);
+     WHEN (PERIOD) DO;
+          RD_SWITCH = NO;
+          WORD = SUBSTR(TOKEN, 1, I-1);
+          END;
+     WHEN (COMMA) DO;
+          WORD = SUBSTR(TOKEN, 1, I-1);
+          IF DROP_COMMAS
+              THEN DO;
+                   TOKEN = WORD;
+                   FINAL = BLANK;
+                   END;
+          END;
+     OTHERWISE WORD = TOKEN;
+     END;
+1/*PROCESS LEVEL NUMBERS USING STACK*/
+ IF WORD > '01'  &  WORD < '51'  &  I = 2  &  PERIOD_SWITCH
+     THEN DO;
+          IF WORD > LEVEL_STACK(LEVEL_POS)
+              THEN DO;
+                   NEST = NEST + 1;
+                   LEVEL_POS = LEVEL_POS + 1;
+                   LEVEL_STACK(LEVEL_POS) = WORD;
+                   LEVEL_NEST(LEVEL_POS) = NEST;
+                   END;
+              ELSE DO WHILE (WORD < LEVEL_STACK(LEVEL_POS));
+                       LEVEL_POS = LEVEL_POS - 1;
+                       END;
+          IF WORD > LEVEL_STACK(LEVEL_POS)
+              THEN CALL MIDDLE_INSERT;
+          NEST = LEVEL_NEST(LEVEL_POS);
+          PERIOD_SWITCH = NO;
+          TOKEN = TOKEN ]] BLANK;
+          ACTION = NEXT_LINE;
+          RETURN;
+          END;
+
+ BINARY_SEARCH:
+ DO WHILE (HIGH >= LOW & ^FOUND);
+     POS = (LOW + HIGH) / 2;
+     IF WORD = KEYWORD(POS)
+         THEN FOUND = YES;
+         ELSE IF WORD > KEYWORD(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END BINARY_SEARCH;
+1IF ^FOUND
+     THEN DO;
+          IF PERIOD_SWITCH
+              THEN DO;
+                   NEST = A_MARGIN;
+                   ACTION = NEXT_LINE;
+                   END;
+              ELSE ACTION = DO_NOTHING;
+          IF FINAL = PERIOD
+              THEN PERIOD_SWITCH = YES;
+              ELSE PERIOD_SWITCH = NO;
+          RETURN;
+          END;
+
+ IF FLAG(POS) = SHORT
+     THEN IF PERIOD_SWITCH
+              THEN DO;
+                   TOKEN = TOKEN ]] BLANK;
+                   IF KEYWORD(POS) = '88'
+                       THEN DO;
+                            NEST = NEST + 1;
+                            CONDITION_LEVEL = YES;
+                            ACTION = DIRECTION(POS);
+                            PERIOD_SWITCH = NO;
+                            RETURN;
+                            END;
+                   LEVEL_POS = 1;
+                   IF KEYWORD(POS) = 'RD'
+                       THEN RD_SWITCH = YES;
+                   END;
+              ELSE DO;
+                   ACTION = DO_NOTHING;
+                   IF FINAL = PERIOD
+                       THEN PERIOD_SWITCH = YES;
+                       ELSE PERIOD_SWITCH = NO;
+                   RETURN;
+                   END;
+
+ IF PERIOD_SWITCH & KEYWORD(POS) = 'REPORT'
+     THEN DO;
+          MARGIN(POS) = A_MARGIN;
+          DIRECTION(POS) = EJECT;
+          END;
+
+ IF FINAL = PERIOD  ]
+   (DIRECTION(POS) = SKIP1_SET_PERIOD  &  PERIOD_SWITCH)
+     THEN PERIOD_SWITCH = YES;
+     ELSE PERIOD_SWITCH = NO;
+1SELECT (FLAG(POS));
+     WHEN (DUMMY);
+     WHEN (DELETE)
+          IF (^DATA_SWITCH) & (SUBSTITUTE)
+              THEN TOKEN = '';
+     WHEN (PIC_SUB)
+          IF SUBSTITUTE
+              THEN TOKEN = 'PIC';
+     WHEN (COMP_SUB)
+          IF SUBSTITUTE
+              THEN DO;
+                   IF LENGTH(TOKEN) > 13
+                       THEN TOKEN = SUBSTR(TOKEN, 14);
+                       ELSE TOKEN = '';
+                   TOKEN = 'COMP' ]] TOKEN;
+                   END;
+     WHEN (SYNC_SUB)
+          IF SUBSTITUTE
+              THEN IF FINAL = PERIOD ] FINAL = COMMA
+                       THEN TOKEN = 'SYNC' ]] FINAL;
+                       ELSE TOKEN = 'SYNC';
+     WHEN (ZEROS_SUB)
+          IF SUBSTITUTE
+              THEN IF FINAL = PERIOD ] FINAL = COMMA
+                       THEN TOKEN = 'ZEROS' ]] FINAL;
+                       ELSE TOKEN = 'ZEROS';
+     WHEN (DATA_FLAG)
+          IF DATA_FIRST_TIME
+              THEN DO;
+                   DATA_FIRST_TIME = NO;
+                   ACTION = DIRECTION(POS);
+                   NEST = MARGIN(POS);
+                   RETURN;
+                   END;
+              ELSE DO;
+                   ACTION = NEXT_LINE;
+                   NEST = B_MARGIN;
+                   DATA_SWITCH = YES;
+                   RETURN;
+                   END;
+     WHEN (CHANGE)
+          IF RD_SWITCH
+              THEN DO;
+                   NEST = B_MARGIN;
+                   ACTION = NEXT_LINE;
+                   RETURN;
+                   END;
+     OTHERWISE;
+     END;
+1/*SPECIAL PROCESSING FOR DATA RECORD STATEMENT*/
+ IF WORD  = 'RECORD'  &  DATA_SWITCH
+     THEN DO;
+          ACTION = DO_NOTHING;
+          RETURN;
+          END;
+
+ ACTION = DIRECTION(POS);
+ IF MARGIN(POS) ^= SAME_LEVEL
+     THEN NEST = MARGIN(POS);
+ DATA_SWITCH = NO;
+1MIDDLE_INSERT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO THIRD.  IT ALLOWS FOR THE INSERTION  */
+ /*INTO THE STACK OF LEVEL NUMBERS THAT ARE NOT FOUND WHEN THE STACK  */
+ /*IS POPPED.                                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  POSITION  FIXED BINARY;
+
+ LEVEL_POS = LEVEL_POS + 1;
+
+ MOVE_UP:  /*MAKE ROOM FOR AN INSERT*/
+ DO POSITION = 20 TO LEVEL_POS+1 BY -1;
+     LEVEL_STACK(POSITION) = LEVEL_STACK(POSITION-1);
+     LEVEL_NEST(POSITION)  = LEVEL_NEST(POSITION-1);
+     END MOVE_UP;
+
+ LEVEL_STACK(LEVEL_POS) = WORD;
+ END MIDDLE_INSERT;
+ END THIRD;
+ END CONTROL_TABLES;
+1GET_INPUT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*ALL INPUT IS DONE HERE.  THE TYPE OF CHOICE FOR NARROW OR WIDE     */
+ /*MARGINS IS CONTROLED HERE THRU THE NEW_PROGRAM SWITCH.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ GET FILE(IN) EDIT(CARD_DECK) (A(6), A(1),  A(65), A(8));
+ IN_COUNT = IN_COUNT + 1;
+
+ IF NEW_PROGRAM
+     THEN INPUT_WORK_AREA = NEW_SOURCE_AREA;
+     ELSE INPUT_WORK_AREA = SOURCE_AREA;
+ END GET_INPUT;
+1OPTION_LIST: PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO COBFORM.  ITS PURPOSE IS TO LIST THE */
+ /*OPTIONS IN EFFECT AT THE TIME WHEN IT IS CALLED.                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+ PUT FILE(SYSPRINT) PAGE EDIT('OPTIONS IN EFFECT') (A);
+ IF OUT_PRIM
+     THEN PUT FILE(SYSPRINT) SKIP(2)
+          EDIT('Primary output data set will be produced.') (A);
+     ELSE PUT FILE(SYSPRINT) SKIP(2)
+          EDIT('Primary output data set will not be produced.')
+              (A);
+
+ IF DUP_OUT
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Secondary output data set will be produced.')
+              (A);
+
+ IF SYS_LIST
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Sysprint copy will be produced.') (A);
+
+ IF SKIP_REMARKS
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('REMARKS paragraph will be output as is.') (A);
+
+ IF SKIP_COMMENTS
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Comments will be output as they are.') (A);
+     ELSE DO;
+          PUT FILE(SYSPRINT) SKIP(1)
+              EDIT('Comments will be reformated') (A);
+          PUT FILE(SYSPRINT) SKIP(1)
+              EDIT('  unless they contain a * in column 72.') (A);
+          END;
+
+ IF ALTERNATE_INDENT
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Alternate indentation method was requested.') (A);
+
+1IF COL_PIC
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('PIC keyword will be alligned to column:', PIC_COL_NO,
+               PERIOD) (A, F(4), A);
+
+ IF DATA_ONLY
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Only DATA DIVISION will be processed.') (A);
+
+ IF PROC_ONLY & ^DATA_ONLY
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Only PROCEDURE DIVISION will be processed.') (A);
+
+ IF KEEP_SPACERS
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Line spacers will not be interpreted.') (A);
+
+ IF ^THENS
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('THEN keyword will omitted from source.') (A);
+
+ IF MAKE_COLUMN
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Using lists will be formatted into single column.')(A);
+
+ IF ^DROP_COMMAS
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Commas will be kept.') (A);
+
+ IF SHOW_COUNT
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+              EDIT ('Record count requested.') (A);
+
+ IF NEW_PROGRAM
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Input file uses columns 7-80.') (A);
+
+ IF ^SUBSTITUTE
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Keyword substitution will not be done.') (A);
+
+ IF COMPRESS
+     THEN PUT FILE(SYSPRINT) SKIP(1)
+          EDIT('Compression of source requested.') (A);
+
+ PUT FILE(SYSPRINT) SKIP(1) DATA(SEQ_INCREMENT);
+ PUT FILE(SYSPRINT) SKIP(1) DATA(NEW_PGM_ID);
+ END OPTION_LIST;
+1PROCESS_TOKENS: PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO COBFORM AND IS USED IN THE MAIN      */
+ /*PROCESS GOING THROUGH THE TOKENS, IT IS ALSO USED IN TOKENIZE      */
+ /*BYPASSING RETURN TO THE MAIN PROCESS FLOW.                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  M  FIXED BINARY;
+
+ GO_THROUGH:  /*GO THROUGH THE TOKENS UNTIL THE SENTRY IS FOUND*/
+ DO M = 1 BY 1 WHILE (TOKEN(M) ^= BLANK);
+    CALL CONTROL_TABLES(TOKEN(M));
+
+    IF NEST = FLAG_REMARKS
+        THEN IF SKIP_REMARKS
+                 THEN DO;
+                      IF STMT ^= ''
+                          THEN CALL PUTOUT;
+                      STMT = SOURCE_AREA;
+                      CALL PUTOUT;
+                      CALL GET_INPUT;
+                      GO TO READ_LOOP; /* DO NOT RETURN TO TOKENIZE */
+                      END;             /* IF CALLED FROM THERE */
+                 ELSE NEST = A_MARGIN;
+
+    IF LENGTH(TOKEN(M)) ^= 0
+        THEN DO;
+             CALL SPACER(TOKEN(M));
+             J = LENGTH(STMT);
+             K = LENGTH(TOKEN(M));
+             IF J + K > 65
+                 THEN DO;
+                      CALL PUTOUT;
+                      IF ^COMPRESS
+                          THEN DO;
+                               NEST = NEST + 1;
+                               CALL TAB;
+                               NEST = NEST - 1;
+                               END;
+                      IF NEST > 6
+                          THEN DO;
+                               J = LENGTH(STMT);
+                               IF J + K > 65
+                                   THEN STMT = SUBSTR(STMT, 1, 65-K);
+                               END;
+                      END;
+             STMT = STMT ]] TOKEN(M);
+             END;
+    END GO_THROUGH;
+1SPACER:  PROCEDURE(TOKEN);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO PROCESS_TOKENS AND PROCESSES THE LINE*/
+ /*SPACING ACTIONS.                                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  TOKEN  CHAR(*) VARYING;
+
+ DECLARE  EJECT_STMT CHAR(5) INIT('EJECT') STATIC;
+ DECLARE  HOLD_NEST  FIXED DECIMAL(2);
+
+ J = LENGTH(STMT);
+ SELECT (ACTION);
+     WHEN (DO_NOTHING)
+          IF J = 0
+              THEN CALL TAB;
+              ELSE IF TOKEN ^= PERIOD & TOKEN ^= COMMA & TOKEN ^= ''
+                       THEN STMT = STMT ]] BLANK;
+     WHEN (SPACE_TWICE) DO;
+          IF COL_PIC
+              THEN IF SUBSTR(TOKEN, 1, 3) = 'PIC'
+                       THEN DO WHILE(LENGTH(STMT) < PIC_COL_NO - 10);
+                                STMT = STMT ]] BLANK;
+                                END;
+          STMT = STMT ]] TWO;
+          END;
+     WHEN (NEXT_LINE) DO;
+          IF STMT ^= ''
+              THEN CALL PUTOUT;
+          CALL TAB;
+          END;
+     WHEN (DOUBLE_SPACE) DO;
+          IF STMT ^= ''
+              THEN CALL PUTOUT;
+          STMT = BLANK;
+          CALL PUTOUT;
+          CALL TAB;
+          END;
+1    WHEN (TRIPLE_SPACE) DO;
+          IF STMT ^= ''
+              THEN CALL PUTOUT;
+          STMT = BLANK;
+          CALL PUTOUT;
+          STMT = BLANK;
+          CALL PUTOUT;
+          CALL TAB;
+          END;
+     /* USED FOR ALTERNATE INDENT */
+     WHEN (SPECIAL_PROCESS) DO;
+          CALL PUTOUT;
+          IF THENS
+              THEN DO;
+                   CALL TAB;
+                   STMT = STMT ]] THEN_KEYWORD;
+                   CALL PUTOUT;
+                   END;
+          NEST = NEST + 1;
+          IF NEST > 11
+              THEN NEST = 11;
+          CALL TAB;
+          END;
+     WHEN (EJECT)
+          IF KEEP_SPACERS
+              THEN IF STMT ^= ''
+                       THEN CALL PUTOUT;
+                       ELSE;
+              ELSE DO;
+                   IF STMT ^= ''
+                       THEN CALL PUTOUT;
+                   STMT = FOUR ]] EJECT_STMT;
+                   CALL PUTOUT;
+                   CALL TAB;
+                   END;
+1    WHEN (SKIP1_SET_PERIOD)
+          IF KEEP_SPACERS
+              THEN DO;
+                   IF STMT ^= ''
+                       THEN CALL PUTOUT;
+                   HOLD_NEST = NEST;
+                   NEST = 1;
+                   CALL TAB;
+                   NEST = HOLD_NEST;
+                   END;
+              ELSE DO;
+                   SELECT (TOKEN);
+                       WHEN ('SKIP1') DO;
+                            IF STMT ^= ''
+                                THEN CALL PUTOUT;
+                            STMT = BLANK;
+                            CALL PUTOUT;
+                            END;
+                       WHEN ('SKIP2') DO;
+                            IF STMT ^= ''
+                                THEN CALL PUTOUT;
+                            STMT = BLANK;
+                            CALL PUTOUT;
+                            STMT = BLANK;
+                            CALL PUTOUT;
+                            END;
+                       WHEN ('SKIP3') DO;
+                            IF STMT ^= ''
+                                THEN CALL PUTOUT;
+                            STMT = BLANK;
+                            CALL PUTOUT;
+                            STMT = BLANK;
+                            CALL PUTOUT;
+                            STMT = BLANK;
+                            CALL PUTOUT;
+                            END;
+                       OTHERWISE;
+                       END;
+                   TOKEN = '';
+                   END;
+     OTHERWISE;
+     END;
+ END SPACER;
+ END PROCESS_TOKENS;
+1PUTOUT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO COBFORM AND OUTPUTS THE STATEMENTS   */
+ /*ONCE THEY ARE CONSTRUCTED.                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ ON UNDEFINEDFILE(OUT2) BEGIN;
+     DUP_OUT = NO;
+     PUT FILE(SYSPRINT)
+         EDIT('OPTION OUT2 CANCELED BECAUSE FILE NOT ALLOCATED',
+              'PRIMARY OUTPUT WILL STILL BE PRODUCED')
+             (SKIP(3), A, SKIP(1), A, SKIP(2));
+     GO TO FIXED;
+     END;
+
+ OUT_AREA = STMT;
+ STMT = '';
+
+ SEQ_VALUE = SEQ_VALUE + SEQ_INCREMENT;
+ OUT_SEQ_NO = SEQ_VALUE;
+
+ IF OUT_PRIM
+     THEN PUT FILE(OUT) EDIT(OUTPUT_CARD) (A);
+ OUT_COUNT = OUT_COUNT + 1;
+
+ IF SYS_LIST
+     THEN PUT FILE(SYSPRINT) SKIP(1) EDIT(OUTPUT_CARD) (A);
+
+ FIXED:  /* USED ONLY WITH ON CONDITION FOR RECOVERY */
+ IF DUP_OUT
+     THEN PUT FILE(OUT2) EDIT(OUTPUT_CARD) (A);
+ END PUTOUT;
+1TAB:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO COBFORM.  IT INSERTS BLANKS ON THE   */
+ /*BEGINNING OF STMT TABBING THE TEXT TO THE CURRENT NEST LEVEL.      */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  ITERATE  FIXED DECIMAL(2);
+
+ ITERATE = NEST;
+
+ ITERATION:  /* DO ONCE FOR EACH NEST LEVEL */
+ DO WHILE (ITERATE > 0);
+     STMT = FOUR ]] STMT;
+     ITERATE = ITERATE - 1;
+     END ITERATION;
+
+ /* ADD EXTRA BLANKS FOR (THEN, ELSE) OFFSET*/
+ IF ^ALTERNATE_INDENT
+     THEN SELECT (NEST);
+              WHEN (3)  STMT = BLANK ]] STMT;
+              WHEN (4)  STMT = BLANK ]] STMT;
+              WHEN (5)  STMT = TWO ]] STMT;
+              WHEN (6)  STMT = TWO ]] STMT;
+              WHEN (7)  STMT = THREE ]] STMT;
+              WHEN (8)  STMT = THREE ]] STMT;
+              WHEN (9)  STMT = FOUR ]] STMT;
+              WHEN (10) STMT = FOUR ]] STMT;
+              WHEN (11) STMT = TWO ]] STMT;
+              OTHERWISE;
+              END;
+ END TAB;
+1TOKENIZE:  PROCEDURE(N)  RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO COBFORM.  IT REDUCES THE INPUT AREA  */
+ /*INTO TOKENS TAKING OUT BLANKS.  SPECIAL PROCESSING IS PROVIDED FOR */
+ /*LITERALS.                                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  N  FIXED BINARY;
+
+ DECLARE  D_QUOTE  CHAR(1) INIT('"') STATIC;
+ DECLARE  DELIMITER  CHAR(1);
+ DECLARE  (STARTPOS, POS, POS2)  FIXED BINARY;
+ DECLARE  LITERAL  CHAR(73) VARYING;
+ DECLARE  SEND_PERIOD  BIT(1) INIT('0'B);
+ DECLARE  QUOTE  CHAR(1) INIT('''') STATIC;
+
+ /*CHECK FOR LITERAL*/
+ POS = INDEX(INPUT_WORK_AREA, QUOTE);
+ POS2 = INDEX(INPUT_WORK_AREA, D_QUOTE);
+ DELIMITER = BLANK;
+ SELECT;
+     WHEN (POS ^= 0 & (POS2 = 0 ] POS < POS2)) DO;
+     /*LITERAL BOUNDED BY SINGLE QUOTES*/
+          DELIMITER = QUOTE;
+          LITERAL = SUBSTR(INPUT_WORK_AREA, POS);
+          INPUT_WORK_AREA = SUBSTR(INPUT_WORK_AREA, 1, POS-1);
+          END;
+     WHEN (POS2 ^= 0 & (POS = 0 ] POS2 < POS)) DO;
+     /*LITERAL BOUNDED BY DOUBLE QUOTES*/
+          DELIMITER = D_QUOTE;
+          LITERAL = SUBSTR(INPUT_WORK_AREA, POS2);
+          INPUT_WORK_AREA = SUBSTR(INPUT_WORK_AREA, 1, POS2-1);
+          END;
+      OTHERWISE;
+      END;
+
+ /*FIND POSITION OF FIRST NON-BLANK CHARACTER*/
+ POS = VERIFY(INPUT_WORK_AREA, BLANK);
+
+ DISECT:  /*PICK OUT THE PARTS TAKING OUT THE BLANKS*/
+ DO N = N BY 1 WHILE (POS ^= 0);
+     INPUT_WORK_AREA = SUBSTR(INPUT_WORK_AREA, POS);
+     POS = INDEX(INPUT_WORK_AREA, BLANK);
+     TOKEN(N) = SUBSTR(INPUT_WORK_AREA, 1, POS-1);
+     INPUT_WORK_AREA = SUBSTR(INPUT_WORK_AREA, POS+1);
+     POS = VERIFY(INPUT_WORK_AREA, BLANK);
+     END DISECT;
+1/*THE FOLLOWING IF BLOCK IS SPECIAL PROCESSING FOR LITERALS*/
+ IF DELIMITER ^= BLANK
+     THEN DO;
+          STARTPOS = 2;
+          POS = INDEX(SUBSTR(LITERAL, STARTPOS), DELIMITER);
+
+          TWO_IN_A_ROW:  /* SKIP OVER TWO DELIMITERS IN A ROW */
+          DO WHILE (POS ^= 0  &
+                    SUBSTR(LITERAL, POS+STARTPOS, 1) = DELIMITER);
+              STARTPOS = POS + STARTPOS + 1;
+              POS = INDEX(SUBSTR(LITERAL, STARTPOS), DELIMITER);
+              END TWO_IN_A_ROW;
+
+          IF POS ^= 0
+              THEN DO;  /*FOUND WHOLE LITERAL*/
+                   /*PREVENT PUTTING A PERIOD ON THE NEXT LINE*/
+                   FINAL = SUBSTR(LITERAL, POS+STARTPOS, 1);
+                   SELECT (FINAL);
+                       WHEN (PERIOD) DO;
+                            POS = POS + 1;
+                            SEND_PERIOD = YES;
+                            END;
+                       WHEN (COMMA) POS = POS + 1;
+                       OTHERWISE;
+                       END;
+                   INPUT_WORK_AREA = SUBSTR(LITERAL, POS+STARTPOS);
+                   LITERAL = SUBSTR(LITERAL, 1, POS+STARTPOS-1);
+                   IF LENGTH(LITERAL) <= 30
+                       THEN DO;  /*PUT LITERAL INTO A TOKEN*/
+                            TOKEN(N) = LITERAL;
+                            POS = VERIFY(INPUT_WORK_AREA, BLANK);
+                            N = N + 1;
+                            CALL TOKENIZE(N);
+                            RETURN;
+                            END;
+1                  /*LITERAL BIGGER THAN TOKEN PROCESSING AREA*/
+                   TOKEN(N) = BLANK;
+                   CALL PROCESS_TOKENS;
+                   IF SEND_PERIOD
+                       THEN CALL CONTROL_TABLES(PERIOD);
+                   J = LENGTH(STMT);
+                   K = LENGTH(LITERAL);
+                   SELECT;
+                       WHEN (J = 0) STMT = FOUR ]] LITERAL;
+                       WHEN (J+K < 65) STMT = STMT ]] BLANK ]] LITERAL;
+                       OTHERWISE DO;
+                           CALL PUTOUT;
+                           NEST = NEST + 1;
+                           CALL TAB;
+                           NEST = NEST - 1;
+                           J = LENGTH(STMT);
+                           IF J + K > 65
+                               THEN DO;
+                                    STMT = SUBSTR(STMT, 1, 65-K)
+                                         ]] LITERAL;
+                                    CALL WARNING;
+                                    END;
+                               ELSE STMT = STMT ]] LITERAL;
+                           END;
+                       END;
+                   NEST = NEST + 1;
+                   CALL TOKENIZE(1);
+                   NEST = NEST - 1;
+                   RETURN;
+                   END;
+1             ELSE DO;  /*LITERAL CONTINUED ON NEXT CARD*/
+                   TOKEN(N) = BLANK;
+                   CALL PROCESS_TOKENS;
+                   J = LENGTH(STMT);
+                   K = LENGTH(LITERAL);
+                   /* CORRECTION FOR WIDE_MARGINS */
+                   K = K - 8;
+                   LITERAL = SUBSTR(LITERAL, 1, K);
+                   SELECT;
+                       WHEN (J = 0);
+                       WHEN (J + K < 65) DO;
+                            DO WHILE (J + K < 64);
+                                 LITERAL = BLANK ]] LITERAL;
+                                 K = LENGTH(LITERAL);
+                                 END;
+                            LITERAL = STMT ]] BLANK ]] LITERAL;
+                            END;
+                       OTHERWISE CALL PUTOUT;
+                       END;
+
+                   LEFT_PAD:  /*CORRECT AREA REMOVED FROM BEGINNING*/
+                   DO WHILE (LENGTH(LITERAL) < 65);
+                       LITERAL = BLANK ]] LITERAL;
+                       END LEFT_PAD;
+
+                   STMT = LITERAL;
+                   CALL PUTOUT;
+                   OUT_COL_7 = '-';
+                   CALL GET_INPUT;
+                   POS2 = INDEX(INPUT_WORK_AREA, DELIMITER);
+                   POS = INDEX(SUBSTR(INPUT_WORK_AREA, POS2+1),
+                              DELIMITER) + POS2;
+
+                   COPY_IT:  /*PROCESS CONTINUATION OF LITERAL*/
+                   DO WHILE (MORE_IN & COL_7 = '-' & POS = 0);
+                       STMT = INPUT_WORK_AREA;
+                       CALL PUTOUT;
+                       CALL GET_INPUT;
+                       POS2 = INDEX(INPUT_WORK_AREA, DELIMITER);
+                       POS = INDEX(SUBSTR(INPUT_WORK_AREA, POS2+1),
+                                   DELIMITER) + POS2;
+                       END COPY_IT;
+1                  IF (MORE_IN & POS ^= 0)
+                       THEN DO;  /*FOUND THE END OF THE LITERAL*/
+                            LITERAL = SUBSTR(INPUT_WORK_AREA, 1, POS);
+                            INPUT_WORK_AREA =
+                                SUBSTR(INPUT_WORK_AREA, POS+1);
+                            STMT = LITERAL;
+                            IF INPUT_WORK_AREA = PERIOD
+                              ] INPUT_WORK_AREA = COMMA
+                                THEN DO;
+                                     SEND_PERIOD = YES;
+                                     STMT = STMT ]] INPUT_WORK_AREA;
+                                     INPUT_WORK_AREA = BLANK;
+                                     END;
+                            NEST = NEST + 1;
+                            CALL TOKENIZE(1);
+                            NEST = NEST - 1;
+                            CALL PROCESS_TOKENS;
+                            POS = INDEX(STMT, DELIMITER);
+                            IF POS ^= 0
+                                THEN CALL PUTOUT;
+                            IF SEND_PERIOD
+                                THEN CALL CONTROL_TABLES(PERIOD);
+                            OUT_COL_7 = BLANK;
+                            RETURN;
+                            END;
+                       ELSE IF MORE_IN  /*NO CLOSING DELIMITER*/
+                                THEN DO;
+                                     CALL WARNING;
+                                     OUT_COL_7 = BLANK;
+                                     NEST = NEST + 1;
+                                     CALL TOKENIZE(1);
+                                     NEST = NEST - 1;
+                                     RETURN;
+                                     END;
+                   END;
+          END;
+
+ /*SET THE SENTRY*/
+ TOKEN(N) = BLANK;
+ END TOKENIZE;
+1WARNING:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE IS INTERNAL TO COBFORM.  IT ISSUES A ONE TIME       */
+ /*WARNING/EXPLANATION FOR TOKENS WHICH CANNOT FIT ON A LINE AT THEIR */
+ /*NEST LEVEL.  IT ALSO KEEPS TRACK OF THE LINE RANGE IN WHICH THE    */
+ /*PROBLEM TAKES PLACE, WITH A FIVE LINE RANGE MINIMUM.               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FIRST_LINE  FIXED DECIMAL(15) STATIC INIT(0);
+ DECLARE  LAST_LINE   FIXED DECIMAL(15) STATIC INIT(0);
+
+ IF GIVE_MSG
+     THEN DO;
+          PUT FILE(SYSPRINT) SKIP(3)
+              EDIT('WARNING:  INDENTATION MAY NEED CORRECTION ON ',
+                   'THE FOLLOWING LINES') (A);
+          GIVE_MSG = NO;
+          FIRST_LINE = SEQ_VALUE;
+          LAST_LINE = SEQ_VALUE + 2*SEQ_INCREMENT;
+          RETURN;
+          END;
+
+ IF SEQ_VALUE = 0 /* LAST CALL */
+     THEN IF FIRST_LINE = 0 & LAST_LINE = 0
+              THEN RETURN; /* NO PROBLEMS */
+              ELSE SEQ_VALUE = LAST_LINE + 6 * SEQ_INCREMENT;
+
+ IF LAST_LINE < SEQ_VALUE - 5 * SEQ_INCREMENT
+     THEN DO;
+          PUT FILE(SYSPRINT) SKIP(1) EDIT('*** Line ',
+              FIRST_LINE, '   To ', LAST_LINE)
+              (A, F(8), A, F(8));
+          FIRST_LINE = SEQ_VALUE;
+          LAST_LINE = SEQ_VALUE + 2*SEQ_INCREMENT;
+          END;
+     ELSE LAST_LINE = SEQ_VALUE + 2*SEQ_INCREMENT;
+
+ END WARNING;
+
+ END COBFORM;
+

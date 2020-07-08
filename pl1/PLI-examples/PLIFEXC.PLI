@@ -1,0 +1,908 @@
+*PROCESS NM;
+ PLIFEXC:  PROCEDURE(KEYWORD, ABREVIATION, CHOICE, SPACING, OPTIONS,
+     IN, OUT) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PLIFEXC V2.1  BY CLYDE THOMAS ZUBER');
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DOES THE ACTUAL PLIFORM PROCESSING.  ALL LOGIC AND */
+ /* SOURCE I/O IS DONE FROM THIS PROCEDURE.  THE BASIC PURPOSE IS TO  */
+ /* MAKE A PL/I PROGRAM CONFORM TO SOME DESIRED STRUCTURE OF          */
+ /* INDENTATION AND SPACING.  KEYWORD - ABREVIATION SUBSTITUTION MAY  */
+ /* ALSO BE DONE.                                                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  KEYWORD(*)      CHAR(*) VARYING;
+ DECLARE  ABREVIATION(*)  CHAR(*) VARYING;
+ DECLARE  CHOICE(*)       BIT(*);
+ DECLARE
+     1  SPACING(*),
+        2  MARGIN,
+           3  NO_SPACE          BIT(*),
+           3  SPACE_ONCE        BIT(*),
+           3  SPACE_TWICE       BIT(*),
+           3  INDENT_CONSTRUCT  BIT(*),
+        2  LINE,
+           3  NEXT_LINE         BIT(*),
+           3  DOUBLE_SPACE      BIT(*),
+           3  TRIPLE_SPACE      BIT(*),
+           3  EJECT             BIT(*);
+ DECLARE
+     1  OPTIONS,
+        2  SEQ_INCR      FIXED BINARY(31),
+        2  FLAGS,
+           3  VARYOUT    BIT(*),
+           3  LISTOUT    BIT(*),
+           3  LISTONLY   BIT(*),
+           3  COUNT      BIT(*),
+           3  ALTINDENT  BIT(*),
+           3  UNUSED6    BIT(*),
+           3  UNUSED7    BIT(*),
+           3  UNUSED8    BIT(*);
+
+ DECLARE  IN    FILE VARIABLE;
+ DECLARE  OUT   FILE VARIABLE;
+1DECLARE  AFTER_NO_SPACE     BIT(1) STATIC INIT('0'B);
+ DECLARE  AFTER_SPACE_ONCE   BIT(1) STATIC INIT('0'B);
+ DECLARE  AFTER_SPACE_TWICE  BIT(1) STATIC INIT('0'B);
+ DECLARE  BEGIN_IN_LINE  BIT(1);
+ DECLARE  BLANK  CHAR(1) VARYING STATIC INIT(' ');
+ DECLARE  BLANKS  CHAR(9) STATIC INIT(' ');
+ DECLARE  CASE_STMT  BIT(1) STATIC INIT('0'B);
+ DECLARE  CHECK_INDENT  BIT(1) STATIC INIT('0'B);
+ DECLARE  DELAY_POP  BIT(1) STATIC INIT('0'B);
+ DECLARE  DELIMITER  CHAR(17) VARYING STATIC INIT(' |ª&*()-+=:;''<>,/');
+ DECLARE  DOUBLE_DELIMIT  CHAR(5) VARYING STATIC INIT('=*|><');
+ DECLARE  FOUND  BIT(1);
+ DECLARE  HIGH  FIXED BINARY(31);
+ DECLARE  I  FIXED BINARY(31);
+ DECLARE  ICOUNT  FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  INPUT_AREA  CHAR(91) VARYING;
+ DECLARE  LOW  FIXED BINARY(31);
+ DECLARE  MORE_IN  BIT(1) STATIC INIT('1'B);
+ DECLARE  NO  BIT(1) STATIC INIT('0'B);
+ DECLARE  OCOUNT  FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  POS  FIXED BINARY(31);
+ DECLARE  POS2  FIXED BINARY(31);
+ DECLARE  QUOTE CHAR(1) STATIC INIT('''');
+ DECLARE  SPACE2  BIT(1) STATIC INIT('0'B);
+ DECLARE  SPACE3  BIT(1) STATIC INIT('0'B);
+ DECLARE  STACK(20)  FIXED DECIMAL(1);
+ DECLARE  STACK_PTR  FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  STMT  CHAR(91) VARYING INIT('');
+ DECLARE  STMT_LENGTH  FIXED BINARY(31) STATIC INIT(71);
+ DECLARE  TOKEN  CHAR(32760) VARYING;
+ DECLARE  WORD_LEVEL  FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  WORD_STACK(60)  CHAR(8);
+ DECLARE  YES  BIT(1) STATIC INIT('1'B);
+
+ DECLARE  (ADDR, HBOUND, INDEX, LENGTH, STRING, SUBSTR) BUILTIN;
+ DECLARE  (GETDCB, PUTDCB)  ENTRY;
+ DECLARE  LINDEX  ENTRY RETURNS(FIXED BINARY(31));  /* REALLY ASM */
+ DECLARE  MAXLEN  ENTRY RETURNS(FIXED BINARY(31));  /* REALLY ASM */
+ DECLARE  VERIFY  ENTRY RETURNS(FIXED BINARY(31));  /* REALLY ASM */
+1DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ DECLARE  READ_BUF   CHAR(100) VARYING;
+ DECLARE  WRITE_BUF  CHAR(100) VARYING;
+
+ DECLARE
+     1  OUT_REC,
+        2  OUT_CNTL  CHAR(1),
+        2  OUT_AREA  CHAR(71),
+        2  OUT_SEQ  PIC '(8)9';
+
+ DECLARE
+     1  IN_PARM,
+        2  I_RECFM,
+           3  I_FIXED      BIT(1),
+           3  I_VARIABLE   BIT(1),
+           3  I_UNDEFINED  BIT(1),
+           3  I_BLOCKED    BIT(1),
+           3  I_SPANNED    BIT(1),
+           3  I_A_CNTL     BIT(1),
+           3  I_M_CNTL     BIT(1),
+           3  I_TRK_OVFL   BIT(1),
+        2  I_LRECL    FIXED BINARY,
+        2  I_BLKSIZE  FIXED BINARY;
+
+ DECLARE
+     1  OUT_PARM  STATIC,
+        2  O_RECFM,
+           3  O_FIXED      BIT(1) INIT('1'B),
+           3  O_VARIABLE   BIT(1) INIT('0'B),
+           3  O_UNDEFINED  BIT(1) INIT('0'B),
+           3  O_BLOCKED    BIT(1) INIT('1'B),
+           3  O_SPANNED    BIT(1) INIT('0'B),
+           3  O_A_CNTL     BIT(1) INIT('0'B),
+           3  O_M_CNTL     BIT(1) INIT('0'B),
+           3  O_TRK_OVFL   BIT(1) INIT('0'B),
+        2  O_LRECL    FIXED BINARY INIT(80),
+        2  O_BLKSIZE  FIXED BINARY INIT(0);
+1ON ENDFILE(IN) MORE_IN = NO;
+
+ /* RE-INITIALIZE OUTPUT FILE IF RECFM=VB DESIRED */
+ IF VARYOUT
+     THEN DO;
+          STMT_LENGTH = 91;
+          O_LRECL = 104;
+          O_FIXED = NO;
+          O_VARIABLE = YES;
+          END;
+
+ /* INITIALIZE */
+ CALL PUTDCB(OUT, OUT_PARM);
+ OUT_CNTL = BLANK;
+ OUT_SEQ = SEQ_INCR;
+ TOKEN = '';
+ CALL GETDCB(IN, IN_PARM);
+
+ CALL GETIN;
+ GET_LOOP:  /* MAIN CONTROL LOOP */
+ DO WHILE(MORE_IN);
+     NULL_LOOP:  /* TOKENIZE INPUT RECORD */
+     DO WHILE((INPUT_AREA ª= '') & MORE_IN);
+         POS = VERIFY(INPUT_AREA, BLANK);
+
+         BLK_AREA:  /* SKIP BLANK AREAS */
+         DO WHILE(POS = 0 & MORE_IN);
+             CALL GETIN;
+             POS = VERIFY(INPUT_AREA, BLANK);
+             END BLK_AREA;
+
+         /* TRIM TO BEGINNING OF TOKEN */
+         INPUT_AREA = SUBSTR(INPUT_AREA, POS);
+
+         /* FIND END OF TOKEN */
+         POS = LINDEX(INPUT_AREA, DELIMITER);
+         DO WHILE(POS = 0 & MORE_IN);
+             TOKEN = TOKEN || INPUT_AREA;
+             CALL GETIN;
+             POS = LINDEX(INPUT_AREA, DELIMITER);
+             END;
+1        IF POS = 1 & LENGTH(TOKEN) = 0
+             /* TOKEN IS A DELIMITER */
+             THEN DO;
+                  TOKEN = SUBSTR(INPUT_AREA, 1, 1);
+                  INPUT_AREA = SUBSTR(INPUT_AREA, 2);
+                  IF LENGTH(INPUT_AREA) = 0
+                      THEN CALL GETIN;
+                  /* IS THIS A DOUBLE DELIMITER? */
+                  POS = LINDEX(INPUT_AREA, DOUBLE_DELIMIT);
+                  IF POS = 1
+                      /* TOKEN MAY BE A DOUBLE DELIMETER */
+                      THEN DO;
+                           TOKEN = TOKEN || SUBSTR(INPUT_AREA, 1, 1);
+                           IF TOKEN = '/*' | TOKEN = '||' |
+                              TOKEN = 'ª=' | TOKEN = '>=' |
+                              TOKEN = '<=' | TOKEN = '**' |
+                              TOKEN = 'ª>' | TOKEN = 'ª<' |
+                              TOKEN = '->'
+                               THEN INPUT_AREA = SUBSTR(INPUT_AREA, 2);
+                               ELSE TOKEN = SUBSTR(TOKEN, 1, 1);
+                           END;
+                  END;
+             /* TOKEN IS NOT A DELIMITER */
+             ELSE DO;
+                  TOKEN = TOKEN || SUBSTR(INPUT_AREA, 1, POS-1);
+                  INPUT_AREA = SUBSTR(INPUT_AREA, POS);
+                  END;
+1        IF TOKEN = QUOTE | TOKEN = '/*'
+             THEN CALL SPECIAL_PROCESS;
+             ELSE CALL TOKEN_PROCESS;
+
+         TOKEN = '';
+
+         END NULL_LOOP;
+
+     CALL GETIN;
+
+     END GET_LOOP;
+ CALL PUTOUT;
+ CLOSE FILE(IN);
+
+ IF COUNT
+     THEN DO;
+          PUT SKIP(2) EDIT(ICOUNT, ' IN  RECORDS') (F(9),A);
+          PUT SKIP(1) EDIT(OCOUNT, ' OUT RECORDS') (F(9),A);
+          END;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1GETIN:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DOES ALL SOURCE INPUT.                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ READ FILE(IN) INTO(READ_BUF);
+ IF ªMORE_IN
+     THEN DO;
+          INPUT_AREA = '';
+          RETURN;
+          END;
+
+ ICOUNT = ICOUNT + 1;
+
+ BEGIN_IN_LINE = YES;
+1SELECT;
+     WHEN(I_FIXED) DO;
+         INPUT_AREA = SUBSTR(READ_BUF, 2, 71);
+         SELECT(SUBSTR(READ_BUF, 1, 1));
+             WHEN('*') OUT_CNTL = '*';
+             WHEN('(') CASE_STMT = YES;
+             WHEN(')') CASE_STMT = NO;
+             OTHERWISE;
+             END;
+         END;
+     WHEN(I_VARIABLE) DO;
+         INPUT_AREA = SUBSTR(READ_BUF, 10);
+         SELECT(SUBSTR(READ_BUF, 9, 1));
+             WHEN('*') OUT_CNTL = '*';
+             WHEN('(') CASE_STMT = YES;
+             WHEN(')') CASE_STMT = NO;
+             OTHERWISE;
+             END;
+         END;
+     WHEN(I_UNDEFINED)
+         IF LENGTH(READ_BUF) = 80
+             THEN DO;
+                  INPUT_AREA = SUBSTR(READ_BUF, 2, 71);
+                  SELECT(SUBSTR(READ_BUF, 1, 1));
+                      WHEN('*') OUT_CNTL = '*';
+                      WHEN('(') CASE_STMT = YES;
+                      WHEN(')') CASE_STMT = NO;
+                      OTHERWISE;
+                      END;
+                  END;
+             ELSE DO;
+                  INPUT_AREA = SUBSTR(READ_BUF, 10);
+                  SELECT(SUBSTR(READ_BUF, 9, 1));
+                      WHEN('*') OUT_CNTL = '*';
+                      WHEN('(') CASE_STMT = YES;
+                      WHEN(')') CASE_STMT = NO;
+                      OTHERWISE;
+                      END;
+                  END;
+     END;
+
+ END GETIN;
+1PUTOUT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PRODUCES ALL THE FORMATTED OUTPUT.                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF LENGTH(STMT) = 0
+     THEN RETURN;
+
+ IF VARYOUT
+
+     THEN DO;
+          WRITE_BUF = OUT_SEQ || OUT_CNTL || STMT;
+          SELECT;
+              WHEN(LISTONLY) PUT SKIP EDIT(WRITE_BUF) (A);
+              WHEN(LISTOUT) DO;
+                  PUT SKIP EDIT(WRITE_BUF) (A);
+                  WRITE FILE(OUT) FROM(WRITE_BUF);
+                  END;
+              OTHERWISE WRITE FILE(OUT) FROM(WRITE_BUF);
+              END;
+          END;
+     ELSE DO;
+          OUT_AREA = STMT;
+          SELECT;
+              WHEN(LISTONLY) PUT SKIP EDIT(OUT_REC) (A);
+              WHEN(LISTOUT) DO;
+                  PUT SKIP EDIT(OUT_REC) (A);
+                  WRITE FILE(OUT) FROM(OUT_REC);
+                  END;
+              OTHERWISE WRITE FILE(OUT) FROM(OUT_REC);
+              END;
+          END;
+
+ /* OUTPUT STATS */
+ OCOUNT = OCOUNT + 1;
+
+ /* GET READY FOR NEXT TIME */
+ OUT_CNTL = BLANK;
+ OUT_SEQ = OUT_SEQ + SEQ_INCR;
+ CALL PAD;
+
+ END PUTOUT;
+1PAD:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE ADJUSTS THE LEFT MARGIN TO THE PROPER INDENTATION. */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ STMT= '';
+
+ /* SET INDENTATION FOR NEXT LINE */
+ DO I = 1 TO STACK_PTR  WHILE(I <= 20);
+     STMT = STMT || SUBSTR(BLANKS, 1, STACK(I));
+     END;
+
+ /* PREVENT OVERFLOW */
+ IF STACK_PTR >= 20
+     THEN STACK_PTR = 20;
+
+ END PAD;
+1TOKEN_PROCESS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS LOGIC FOR ORDINARY TYPE TOKENS (IE. NOT COMMENTS OR       */
+ /* QUOTED STRINGS).                                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ SPACING(0) = NO;
+ BEGIN_IN_LINE = NO;
+
+ FOUND = NO;
+ IF LENGTH(TOKEN) <= MAXLEN(KEYWORD(1))
+     THEN DO;
+          HIGH = HBOUND(KEYWORD, 1);
+          LOW  = 1;
+
+          BINARY_SEARCH:
+          DO WHILE(HIGH >= LOW & ªFOUND);
+              POS = (LOW + HIGH) / 2;
+              IF TOKEN = KEYWORD(POS)
+                  THEN FOUND = YES;
+                  ELSE IF TOKEN > KEYWORD(POS)
+                           THEN LOW = POS + 1;
+                           ELSE HIGH = POS - 1;
+              END BINARY_SEARCH;
+          IF ªFOUND & LENGTH(TOKEN) <= MAXLEN(ABREVIATION(1))
+              THEN DO;
+                   IF POS + 10 > HBOUND(KEYWORD, 1)
+                       THEN I = HBOUND(KEYWORD, 1);
+                       ELSE I = POS + 10;
+                   IF POS - 10 < 1
+                       THEN POS = 1;
+                       ELSE POS = POS - 10;
+                   DO POS = POS TO I WHILE(ªFOUND);
+                       IF TOKEN = ABREVIATION(POS)
+                           THEN FOUND = YES;
+                       END;
+                   POS = POS - 1;
+                   END;
+          END;
+1IF FOUND
+     THEN DO;
+          SELECT(SUBSTR(CHOICE(POS), 1, 2));
+              WHEN('11'B);
+              WHEN('01'B) TOKEN = ABREVIATION(POS);
+              WHEN('10'B) TOKEN = KEYWORD(POS);
+              END;
+
+          IF INDENT_CONSTRUCT(POS)
+              THEN CHECK_INDENT = YES;
+
+          INDENT_CONSTRUCT(0) = INDENT_CONSTRUCT(POS);
+          LINE(0) = LINE(POS);
+
+          SELECT;
+              WHEN(AFTER_NO_SPACE) DO;
+                  AFTER_NO_SPACE = NO;
+                  NO_SPACE(0) = YES;
+                  CALL SPACER(SPACING(0));
+                  END;
+              WHEN(AFTER_SPACE_ONCE) DO;
+                  AFTER_SPACE_ONCE = NO;
+                  SPACE_ONCE(0) = YES;
+                  CALL SPACER(SPACING(0));
+                  END;
+              WHEN(AFTER_SPACE_TWICE) DO;
+                  AFTER_SPACE_TWICE = NO;
+                  SPACE_TWICE(0) = YES;
+                  CALL SPACER(SPACING(0));
+                  END;
+              OTHERWISE CALL SPACER(SPACING(POS));
+              END;
+
+          SELECT(KEYWORD(POS));
+              WHEN(')', ';');
+              WHEN('(', 'ª', '%') AFTER_NO_SPACE = YES;
+              WHEN('IF') AFTER_SPACE_ONCE = YES;
+              WHEN('%DECLARE', ':', 'DECLARE') AFTER_SPACE_TWICE = YES;
+              OTHERWISE IF LINDEX(KEYWORD(POS), DELIMITER) ª= 0
+                  THEN AFTER_SPACE_ONCE = YES;
+              END;
+          END;
+1    ELSE DO;
+          SELECT;
+              WHEN(AFTER_NO_SPACE) DO;
+                  AFTER_NO_SPACE = NO;
+                  NO_SPACE(0) = YES;
+                  END;
+              WHEN(AFTER_SPACE_ONCE) DO;
+                  AFTER_SPACE_ONCE = NO;
+                  SPACE_ONCE(0) = YES;
+                  END;
+              WHEN(AFTER_SPACE_TWICE) DO;
+                  AFTER_SPACE_TWICE = NO;
+                  SPACE_TWICE(0) = YES;
+                  END;
+              OTHERWISE SPACE_ONCE(0) = YES;
+              END;
+          CALL SPACER(SPACING(0));
+          END;
+1SPACER:  PROCEDURE(SPACING);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CREATE DESIRED SPACING FOR SOURCE.  MARGIN SPACING GOES BEFORE A  */
+ /* TOKEN AND LINE SPACING AFTER.  THIS PROCEDURE IS INTERNAL TO      */
+ /* TOKEN_PROCESS.                                                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE
+     1  SPACING,
+        2  MARGIN,
+           3  NO_SPACE          BIT(*),
+           3  SPACE_ONCE        BIT(*),
+           3  SPACE_TWICE       BIT(*),
+           3  INDENT_CONSTRUCT  BIT(*),
+        2  LINE,
+           3  NEXT_LINE         BIT(*),
+           3  DOUBLE_SPACE      BIT(*),
+           3  TRIPLE_SPACE      BIT(*),
+           3  EJECT             BIT(*);
+
+ DECLARE  REPEAT    BIT(1) INIT('1'B);
+
+ DECLARE  NEW_LINE  BIT(1) INIT('0'B);
+1IF CHECK_INDENT
+     THEN IF SUBSTR(TOKEN, 1, 1) = '%'
+              THEN CALL INDENTOR(SUBSTR(TOKEN, 2));
+              ELSE CALL INDENTOR(TOKEN);
+
+ IF STMT ª= BLANK
+     THEN SELECT;
+              WHEN(NO_SPACE);
+              WHEN(SPACE_ONCE) STMT = STMT || BLANK;
+              WHEN(SPACE_TWICE) STMT = STMT || BLANK || BLANK;
+              OTHERWISE;
+              END;
+
+ IF NEW_LINE
+     THEN CALL PUTOUT;
+
+ ADD_ON:
+ DO WHILE(REPEAT);
+     REPEAT = NO;
+1    SELECT;
+         WHEN(LENGTH(TOKEN) + LENGTH(STMT) < STMT_LENGTH) DO;
+             STMT = STMT || TOKEN;
+             IF SUBSTR(TOKEN, 1, 2) = '/*'
+                 THEN CALL PUTOUT;
+             END;
+         WHEN((LENGTH(TOKEN) + LENGTH(STMT) = STMT_LENGTH) &
+             (LENGTH(TOKEN) = 1)) STMT = STMT || TOKEN;
+         WHEN(SUBSTR(TOKEN, 1, 2) = '/*') DO;
+             POS = STMT_LENGTH - LENGTH(STMT) + 1;
+             DO WHILE(LENGTH(TOKEN) >= POS);
+                 STMT = STMT || TOKEN;
+                 TOKEN = SUBSTR(TOKEN, POS);
+                 CALL PUTOUT;
+                 POS = STMT_LENGTH - LENGTH(STMT) + 1;
+                 END;
+             STMT = STMT || TOKEN;
+             CALL PUTOUT;
+             END;
+         WHEN((STMT = BLANK) & (LENGTH(TOKEN) <= STMT_LENGTH))
+             IF LENGTH(STMT) > LENGTH(TOKEN)
+                 THEN STMT = TOKEN;
+                 ELSE STMT = SUBSTR(STMT, 1,
+                          STMT_LENGTH-LENGTH(TOKEN)-1) || TOKEN;
+         WHEN(STMT = BLANK) DO;
+             DO WHILE(LENGTH(TOKEN) > STMT_LENGTH);
+                 STMT = TOKEN;
+                 CALL PUTOUT;
+                 TOKEN = SUBSTR(TOKEN, STMT_LENGTH+1);
+                 END;
+             STMT = TOKEN;
+             CALL PUTOUT;
+             END;
+         OTHERWISE DO;
+             STACK_PTR = STACK_PTR + 1;
+             IF STACK_PTR <= 20
+                 THEN STACK(STACK_PTR) = 4;
+             CALL PUTOUT;
+             STACK_PTR = STACK_PTR - 1;
+             REPEAT = YES;
+             END;
+         END;
+     END ADD_ON;
+1SELECT;
+     WHEN(NEXT_LINE) DO;
+         SELECT;
+             WHEN(SPACE2) DO;
+                 CALL PUTOUT;
+                 STMT = BLANK;
+                 CALL PUTOUT;
+                 END;
+             WHEN(SPACE3) DO;
+                 CALL PUTOUT;
+                 STMT = BLANK;
+                 CALL PUTOUT;
+                 STMT = BLANK;
+                 CALL PUTOUT;
+                 END;
+             OTHERWISE CALL PUTOUT;
+             END;
+         SPACE2 = NO;
+         SPACE3 = NO;
+         END;
+     WHEN(DOUBLE_SPACE) SPACE2 = YES;
+     WHEN(TRIPLE_SPACE) SPACE3 = YES;
+     OTHERWISE;
+     END;
+
+ IF EJECT
+     THEN DO;
+          I = VERIFY(STMT, BLANK);
+          STMT = SUBSTR(STMT, I);
+          STACK_PTR = 0;
+          WORD_LEVEL = 0;
+          CHECK_INDENT = NO;
+          OUT_CNTL = '1';
+          END;
+1INDENTOR:  PROCEDURE(TOKEN);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO SPACER, IT MAINTAINS INDENTATION    */
+ /* FOR SPECIAL CONSTRUCTS SUCH AS IF-THEN-ELSE.                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  TOKEN  CHAR(*) VARYING;
+ DECLARE  REPEAT  BIT(1) INIT('1'B);
+
+
+ IF DELAY_POP
+     THEN IF TOKEN ª= 'ELSE'
+              THEN DO;
+                   DO WHILE(WORD_STACK(WORD_LEVEL) = 'THEN' |
+                   WORD_STACK(WORD_LEVEL) = 'ELSE');
+                       STACK_PTR = STACK_PTR - 1;
+                       CALL FLUSH(NO);
+                       END;
+                   IF STMT = BLANK
+                       THEN CALL PAD;
+                   END;
+
+ DELAY_POP = NO;
+1IF INDENT_CONSTRUCT  |  TOKEN = 'END'  |  TOKEN = ';'  |
+    (TOKEN > '0' & (SUBSTR(STMT, LENGTH(STMT), 1) = ',') & STRUCTURE) |
+    (TOKEN > '0' & ((SUBSTR(STMT, LENGTH(STMT)-6)= 'DECLARE')
+                  | (SUBSTR(STMT, LENGTH(STMT)-2)= 'DCL')))
+
+     THEN IF TOKEN > '0'
+              THEN DO;
+                   NEW_LINE = YES;
+                   AFTER_SPACE_TWICE = YES;
+                   IF TOKEN > WORD_STACK(WORD_LEVEL)
+                       THEN IF WORD_LEVEL < 60
+                                THEN DO;
+                                     STACK_PTR = STACK_PTR + 1;
+                                     IF STACK_PTR <= 20
+                                         THEN STACK(STACK_PTR) = 3;
+                                     WORD_LEVEL = WORD_LEVEL + 1;
+                                     WORD_STACK(WORD_LEVEL) = TOKEN;
+                                     END;
+                                ELSE;
+                   ELSE DO WHILE(TOKEN < WORD_STACK(WORD_LEVEL));
+                            WORD_LEVEL = WORD_LEVEL - 1;
+                            STACK_PTR = STACK_PTR - 1;
+                            END;
+                   END;
+              ELSE IF (TOKEN = ';') & (WORD_STACK(WORD_LEVEL) = ';')
+                       THEN RETURN;
+                       ELSE IF WORD_LEVEL < 60
+                                THEN DO;
+                                     WORD_LEVEL = WORD_LEVEL + 1;
+                                     WORD_STACK(WORD_LEVEL) = TOKEN;
+                                     END;
+                                ELSE;
+
+     ELSE IF ªFOUND & (TOKEN < '0') & STRUCTURE &
+            (SUBSTR(TOKEN, 1, 1) ª= QUOTE) &
+            (SUBSTR(STMT, LENGTH(STMT), 1) = ',')
+              THEN DO;
+                   TOKEN = SUBSTR(BLANKS, 1, 9) || TOKEN;
+                   NEW_LINE = YES;
+                   RETURN;
+                   END;
+              ELSE RETURN;
+1IF TOKEN = 'THEN'
+     THEN DO;
+          NEW_LINE = YES;
+          STACK_PTR = STACK_PTR + 1;
+          IF STACK_PTR <= 20
+              THEN IF ALTINDENT
+                       THEN STACK(STACK_PTR) = 0;
+                       ELSE STACK(STACK_PTR) = 4;
+          IF (WORD_STACK(WORD_LEVEL-1) = 'THEN' |
+             WORD_STACK(WORD_LEVEL-1) = 'ELSE') &
+             (STACK_PTR <= 20) & ªCASE_STMT
+              THEN STACK(STACK_PTR) = STACK(STACK_PTR) + 5;
+          RETURN;
+          END;
+
+ DO WHILE(TOKEN = ';'  &  REPEAT);
+     REPEAT = NO;
+
+     SELECT(WORD_STACK(WORD_LEVEL-1));
+
+         WHEN('DECLARE') CALL FLUSH(NO);
+
+         WHEN('DO') DO;
+             STACK_PTR = STACK_PTR + 1;
+             IF STACK_PTR <= 20
+                 THEN STACK(STACK_PTR) = 5;
+             END;
+
+         WHEN('SELECT') DO;
+             STACK_PTR = STACK_PTR + 1;
+             IF STACK_PTR <= 20
+                 THEN IF WORD_STACK(WORD_LEVEL-2) = 'THEN'
+                       | WORD_STACK(WORD_LEVEL-2) = 'ELSE'
+                          THEN STACK(STACK_PTR) = 9;
+                          ELSE STACK(STACK_PTR) = 4;
+             END;
+1        WHEN('END') DO;
+             STACK_PTR = STACK_PTR - 1;
+             CALL FLUSH(NO);
+             IF WORD_STACK(WORD_LEVEL) = 'ELSE'
+                 THEN DO;
+                      REPEAT = YES;
+                      IF WORD_LEVEL < 60
+                          THEN DO;
+                               WORD_LEVEL = WORD_LEVEL + 1;
+                               WORD_STACK(WORD_LEVEL) = TOKEN;
+                               END;
+                      END;
+                 ELSE DELAY_POP = YES;
+             END;
+
+         WHEN('ELSE') DO;
+             STACK_PTR = STACK_PTR - 1;
+             CALL FLUSH(NO);
+             DELAY_POP = YES;
+             IF WORD_STACK(WORD_LEVEL) = 'ELSE'
+                 THEN DO;
+                      DELAY_POP = NO;
+                      REPEAT = YES;
+                      IF WORD_LEVEL < 60
+                          THEN DO;
+                               WORD_LEVEL = WORD_LEVEL + 1;
+                               WORD_STACK(WORD_LEVEL) = TOKEN;
+                               END;
+                      END;
+             END;
+1        WHEN('THEN') DO;
+             WORD_LEVEL = WORD_LEVEL - 1;
+             IF CASE_STMT
+                 THEN STACK_PTR = STACK_PTR - 1;
+             DELAY_POP = YES;
+             END;
+
+         WHEN('BEGIN') DO;
+             STACK_PTR = STACK_PTR + 1;
+             IF STACK_PTR <= 20
+                 THEN STACK(STACK_PTR) = 4;
+             END;
+
+         OTHERWISE IF STRUCTURE
+             THEN CALL FLUSH(YES);
+         END;
+     END;
+
+ IF STACK_PTR < 0
+     THEN STACK_PTR = 0;
+
+ IF WORD_LEVEL < 0
+     THEN WORD_LEVEL = 0;
+1FLUSH:  PROCEDURE(PURGE);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO INDENTOR.  WILL CLEAN OUT THE       */
+ /* STACK TO THE APPROPRIATE LEVEL WHEN A CONSTRUCT ENDS.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PURGE  BIT(1);
+ DECLARE  I  FIXED BINARY(31) INIT(0);
+
+ DO WORD_LEVEL = WORD_LEVEL TO 1 BY -1
+    UNTIL(WORD_STACK(WORD_LEVEL) = 'DO'      |
+          WORD_STACK(WORD_LEVEL) = 'SELECT'  |
+          WORD_STACK(WORD_LEVEL) = 'THEN'    |
+          WORD_STACK(WORD_LEVEL) = 'DECLARE' |
+          WORD_STACK(WORD_LEVEL) = 'BEGIN'   |
+          WORD_STACK(WORD_LEVEL) = 'DCL');
+     I = I + 1;
+     END;
+ WORD_LEVEL = WORD_LEVEL - 1;
+ IF WORD_LEVEL <= 0  &  ªINDENT_CONSTRUCT
+     THEN CHECK_INDENT = NO;
+
+ /* FOR PURGING STACK FROM DECLARE STRUCTURE CONSTRUCT */
+ IF PURGE
+     THEN STACK_PTR = STACK_PTR - I + 2;
+
+ END FLUSH;
+1STRUCTURE:  PROCEDURE RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO INDENTOR, PROVIDES SPECIAL          */
+ /* HANDLING FOR STRUCTURE DECLARATIONS.                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DO I = WORD_LEVEL TO 1 BY -1
+    WHILE(WORD_STACK(I) > '0' | WORD_STACK(I) = ';');
+     END;
+
+ IF WORD_STACK(I) = 'DECLARE' | WORD_STACK(I) = 'DCL'
+     THEN RETURN(YES);
+     ELSE RETURN(NO);
+
+ END STRUCTURE;
+
+ END INDENTOR;
+
+ END SPACER;
+
+ END TOKEN_PROCESS;
+1SPECIAL_PROCESS:  PROCEDURE RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROVIDES PROCESSING LOGIC FOR COMMENTS AND QUOTED STRINGS.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  CONTINUED  BIT(1) INIT('0'B);
+
+ IF LENGTH(INPUT_AREA) = 0 & MORE_IN
+     THEN DO;
+          CALL GETIN;
+          IF ªMORE_IN
+              THEN RETURN;
+          END;
+
+ IF BEGIN_IN_LINE & TOKEN = '/*'
+     THEN DO;
+          IF STMT ª= BLANK
+              THEN CALL PUTOUT;
+          CALL COMMENT_LINES;
+          RETURN;
+          END;
+1SELECT(SUBSTR(TOKEN, 1, 1));
+     WHEN('/') CALL COMMENT_ENDPOS(CONTINUED);
+     WHEN(QUOTE) DO;
+         POS = INDEX(INPUT_AREA, QUOTE);
+         IF POS = LENGTH(INPUT_AREA) /* NO SPLIT ON DOUBLE QUOTE */
+             THEN INPUT_AREA = INPUT_AREA || ' ';
+         PASS_DOUBLE:  /* SKIP DOUBLE QUOTE REPRESENTATION OF QUOTE */
+         DO WHILE((POS ª= 0) & (SUBSTR(INPUT_AREA, POS+1, 1) = QUOTE));
+             POS2 = INDEX(SUBSTR(INPUT_AREA, POS+2), QUOTE);
+             IF POS2 = 0
+                 THEN POS = 0;
+                 ELSE POS = POS + POS2 + 1;
+             END PASS_DOUBLE;
+         IF POS = 0
+             THEN DO;
+                  CONTINUED = YES;
+                  POS = LENGTH(INPUT_AREA);
+                  END;
+         TOKEN = TOKEN || SUBSTR(INPUT_AREA, 1, POS);
+         IF POS+1 > LENGTH(INPUT_AREA)
+             THEN INPUT_AREA = '';
+             ELSE INPUT_AREA = SUBSTR(INPUT_AREA, POS+1);
+         END;
+     END;
+
+ IF CONTINUED
+     THEN DO;
+          CALL SPECIAL_PROCESS;
+          RETURN;
+          END;
+
+ CALL TOKEN_PROCESS;
+
+ END SPECIAL_PROCESS;
+1COMMENT_ENDPOS:  PROCEDURE(CONTINUED) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* FINDS THE END OF A COMMENTS WITHIN THE INPUT SOURCE.              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  CONTINUED  BIT(1);
+
+ POS = INDEX(INPUT_AREA, '*/');
+ IF POS = 0
+     THEN DO;
+          CONTINUED = YES;
+          POS = LENGTH(INPUT_AREA);
+          END;
+     ELSE POS = POS + 1;
+
+ TOKEN = TOKEN || SUBSTR(INPUT_AREA, 1, POS);
+
+ IF POS+1 > LENGTH(INPUT_AREA)
+     THEN INPUT_AREA = '';
+     ELSE INPUT_AREA = SUBSTR(INPUT_AREA, POS+1);
+
+ END COMMENT_ENDPOS;
+1COMMENT_LINES:  PROCEDURE RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESSES COMMENTS WHICH OCCUPY MORE THAN ONE LINE OF TEXT.       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE CONTINUED BIT(1) INIT('0'B);
+
+
+ CALL COMMENT_ENDPOS(CONTINUED);
+ STMT = TOKEN;
+ CALL PUTOUT;
+ IF LENGTH(TOKEN) > STMT_LENGTH
+     THEN TOKEN = SUBSTR(TOKEN, STMT_LENGTH+1);
+     ELSE TOKEN = '';
+
+ IF CONTINUED & MORE_IN
+     THEN DO;
+          CALL GETIN;
+          IF ªMORE_IN
+              THEN DO;
+                   STMT = TOKEN;
+                   CALL PUTOUT;
+                   RETURN;
+                   END;
+          CALL COMMENT_LINES;
+          END;
+     ELSE DO;
+          DO WHILE(LENGTH(TOKEN) > STMT_LENGTH);
+              STMT = TOKEN;
+              CALL PUTOUT;
+              TOKEN = SUBSTR(TOKEN, STMT_LENGTH+1);
+              END;
+          STMT = TOKEN;
+          CALL PUTOUT;
+          END;
+
+ END COMMENT_LINES;
+
+ END PLIFEXC;
+

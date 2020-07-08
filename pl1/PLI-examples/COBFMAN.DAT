@@ -1,0 +1,551 @@
+1
+-
+-
+-
+-
+-
+-
+-
+-
+                       COBOL SOURCE FORMAT UTILITY
++                      ___________________________
+0                         BY CLYDE THOMAS ZUBER
+0                              VERSION 3.0
+1                                                             PAGE   2
+0 TABLE OF CONTENTS:
++ _________________
+-
+-      SUBJECT                                                PAGE
++      _______                                                ____
+-      GENERAL INFORMATION   --------------------------------    3
+0      FUNCTION HELP INFORMATION   --------------------------    4
+0      SYSIN CONTROL FILE HELP INFORMATION   ----------------    5
+0      PARMS HELP INFORMATION   -----------------------------    6
+0      SAMPLE CONTROL (JCL OR TSO) CARDS   ------------------    8
+0      CURRENT LIST OF COMMANDS   ---------------------------    9
+0      PARAMETERS   -----------------------------------------   10
+0      DEFAULTS   -------------------------------------------   11
+0      THE CASE CONSTRUCT AND ITS USE   ---------------------   12
+0      TROUBLE SHOOTING GUIDE   -----------------------------   13
+0      INDEX   ----------------------------------------------   14
+1                                                             PAGE   3
+0 GENERAL INFORMATION:
++ ___________________
+-    IN ORDER TO OBTAIN INFORMATION ABOUT THE USE OF THIS UTILITY A
+  NUMBER OF HELP COMMAND WORDS HAVE BEEN PROVIDED TO GIVE THE EXACT
+  INFORMATION DESIRED.  THESE MAY BE ENTERED WHILE IN THE SYSIN
+  CONTROL LOOP.  THE HELP KEY WORDS, FUNCTION, SYNTAX AND PARMS,
+  LOOSELY CORRESPOND TO THE TSO HELP FACILITY'S, FUNCTION, SYNTAX AND
+  OPERANDS.  HOWEVER, INSTEAD OF REFERING TO JUST ONE COMMAND THEY
+  RELATE TO THE ENTIRE USE OF THE FORMATTER.
+0    KEY WORD    EXPLANATION
++    ________    ___________
+0    COMMANDS    SIMPLY LISTS ALL AVAILABLE COMMANDS.  THESE ARE ALL
++    ________
+                 THE COMMANDS EXPLAINED BY THE SYNTAX AND PARMS
+                 COMMANDS.
+0    FUNCTION    EXPLAINS THE PURPOSE OF THE FORMATTER AND DETAILS THE
++    ________
+                 WAYS IT MAY BE USED.  IN ADDITION IT GIVES WARNINGS
+                 AS TO LIMITATIONS.
+0    HELPS       LISTS THE ENTIRE HELP FACILITY.
++    _____
+0    PARMS       LISTS AND EXPLAINS ALL FORMATTER COMMANDS WHICH MAY
++    _____
+                 ALTER THE PROCESSING OF THE COBOL PROGRAM.  THESE ARE
+                 THE AVAILABLE OPTIONS.
+0    SYNTAX      EXPLAINS HOW TO USE THE SYSIN CONTROL PROCESSOR AND
++    ______
+                 THE KEYWORDS WHICH SPECIFICALLY RELATE TO IT.
+1                                                             PAGE   4
+0 FUNCTION HELP INFORMATION:
++ _________________________
+- FUNCTION:
++ ________
+     THIS UTILITY ACCEPTS AS INPUT A COBOL SOURCE PROGRAM AND OUTPUTS
+     THE SAME PROGRAM REFORMATTED.  BLANK LINES ARE INSERTED WHERE
+     APPROPRIATE AND INDENTATION IS MADE, UP TO SIX LEVELS.  THE
+     UTILITY CAN BE USED TO MAKE OLD PROGRAMS WHICH WERE NEVER
+     PROPERLY FORMATED MORE READABLE, OR IT CAN FORMAT NEW COBOL
+     PROGRAMS WHICH CAN BE TYPED IN A FREE FORMAT MANNER.  NORMALLY,
+     ONLY COLUMNS 7-72 ARE USED FOR THE INPUT PROGRAM, BUT BY
+     INDICATING WIDE_MARGINS AS AN OPTION COLUMNS 7-80 MAY BE USED.
+     (COLUMN 7 IS RESERVED FOR INDICATING COMMENTS, CONTINUATION AND
+     THE CASE CONSTRUCT WHETHER WIDE_MARGINS IS SPECIFIED OR NOT).
+     THIS MAKES TYPING NEW PROGRAMS MUCH EASIER AS ONE NEED ONLY TYPE
+     THE WORDS IN ORDER AND THE FORMATTER WILL ARRANGE THEM INTO THE
+     PROPER FORM.
+- PARTIAL PROGRAMS:
++ ________________
+     PARTIAL PROGRAMS MAY BE REFORMATTED PROVIDED ONE OF THE DIVISION
+     NAMES (IE. IDENTIFICATION, DATA, ENVIRONMENT, OR PROCEDURE) IS
+     PLACED IN THE BEGINNING OF THE CODE TO INDICATE TO THE FORMATTER
+     HOW TO PROCESS THE PARTIAL PROGRAM.  THIS SHOULD NOT BE CONFUSED
+     WITH THE DATA_DIVISION_ONLY AND PROCEDURE_DIVISION_ONLY COMMANDS
+     WHICH CAUSE PARTIAL PROCESSING OF A WHOLE PROGRAM.
+- WARNING:
++ _______
+       THE WORD ENVIRONMENT IS A FORMATTER KEYWORD AND SHOULD NOT BE
+     USED IN THE REMARKS SECTION OF YOUR PROGRAM. IF IT IS USED, THE
+     PROCESSING IN THIS AREA OF YOUR PROGRAM MAY BE WRONG.
+       A SINGLE OR DOUBLE QUOTE IN THE REMARKS SECTION WILL BE
+     INTERPRETED AS THE BEGINNING OF A LITERAL UNLESS THE NO_REMARKS
+     OPTION IS SPECIFIED.
+- DISCLAIMER:
++ __________
+     NO RESULTS OF THIS UTILITY ARE GUARANTEED.  SYNTAX OF OUTPUT
+     WILL COPY ANY PUNCTUATION OR SPELLING DEFECTS OF THE INPUT.
+     AS THE OUTPUT IS DISTINCT FROM THE INPUT NO RISK IS INVOLVED,
+     BUT OUTPUT SHOULD BE INSPECTED BEFORE DELETING THE INPUT.
+1                                                             PAGE   5
+0 SYSIN HELP INFORMATION:
++ ______________________
+- SYSIN CONTROL FILE:
++ __________________
+     SOME FEATURES OF THIS PROGRAM ARE CONTROLLABLE THROUGH THE SYSIN
+     FILE.  (ALL FEATURES HAVE A DEFAULT SO THAT CONTROL IS ONLY
+     NECESSARY TO SPECIFY NON-DEFAULT OPTIONS).
+- SYSIN SYNTAX:
++ ____________
+     ALL COMMANDS WHICH ARE MORE THAN ONE "WORD" ARE CONNECTED WITH
+     EITHER HYPHENS OR UNDERLINE CHARACTERS.  NO QUOTES ARE NEEDED.
+     NUMBER OPERANDS ARE ENTERED WITHOUT QUOTES AS INDICATED.
+- CONTROL LOOP COMMANDS:
++ _____________________
+0      BEGIN        CAUSES OPTIONS NOT TO BE DISPLAYED BEFORE
++      _____
+                    EXECUTION.  EXECUTION BEGINS IMMEDIATELY.
+0      CANCEL       SKIPS PROCESSING OF FILES AND IMMEDIATELY TERMINATES
++      ______
+                    EXECUTION. FOR EXAMPLE, THIS CAN PREVENT AN ABEND IF
+                    THE NECESSARY FILES ARE NOT ALLOCATED.
+0      END          ENDS THE CONTROL LOOP.
++      ___
+0      JCL          DISPLAYS INFORMATION ABOUT RUNNING THE FORMATTER
++      ___
+                    IN THE BACKGROUND.
+0      STATE        DISPLAYS THE OPTIONS IN EFFECT AT THE TIME THE
++      _____
+                    COMMAND IS ISSUED.  CAN BE USED TO VERIFY SOME
+                    DEFAULT OPTIONS AND ALL SELECTED OPTIONS.
+0      STOP         ENDS THE CONTROL LOOP.
++      ____
+0      TSO          DISPLAYS INFORMATION ABOUT RUNNING THE FORMATTER
++      ___
+                    IN THE FOREGROUND.
+1                                                             PAGE   6
+0 PARMS HELP INFORMATION:
++ ______________________
+- MANY OF THESE COMMANDS ALSO HAVE PARAMETERS WHICH MAY BE USED INSTEAD.
+-      ALT-INDENT   PROVIDES AN ALTERNATE FORM OF INDENTATION.  THE
++      __________
+                    "THEN" AND "ELSE" KEYWORDS IN IF STATEMENTS ARE NOT
+                    INDENTED, BUT REMAIN ON THE SAME LEVEL AS THE "IF".
+                    STATEMENTS FOLLOWING THESE KEYWORDS WILL BEGIN ON
+                    THE NEXT LINE.
+0      COMPRESS-SOURCE  THIS IS THE REVERSE FUNCTION OF THE FORMATTER.
++      _______________
+                    IT CAUSES THE OUTPUT TO CONTAIN ONE SPACE
+                    BETWEEN EACH WORD WITH NO REGARD TO SYNTAX OR
+                    MARGINS IN ORDER TO UTILIZE AS LITTLE SPACE AS
+                    POSSIBLE.  TO REGAIN THE PROPER FORM, USE THE
+                    FORMATTER WITHOUT THIS OPTION SPECIFIED.
+                    ONE MAY DESIRE TO SPECIFY NO_COMMENTS WHEN BOTH
+                    COMPRESSING AND REFORMATTING LATER.
+0      COUNT        DISPLAY INPUT AND OUTPUT FILE RECORD COUNTS.
++      _____
+0      DATA-DIVISION-ONLY  WHEN THIS IS SELECTED ONLY THE DATA
++      __________________
+                    DIVISION IS REFORMATTED.  FOR PROCESSING TO OCCUR
+                    THE DIVISION NAME MUST BEGIN IN COLUMN EIGHT AND
+                    THERE MUST BE ONLY ONE SPACE BETWEEN DATA AND
+                    DIVISION.  IN ADDITION THE REMAINDER OF THE LINE
+                    SHOULD BE BLANK.  PLEASE NOTE THAT THIS IS THE
+                    NORMAL POSITION FOR THESE WORDS.
+0      KEEP-COMMAS  PREVENTS THE DEFAULT OPTION THAT DELETES COMMAS
++      ___________
+                    WHILE FORMATTING.
+0      KEEP-SPACERS  THIS COMMAND MAY BE USED TO OVERRIDE THE DEFAULT
++      ____________
+                    PROCESSING OF THE COBOL FORMAT WORDS EJECT, SKIP1,
+                    SKIP2 AND SKIP3.  NORMALLY THESE WORDS ARE DELETED
+                    AND BLANK LINES ARE INSERTED FOR THE SKIPS.  WHEN
+                    THIS COMMAND IS USED THESE WORDS IN THE PROGRAM
+                    ARE LEFT ALONE AND NO ADDITIONAL EJECTS ARE ADDED.
+0      LIST-ONLY    ONLY THE SYSPRINT LISTING IS PRODUCED.  NO OUTPUT
++      _________
+                    FILES ARE PRODUCED.
+0      LIST-OUTPUT  DISPLAYS A LISTING OF THE OUTPUT FILE ON SYSPRINT.
++      ___________
+                    THIS OPTION IS RECOMMENDED FOR EXECUTION ONLY IN
+                    THE BATCH ENVIRONMENT.
+0      NO-COMMENTS  CAUSES COMMENT LINES TO BE SKIPPED IN REFORMATTING
++      ___________
+                    PROCESS.  NOTE HOWEVER, THAT BLOCK COMMENTS ARE
+                    ALWAYS SKIPPED.  SO IF YOU DESIRE ONLY A FEW
+                    FEW COMMENTS TO BE SKIPPED MERELY MAKE SURE THEY
+                    HAVE A * IN COLUMN 72 WHICH WILL FLAG THEM AS
+                    BLOCK COMMENTS.
+1                                                             PAGE   7
+0 PARMS HELP INFORMATION CONTINUED:
++ ________________________________
+-      NO-REMARKS   WHEN THIS KEYWORD IS SELECTED, THE REMARKS
++      __________
+                    PARAGRAPH OF THE IDENTIFICATION DIVISION IS NOT
+                    REFORMATTED.  IT SHOULD BE NOTED THAT WHEN THIS
+                    OPTION IS IN EFFECT, THE REMARKS PARAGRAPH COLUMNS
+                    8-72 IS OUTPUT AS IS AND COLS 73-80 ARE IGNORED
+                    EVEN IF THE WIDE_MARGINS OPTION IS IN EFFECT.
+0      NO-SUBSTITUTIONS  THIS OPTION PREVENTS THE FORMATTER FROM
++      ________________
+                    ABREVIATING KEYWORDS ENCOUNTERED IN THE PROGRAM.
+                    THIS OPTION IS NEVER RECOMMENDED FOR USE SINCE
+                    IT GOES AGAINST THE PRINCIPLE OF ELIMINATING THE
+                    UNNECESSARY.
+0      OMIT-THENS   CAUSES THE COBOL KEYWORD "THEN" TO BE OMITTED FROM
++      __________
+                    THE OUTPUT DATA SET(S).
+0      OUT2         CAUSES THE CREATION OF A SECOND OUTPUT DATA SET
++      ____
+                    ALLOCATED TO DDNAME OUT2.  THIS IS RECOMMENDED
+                    ONLY FOR MULTIPLE CLASS OUTPUT.
+0      PGM-ID CHAR-STRING  SPECIFIES A PROGRAM IDENTIFIER.  CHAR-STRING
++      __________________
+                    SHOULD BE SUBSTITUTED BY YOUR IDENTIFIER, USING UP
+                    TO EIGHT CHARACTERS.  THIS VALUE WILL APPEAR IN
+                    COLUMNS 73 - 80 OF THE OUTPUT FILE(S).
+0      PIC-COL  NUMBER  SPECIFY A COLUMN IN WHICH TO BEGIN ALL "PIC"
++      _______________
+                    COBOL KEYWORDS.  IF IT IS IMPOSSIBLE TO PLACE IT
+                    BEGINNING IN THE SPECIFIED COLUMN THE DEFAULT OF
+                    SPACING TWICE IS USED.  NUMBER MAY BE ANY VALUE FROM
+                    13 TO 70.  IF NUMBER IS NOT GIVEN BY THE USER WHEN
+                    PIC_COL IS USED THE VALUE OF NUMBER DEFAULTS TO 37.
+0      PROCEDURE-DIVISION-ONLY  CAUSES PROCESSING FOR THE PROCEDURE
++      _______________________
+                    DIVISION ONLY.  THE WORD "PROCEDURE" SHOULD START ON
+                    THE A MARGIN (COLUMN 8) FOLLOWED BY ONE SPACE AND
+                    THEN THE WORD "DIVISION.".  THE REMAINDER OF THE
+                    LINE SHOULD BE BLANK.  PLEASE NOTE THAT THIS IS THE
+                    NORMAL POSITION FOR THESE WORDS.
+0      SEQ  NUMBER  SPECIFY INCREMENT VALUE FOR OUTPUT CARD NUMBERING.
++      ___________
+                    "NUMBER" SHOULD BE REPLACED BY ANY VALUE
+                    FROM 1 TO 100.
+0      USING-COLUMN THIS OPTION SPECIFIES THAT IDENTIFIERS FOLLOWING
++      ____________
+                    THE USING KEYWORD IN A COBOL PROGRAM (IE. IN A
+                    CALL OR ENTRY STATEMENT) ARE TO BE FORMATTED INTO
+                    A SINGLE COLUMN.
+0      WIDE-MARGINS   USED TO SPECIFY THAT THE INPUT TEXT IS IN
++      ____________
+                    COLUMNS 7 THROUGH 80.  THIS IS CONVENIENT FOR
+                    ENTERING A NEW PROGRAM.  IT NATURALLY ASSUMES THAT
+                    THERE IS NO PROGRAM IDENTIFIER OR SEQUENCE
+                    NUMBERING IN COLUMNS 73-80 OF THE INPUT, OTHERWISE
+                    THESE WOULD BE PROCESSED AS PART OF THE PROGRAM.
+1                                                             PAGE   8
+0 SAMPLE CONTROL CARDS:
++ ____________________
+- IN TSO FOREGROUND:
++ _________________
+0    THE FOLLOWING COMMANDS CORRESPOND TO THE SAMPLE JCL BELOW.
+     THESE MAY ALSO BE PLACED IN A CLIST FOR MORE CONVENIENT USE.
+0    ALLOC DA(LIBRARY WHICH CONTAINS COBFORM MODULE) SHR
++             _____________________________________
+     ALLOC F(SYSPRINT) DA(*)
+     ALLOC F(SYSIN)    DA(*)
+     ATTR COBFILE  RECFM(F,B) LRECL(80) BLKSIZE(6160)
+     ALLOC F(OUT) DA(REFORM.COBOL) SPA(5,5) TRA CAT REL US(COBFILE)
+     ALLOC F(IN)  DA(COBOL SOURCE PROGRAM)
++                    ____________________
+     CALL  LIBRARY AS IN FIRST STMT ABOVE(COBFORM)
++          ______________________________
+-
+- SAMPLE JCL:
++ __________
+0    //JOBNAME  JOB  OTHER JOB INFORMATION
++                    _____________________
+     //COBFORM  EXEC PGM=COBFORM
+     //STEPLIB  DD   DSN=LIBRARY WHICH CONTAINS COBFORM MODULE,
++                        _____________________________________
+     //         DISP=SHR
+     //IN       DD   DSN=COBOL SOURCE PROGRAM,DISP=SHR
++                        ____________________
+     //OUT      DD   DSN=INDEX.REFORM.COBOL,DISP=(,CATLG),
++                        __________________
+     //         SPACE=(TRK,(5,5),RLSE),UNIT=DISK,
+     //         DCB=(RECFM=FB,LRECL=80,BLKSIZE=6160)
+     //SYSIN    DD   *
+       PLACE HERE CARDS WITH OPTIONS IF DESIRED
++      ________________________________________
+     /*
+     //
+-         THE UNDERLINED PARTS SHOW WHERE NECESSARY SUBSTITUTIONS MUST
+     BE MADE.
+1                                                             PAGE   9
+0   CURRENTLY AVAILABLE COMMANDS                PARAMETER
++   ____________________________                _________
+-     ALT_INDENT   ---------------------------  AI
+      BEGIN
+      CANCEL
+      CASE_CONSTRUCT
+      COMMANDS
+      COMPRESS_SOURCE   ----------------------  CS
+      COUNT   --------------------------------  CO
+      DATA_DIVISION_ONLY   -------------------  DO
+      END
+      FUNCTION
+      HELP
+      HELPS
+      JCL
+      KEEP_COMMAS   --------------------------  KC
+      KEEP_SPACERS   -------------------------  KS
+      LIST_ONLY   ----------------------------  LO
+      LIST_OUTPUT   --------------------------  LI
+      NO_COMMENTS   --------------------------  NC
+      NO_REMARKS   ---------------------------  NR
+      NO_SUBSTITUTIONS   ---------------------  NS
+      OMIT_THENS   ---------------------------  OT
+      OUT2   ---------------------------------  O2
+      PARMS
+      PGM_ID
+      PIC_COL   ------------------------------  PC
+      PROCEDURE_DIVISION_ONLY   --------------  PO
+      SEQ
+      STATE
+      STOP
+      SYNTAX
+      TSO
+      USING_COLUMN   -------------------------  UC
+      WIDE_MARGINS   -------------------------  WM
+1                                                             PAGE  10
+0   PARAMETERS:
++   __________
+-   (SEE PAGE 9 FOR POSSIBLE PARAMETER CODES)
+0          INSTEAD OF USING THE KEYWORDS DURING THE SYSIN CONTROL LOOP,
+      THOSE KEYWORDS THAT HAVE A PARAMETER SUBSTITUTION MAY BE USED ON
+      EITHER THE EXEC CARD WITH A BATCH JOB OR WITH THE CALL STATEMENT
+      WHEN USING TSO.
+0          WHEN DECIDING TO USE PARAMETERS ONE SHOULD UNDERSTAND
+      WHAT THE KEYWORD THAT CORRESPONDS TO THE PARAMETER DOES TO THE
+      PROCESSING OF THE COBOL PROGRAM.  PARAMETERS WILL ACT EXACTLY IN
+      THE SAME MANNER AS THE KEYWORDS.
+0          KEYWORDS AND PARAMETERS MAY NOT BE MIXED.  PARAMETERS ARE
+      SUGGESTED ONLY FOR THE USER WHO ALWAYS WILL BE USING THE FORMATTER
+      WITH THE SAME OPTIONS.  WHEN THE PARAMETER IS SPECIFIED THE SYSIN
+      CONTROL LOOP IS BYPASSED.
+-     BATCH EXEC CARD EXAMPLE:
+            //STEPNAME EXEC PGM=COBFORM,PARM='/CO,NC'
++             ________                         _____
+0     TSO CALL EXAMPLE:
+            CALL INDEX.DSN.LOAD(COBFORM) '/AI,NR,UC'
++                ______________            ________
+-          AS MANY PARMS AS NECESSARY MAY BE USED TO OVERRIDE DEFAULT
+      OPTIONS.  THE SLASH AT THE BEGINNING OF THE PARAMETER SHOULD BE
+      USED TO AVOID A WARNING MESSAGE.  THE UNDERLINED PARTS INDICATE
+      WHERE THE USER SHOULD MAKE SUBSTITUTIONS.
+1                                                             PAGE  11
+0 DEFAULT ASSUMPTIONS:
++ ___________________
+-     1.  NO RECORD COUNT WILL BE DISPLAYED FOR INPUT AND OUTPUT FILES.
+0     2.  THE ENTIRE INPUT FILE WILL BE PROCESSED, IN MOST INSTANCES
+               THIS MEANS THE ENTIRE COBOL PROGRAM.
+0     3.  COMMAS WILL BE OMITTED.
+0     4.  SPACERS (IE. SKIP1, SKIP2, SKIP3 AND EJECT) WILL BE
+               INTERPRETED IN THE CASE OF LINE SKIPS AND OMITTED IN THE
+               CASE OF EJECT.  THE FORMATTER PLACES EJECTS BEFORE THE
+               WORKING-STORAGE SECTION, REPORT SECTION, LINKAGE SECTION
+               AND PROCEDURE DIVISION.
+0     5.  NO SYSPRINT LISTING.
+0     6.  PRIMARY OUTPUT DATA SET USING THE DDNAME "OUT".
+0     7.  COMMENTS ARE REFORMATTED.
+0     8.  REMARKS SECTION IS REFORMATTED.
+0     9.  FOR COBOL KEYWORDS WHICH HAVE AN ABREVIATION, IT SUBSTITUTES
+               THE ABREVIATION.
+0     10. INPUT MARGINS USE COLUMNS 7-72.
+1                                                             PAGE  12
+0 THE CASE CONSTRUCT OF NESTED IF STATEMENTS:
++ __________________________________________
+-    BECAUSE COBOL HAS NO CASE STATEMENT, IT IS OFTEN NECESSARY TO USE
+     "NESTED IFS" TO ACCOMPLISH THE SAME PURPOSE.  SINCE THE "ELSE"
+     FUNCTIONS IN A DIFFERENT MANNER THAN NORMALLY, AND IS ONLY
+     NECESSARY TO OPTIMIZE PERFORMANCE, A DIFFERENT METHOD OF
+     INDENTATION IS PROVIDED.  NOTE IN THE FOLLOWING EXAMPLE THAT THE
+     SAME VALUE IS COMPARED IN ALL CASES.
+0        IF X = A
+             THEN PERFORM B2A1-MAX
+         ELSE IF X = B
+             THEN PERFORM B2B1-MIN
+         ELSE IF X = C
+             THEN PERFORM B2C1-AVG.
+0    TO OBTAIN THIS TYPE OF INDENTATION THE USER MUST PLACE A "C"
+     (STANDING FOR CASE) IN COLUMN SEVEN OF THE LINE WHICH HAS THE FIRST
+     "IF" IN IT.  THIS OPTION IS AUTOMATICALLY RESET WHEN A PERIOD IS
+     ENCOUNTERED.  TO TEMPORARILY SUSPEND THE CASE PROCESSING PLACE A
+     LETTER "R" (STANDING FOR REGULAR) IN COLUMN SEVEN OF A LINE WHICH
+     HAS AN "IF" IN IT. THIS WILL CAUSE THAT ONE IF STATEMENT TO INDENT
+     NORMALLY.  FOLLOWING IS AN EXAMPLE OF THE RESULT OF THIS TYPE OF
+     CONTROL.
+0      C   IF X = A
+               THEN PERFORM B2A1-MAX
+           ELSE IF X = B
+       R       THEN IF Y = B
+                        THEN PERFORM B2B1-MIN
+                        ELSE NEXT SENTENCE
+           ELSE IF X = C
+               THEN PERFORM B2C1-AVG.
+0    NOTE, HOWEVER, THAT THE "C" AND "R" WOULD NOT BE REPRODUCED TO
+     THE OUTPUT FILE.  NO MANUAL REMOVAL OF THESE CODES IS THEREFORE
+     NECESSARY.
+0    THE CASE CONSTRUCT (C AND R) WILL ALSO WORK WITH THE ALT_INDENT
+     OPTION BUT SOME OF THE CLARITY OF WHAT IS BEING DONE IS LOST.
+0      C   IF X = A
+           THEN
+               PERFORM B2A1-MAX
+           ELSE
+               IF X = B
+               THEN
+       R           IF Y = B
+                   THEN
+                       PERFORM B2B1-MIN
+                   ELSE
+                       NEXT SENTENCE
+           ELSE
+               IF X = C
+               THEN
+                   PERFORM B2C1-AVG.
+1                                                             PAGE  13
+0 TROUBLE SHOOTING GUIDE:
++ ______________________
+-_______________________________________________________________________
+ ]       PROBLEM       ]    PROBABLE REASON    ]   SUGGESTED ACTION    ]
++_______________________________________________________________________
+ ]                     ]                       ]                       ]
+ ] DATA_DIVISION_ONLY  ] "DATA" OR "PROCEDURE" ] FIX POSITIONING OF    ]
+ ] OR PROCEDURE_       ] DOES NOT BEGIN IN     ] DIVISION NAMES SO     ]
+ ]    DIVISION_ONLY    ] COLUMN EIGHT AND/OR   ] FORMATTER CAN TELL    ]
+ ] DOES NOT PROCESS    ] NOT SEPARATED FROM    ] WHERE TO BEGIN        ]
+ ] ANYTHING.           ] "DIVISION." BY ONLY   ] PROCESSING.           ]
+ ]                     ] ONE SPACE AND/OR      ]                       ]
+ ]                     ] REST OF LINE NOT      ]                       ]
+ ]                     ] BLANK.                ]                       ]
+ ]                     ]                       ]                       ]
++_______________________________________________________________________
+ ]                     ]                       ]                       ]
+ ] FORMATTER PUT TWO   ] MAY OCCUR WHEN USING  ] DELETE AN EJECT OR    ]
+ ] EJECTS IN A ROW.    ] DATA_DIVISION_ONLY OR ] PREVENT BY USING THE  ]
+ ]                     ] PROCEDURE_DIVISION_   ] KEEP_SPACERS OPTION.  ]
+ ]                     ] ONLY.  MATERIAL NOT   ]                       ]
+ ]                     ] IN THE DIVISION       ]                       ]
+ ]                     ] SELECTED IS NOT       ]                       ]
+ ]                     ] PROCESSED.            ]                       ]
+ ]                     ]                       ]                       ]
++_______________________________________________________________________
+ ]                     ]                       ]                       ]
+ ] SYSIN CONTROL LOOP  ] SYSIN FILE UNDEFINED. ] ALLOCATE SYSIN FILE   ]
+ ] SKIPPED AND NO      ]                       ] TO TERMINAL OR USE DD ]
+ ] PARAMETER LIST WAS  ]                       ] CARD IN JCL.          ]
+ ] GIVEN.              ]                       ]                       ]
+ ]                     ]                       ]                       ]
++_______________________________________________________________________
+ ]                     ]                       ]                       ]
+ ] SYSIN CONTROL LOOP  ] PARAMETER LIST        ] CHOSE EITHER METHOD   ]
+ ] SKIPPED AND         ] AND SYSIN CONTROL ARE ] OF CONTROL BUT DO NOT ]
+ ] PARAMETER LIST WAS  ] MUTUALLY EXCLUSIVE,   ] TRY TO MIX THE TWO.   ]
+ ] GIVEN.              ] PARAMETERS ARE USED.  ]                       ]
+ ]                     ]                       ]                       ]
++_______________________________________________________________________
+1                                                             PAGE  14
+0 INDEX  (A - G):
++ ______________
+- ALT_INDENT  6
+0 BEGIN  5
+0 BLOCK COMMENTS  6
+0 CANCEL  5
+0 CASE_CONSTRUCT  12
+0 COLUMN  7
+0 COMMA  6
+0 COMMANDS  3
+0 COMMANDS CURRENTLY AVAILABLE  9
+0 COMPRESS_SOURCE  6
+0 CONTROL FILE  5
+0 CONTROL LOOP  5
+0 CONTROL WORDS  5
+       SEE ALSO COMMANDS CURRENTLY AVAILABLE
+0 COUNT  6
+0 CURRENT COMMANDS AVAILABLE  9
+0 DATA_DIVISION_ONLY  6
+0 DEFAULTS  5
+0 END  5
+0 FUNCTION  3
+0 FUNCTION COMMANDS  6
+0 FUNCTION HELP  4
+0 GENERAL HELP  3
+1                                                             PAGE  15
+0 INDEX  (H - O):
++ ______________
+- HELP, INFORMATION
+       FUNCTION  4
+       GENERAL  3
+       PARMS  6
+       SYSIN  5
+0 HELPS  3
+0 HYPHENS  5
+0 IF STATEMENTS  12
+0 INDENTATION  4, 6
+0 INFORMATION, HELP
+       FUNCTION  4
+       GENERAL  3
+       PARMS  6
+       SYSIN  5
+0 JOB CONTROL LANGUAGE, USE WITH  8
+0 JCL, USE WITH  8
+0 KEEP_COMMAS  6
+0 KEEP_SPACERS  6
+0 LIMITATIONS  4
+0 LIST_ONLY  6
+0 LIST_OUTPUT  6
+0 NO_COMMENTS  6
+0 NO_REMARKS  7
+0 NO_SUBSTITUTIONS  7
+0 OMIT_THENS  7
+0 OUT2  7
+1                                                             PAGE  16
+0 INDEX  (P - R):
++ ______________
+- PARAMETERS  10
+      EXCLUSIVE OF SYSIN CONTROL LOOP  10
+0 PARMS  3
+0 PARMS HELP  6
+0 PARTIAL PROCESSING  4
+       SEE ALSO DATA_DIVISION_ONLY AND PROCEDURE_DIVISION_ONLY
+0 PARTIAL PROGRAMS  4
+0 PGM_ID  7
+0 PIC_COL  7
+0 PROBLEMS  13
+0 PROCEDURE_DIVISION_ONLY  7
+0 PURPOSE  4
+0 REMARKS SECTION  4
+0 RISK INVOLVED  4
+0 RUNNING FORMATTER  8
+1                                                             PAGE  17
+0 INDEX  (S - Z):
++ ______________
+- SEQ  7
+0 SPELLING  4
+0 STATE  5
+0 STOP  5
+0 SUBSTITUTIONS  7
+0 SYNTAX  3, 5
+0 SYSIN HELP  5
+0 THEN  7
+0 TIME SHARING OPTION, USE WITH  8
+0 TROUBLE SHOOTING  13
+0 TSO  8
+0 TSO, USE WITH  8
+0 UNDERLINES  5, 8
+0 USING_COLUMN  7
+0 WARNINGS  4
+0 WIDE_MARGINS  7
+

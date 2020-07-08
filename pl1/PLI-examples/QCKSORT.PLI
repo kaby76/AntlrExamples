@@ -1,0 +1,136 @@
+*PROCESS NM;
+ QCKSORT:  PROCEDURE(ARRAY, LOW, HIGH) OPTIONS(REENTRANT) RECURSIVE
+                                               REORDER;
+ DECLARE  IDQCKSO  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('QCKSORT V1.1  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DESCRIPTION OF ALGORITHM:                                         */
+ /*                                                                   */
+ /* THIS QUICKSORT PROCEDURE EMPLOYS AN ALGORITHM WHICH USES          */
+ /* RECURSION TO IMPLEMENT ITS STACK OF PARTITION BOUNDARIES, IT      */
+ /* SORTS ARRAY INTO ASCENDING ORDER.  ARRAY MAY HAVE ANY NUMBER OF   */
+ /* ELEMENTS AND ITS UPPER AND LOWER BOUNDS ARE INDICATED BY THE      */
+ /* CALLING PROGRAM.  A NULL OR ONE ELEMENT ARRAY OR SECTION IS A     */
+ /* TRIVIAL CASE IN WHICH NO ACTION IS TAKEN.  A TWO ELEMENT ARRAY OR */
+ /* SECTION OF AN ARRAY MAY CAUSE ZERO OR ONE SWAP.  ANYTHING GREATER */
+ /* CAUSES THE PARTITION LOGIC TO BE EXECUTED.  PARTITIONING CHOOSES  */
+ /* THE LEFTMOST ELEMENT ARBITRARILY AND ARANGES THE REMAINDER INTO   */
+ /* THOSE LESS THAN OR EQUAL TO THAT CHOSEN ELEMENT AND THOSE GREATER */
+ /* THAN THE CHOSEN ELEMENT.  THIS ALGORITHM LEAVES THE CHOSEN        */
+ /* ELEMENT IN ITS ORIGINAL POSITION UNTIL THE REMAINDER IS           */
+ /* COMPLETELY ARRANGED, THEN FINALLY IT MOVES TO ITS DIVIDING        */
+ /* POSITION.                                                         */
+ /*                                                                   */
+ /* ANALYSIS OF ALGORITHM:                                            */
+ /*                                                                   */
+ /* QCKSORT HAS THE BEST AVERAGE BEHAVIOR OF THE INTERNAL SORTING     */
+ /* ALGORITHMS.  THE AVERAGE COMPUTING TIME IS O(N LOG2 N).           */
+ /*                                                                   */
+ /* THE WORST CASE BEHAVIOR COMPUTING TIME IS O(N2 (SQUARED)).  THIS  */
+ /* BEHAVIOR OCCURS WHENEVER THE ARRAY TO BE SORTED IS ALREADY EITHER */
+ /* IN ASCENDING OR DESCENDING ORDER.  ANOTHER DRAWBACK OF THIS       */
+ /* ALGORITHM IS THAT THE RECURSION PRODUCES A STORAGE STACK WHICH IS */
+ /* O(LOG2 N) WITH WORST CASE O(N).                                   */
+ /*                                                                   */
+ /*********************************************************************/
+1/* SEQUENCE OF KEYS TO BE SORTED */
+ DECLARE  ARRAY(*)  CHAR(*);
+
+ /* LOWER BOUNDARY OF SECTION OF ARRAY TO BE HANDLED IN THIS CALL */
+ DECLARE  LOW  FIXED BINARY(15);
+
+ /* HIGHER BOUNDARY OF SECTION OF ARRAY TO BE HANDLED IN THIS CALL */
+ DECLARE  HIGH  FIXED BINARY(15);
+
+ /* TEMPORARY STORAGE FOR SWAPPING ARRAY VALUES */
+ DECLARE  SWAPER  CHAR(*) CONTROLLED;
+
+ /* LOW ORDER POSITION HOLDER, WORK AREA */
+ DECLARE  LEFT  FIXED BINARY(15);
+
+ /* HIGH ORDER POSITION HOLDER, WORK AREA */
+ DECLARE  RIGHT  FIXED BINARY(15);
+
+ /* COMPILER ROUTINES */
+ DECLARE  LENGTH  BUILTIN;
+1ALLOCATE SWAPER CHAR(LENGTH(ARRAY(LOW)));
+
+ /* CHOOSE TO PARTITION UNTIL THE ARRAY SECTION IS TRIVIAL */
+ SELECT;
+
+
+     /* PARTITION ARRAY SECTION AROUND ARRAY(LOW) */
+     WHEN(HIGH > LOW+1) PARTITION:  DO;
+
+         /* USE LEFT AND RIGHT TO PREVENT ALTERING LOW AND HIGH */
+         LEFT = LOW + 1;
+         RIGHT = HIGH;
+
+         ORDER:  /* GO THROUGH ENTIRE SECTION OF ARRAY */
+         DO WHILE(LEFT <= RIGHT);
+
+             IF ARRAY(LEFT) <= ARRAY(LOW)
+                 /* LEFT WILL MOVE UP UNTIL ARRAY POSITION DOES NOT MEET
+                    PARTITION CRITERIA */
+                 THEN LEFT = LEFT + 1;
+                 ELSE RIGHT_DOWN:  DO;
+                      /* RIGHT WILL MOVE DOWN (AT THIS POINT ALREADY
+                         HAVE A LEFT NOT MEETING PARTITION CRITERIA)
+                         UNTIL AN ARRAY POSITION NOT MEETING PARTITION
+                         CRITERIA */
+                      DO WHILE(ARRAY(RIGHT) > ARRAY(LOW));
+                          RIGHT = RIGHT - 1;
+                          END;
+
+                      /* WHEN RIGHT BECOMES <= LEFT THEN ARRAY SECTION
+                         IS ALREADY PARTITIONED */
+                      IF LEFT < RIGHT
+                          /* SWAP THE LEFT EXCEPTION WITH THE RIGHT
+                             EXCEPTION TO GET BOTH INTO PARTITIONED
+                             ORDER USING ONLY ONE SWAP */
+                          THEN SWAP:  DO;
+                               SWAPER = ARRAY(LEFT);
+                               ARRAY(LEFT) = ARRAY(RIGHT);
+                               ARRAY(RIGHT) = SWAPER;
+                               LEFT = LEFT + 1;
+                               RIGHT = RIGHT - 1;
+                               END SWAP;
+
+                      END RIGHT_DOWN;
+             END ORDER;
+1        /* MOVE THE CHOSEN ELEMENT WHICH THE PARTITION IS AROUND INTO
+            ITS PROPER POSITION */
+         SWAPER = ARRAY(LOW);
+         ARRAY(LOW) = ARRAY(RIGHT);
+         ARRAY(RIGHT) = SWAPER;
+
+         /* SORT THE PARTITIONS */
+         /* RIGHT-1 CREATES A STACK ENTRY */
+         CALL QCKSORT(ARRAY, LOW, RIGHT-1);
+         /* RIGHT+1 CREATES A STACK ENTRY */
+         CALL QCKSORT(ARRAY, RIGHT+1, HIGH);
+
+         END PARTITION;
+
+
+     WHEN(HIGH = LOW+1)
+
+         /* TWO ELEMENT ARRAY SECTION COMPARE AND SWAP IF NECESSARY */
+         IF ARRAY(HIGH) < ARRAY(LOW)
+             THEN DO;
+                  SWAPER = ARRAY(LOW);
+                  ARRAY(LOW) = ARRAY(HIGH);
+                  ARRAY(HIGH) = SWAPER;
+                  END;
+
+
+     OTHERWISE; /* ARRAY SECTION IS NULL OR ONLY ONE ELEMENT */
+
+     END;
+
+
+ FREE SWAPER;
+ END QCKSORT;
+

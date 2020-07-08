@@ -1,0 +1,2438 @@
+*PROCESS M;
+ VSAMCAT:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID    CHAR(35) VARYING STATIC EXTERNAL
+     INIT('VSAMCAT V1.4  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(8)  VARYING STATIC EXTERNAL INIT('ISA(24K)');
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM READS A VSAM CATALOG AND INTERPRETES ITS CONTENTS.   */
+ /* DELETE AND DEFINE STATEMENTS ARE PRODUCED ACCORDING TO THE SYSIN  */
+ /* CONTROL CARD SELECTED.  THE DELETE DD STATEMENT IS OPTIONAL.      */
+ /* IF THE CATALOG IS PASSWORD PROTECTED THE PASSWORD SHOULD BE       */
+ /* PASSED TO THE PROGRAM AS A EXECUTION PARAMETER.  AS MANY CONTROL  */
+ /* CARDS AS DESIRED MAY BE INCLUDED IN FREE FORMAT FASHION AS        */
+ /* FOLLOWS THROUGH SYSIN.                                            */
+ /*                                                                   */
+ /* SYSIN CONTROL CARD FORMATS  USAGE                                 */
+ /* ==========================  =====                                 */
+ /* ENTIRE                      PRODUCE CONTROL CARDS FOR ENTIRE      */
+ /*                             CATALOG                               */
+ /*                                                                   */
+ /* ALIAS=DATA.SET.NAME         TRAVERSE THE ALIAS CHAIN FOR A        */
+ /*                             NON-VSAM DATASET OR A USER CATALOG    */
+ /*                                                                   */
+ /* DSN=DATA.SET.NAME           PRODUCE CONTROL CARDS FOR AN          */
+ /*                             INDIVIDUAL CATALOG ENTRY (OR SET).    */
+ /*                                                                   */
+ /* DDNAMES    USE                                                    */
+ /* =======    ===                                                    */
+ /* STEPCAT    USUALLY NEEDED TO POINT TO THE SAME CATALOG AS VSAMDIR */
+ /*            AND VSAMSEQ.  THE CATALOG CONTAINS ITS OWN SELF        */
+ /*            DESCRIBING RECORDS.                                    */
+ /* VSAMDIR    SPECIFIES THE CATALOG TO BE PROCESSED.  THIS DDNAME    */
+ /*            IS REQUIRED.                                           */
+ /* VSAMSEQ    SPECIFIES THE SAME CATALOG AS VSAMDIR.  THIS DDNAME IS */
+ /*            REQUIRED.                                              */
+ /* SYSPRINT   VSAMCAT PROGRAM ERROR MESSAGES AND DIAGNOSTICS.  THIS  */
+ /*            DDNAME IS REQUIRED BUT UNDER NORMAL CIRCUMSTANCES WILL */
+ /*            NOT BE USED.                                           */
+ /* DUMPPRT    DUMP OUTPUT FOR CATALOG RECORDS WHICH ARE DETECTED TO  */
+ /*            BE INVALID.                                            */
+ /* DEF        DEFINE CONTROL STATEMENTS OUTPUT.  REQUIRED DDNAME.    */
+ /* DEL        DELETE CONTROL STATEMENTS OUTPUT.  OPTIONAL DDNAME.    */
+ /* SYSIN      CONTROL STATEMENT INPUT.  REQUIRED DDNAME.             */
+ /*                                                                   */
+ /*********************************************************************/
+1%/* THE HEX MACRO MAY BE REMOVED IF THE HEX STRINGS IN THE DECLARATION
+    ARE CONVERTED TO BIT STRINGS. THE DEACTIVATE AFTER THE DECLARES
+    SHOULD ALSO BE REMOVED IF THIS IS DONE. */;
+ %INCLUDE HEX
+1DECLARE  PARM  CHAR(100) VARYING;
+
+ /* FILE DECLARATIONS */
+ DECLARE  SYSIN     FILE INPUT  STREAM;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ DECLARE  DEL  FILE OUTPUT RECORD SEQUENTIAL
+          ENV(CONSECUTIVE FB RECSIZE(80));
+ DECLARE  DEF  FILE OUTPUT RECORD SEQUENTIAL
+          ENV(CONSECUTIVE FB RECSIZE(80));
+ DECLARE  VSAMSEQ  FILE INPUT RECORD SEQUENTIAL KEYED
+          ENV(VSAM PASSWORD(PSWD));
+ DECLARE  VSAMDIR  FILE INPUT RECORD SEQUENTIAL KEYED
+          ENV(VSAM GENKEY PASSWORD(PSWD));
+ DECLARE  DUMPPRT  BASED(DCBPTR);
+ DECLARE  DCBPTR PTR;
+
+ /* EXTERNAL ROUTINES */
+
+ /* QCKSORT MAY BE REPLACED WITH ANY GOOD GENERAL PURPOSE SORT ROUTINE.
+    THE ARGUMENTS ARE THE ARRAY TO BE SORTED AND THE LOWER AND UPPER
+    BOUNDS OF THE ARRAY RESPECTIVELY. */
+ DECLARE  QCKSORT  ENTRY((*)CHAR(*), FIXED BINARY, FIXED BINARY);
+
+ /* TSOSET AND TSORST ARE OPTIONAL */
+ DECLARE  TSOSET   ENTRY OPTIONS(ASM, INTER);
+ DECLARE  TSORST   ENTRY OPTIONS(ASM, INTER);
+
+ /* THE DUMP ROUTINE ACCESSES MAY BE REMOVED IF THIS FEATURE IS NOT
+    DESIRED.  DUMPDCB OPENS AND CLOSES THE DUMPPRT DDNAME.  DUMP TAKES
+    A RECORD AND DUMPS IT IN HEX. */
+ DECLARE  DUMPDCB  ENTRY OPTIONS(ASM, INTER);
+ DECLARE  DUMP     ENTRY OPTIONS(ASM, INTER);
+
+ /* LOADAD WORKS LIKE AN ASSEMBLER LOAD ADDRESS INSTRUCTION FOR THE
+    POINTER VARIABLE INVOLVED.  INTOHEX CHANGES A CHAR STRING INTO HEX
+    FORMAT. */
+ DECLARE  LOADAD   ENTRY RETURNS(PTR); /* REALLY ASM */
+ DECLARE  INTOHEX  ENTRY; /* REALLY ASM */
+
+ /* COMPILER FUNCTIONS */
+ DECLARE  (ADDR, INDEX, LENGTH, ONCODE, ONFILE, ONLOC,
+          ONSOURCE, STRING, SUBSTR, UNSPEC, VERIFY)  BUILTIN;
+1/* OUTPUT RECORD AREAS */
+
+ DECLARE  OUTPUT_REC  CHAR(80);
+ DECLARE  VAROUT  CHAR(72) VARYING INIT('');
+
+ DECLARE
+     1  CATALOG_DIRECT  STATIC,
+        2  FILLER1      CHAR(5) INIT('CAT('''),
+        2  TARGET_CAT   CHAR(44) VARYING INIT('&VSAMCAT'),
+        2  FILLER2      CHAR(2) INIT('''/'),
+        2  TARGET_PSWD  CHAR(8) VARYING INIT('&PASSWRD'),
+        2  FILLER3      CHAR(1) INIT(')');
+
+
+ /* OUTPUT WORK IDENTIFIERS IN ALPHABETICAL ORDER */
+
+ DECLARE  ALLOCATION   CHAR(4);
+ DECLARE  DEVICE_TYPE  CHAR(60) VARYING;
+ DECLARE  DSN          CHAR(44) VARYING;
+ DECLARE  EDIT_NUM1    PIC '(7)Z9';
+ DECLARE  EDIT_NUM2    PIC '(7)Z9';
+ DECLARE  EXPDT        PIC '(5)9';
+ DECLARE  FILE_NUMS    CHAR(60) VARYING;
+ DECLARE  FSEQN        PIC '(3)Z9';
+ DECLARE  HEXKEY       CHAR(128) VARYING;
+ DECLARE  INS          CHAR(8) VARYING;
+ DECLARE  INSYS        PIC '9';
+ DECLARE  KEYRANGES    CHAR(512) VARYING;
+ DECLARE  LRECL_MAX    FIXED BINARY(31);
+ DECLARE  OVERSYS      PIC '9';
+ DECLARE  OWNER        CHAR(8) VARYING;
+ DECLARE  RELDSN       CHAR(44) VARYING;
+ DECLARE  VOLUME_SERS  CHAR(60) VARYING;
+1/* REGULAR WORK IDENTIFIERS */
+
+ /* CHARARCTER STRINGS IN ALPHABETICAL ORDER */
+ DECLARE  CHARS      CHAR(36) STATIC
+          INIT('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
+ DECLARE  CNTL       CHAR(50);
+ DECLARE  DATA_CI#   CHAR(3);
+ DECLARE  ENTRY_CI#  CHAR(3);
+ DECLARE  ERRIND     CHAR(10) STATIC INIT('*** ERROR ');
+ DECLARE  HIGH_KEY   CHAR(44);
+ DECLARE  INDEX_CI#  CHAR(3);
+ DECLARE  PSWD       CHAR(8) STATIC;
+
+ /* ARITHMETIC IDENTIFIERS IN ALPHABETICAL ORDER */
+ DECLARE  DUMP_OPTIONS  FIXED BINARY(31) STATIC INIT(0);
+ DECLARE  IN_LENGTH     FIXED BINARY(31) STATIC INIT(505);
+ DECLARE  NNN           FIXED BINARY;
+ DECLARE  OFFSET        FIXED BINARY(31);
+ DECLARE  POS           FIXED BINARY;
+
+ /* BIT STRINGS IN ALPHABETICAL ORDER */
+ DECLARE  AIX           BIT(1) INIT('0'B) STATIC;
+ DECLARE  MORE_SYSIN    BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_VSAMSEQ  BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO            BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO_DELETES    BIT(1) INIT('0'B) STATIC;
+ DECLARE  TRAV_ALIAS    BIT(1) INIT('0'B) STATIC;
+ DECLARE  YES           BIT(1) INIT('1'B) STATIC;
+1/* OVERLAY WORK IDENTIFIERS */
+
+ DECLARE  FULLWORD           FIXED BINARY(31);
+ DECLARE  BIT_FULLWORD       BIT(32) BASED(ADDR(FULLWORD));
+
+ DECLARE  INIT_DISK3380      BIT(32) STATIC INIT(X(3010200E));
+ DECLARE  DISK3380           CHAR(4) BASED(ADDR(INIT_DISK3380));
+ DECLARE  INIT_DISK3350      BIT(32) STATIC INIT(X(3050200B));
+ DECLARE  DISK3350           CHAR(4) BASED(ADDR(INIT_DISK3350));
+ DECLARE  INIT_DISK3330      BIT(32) STATIC INIT(X(3050200D));
+ DECLARE  DISK3330           CHAR(4) BASED(ADDR(INIT_DISK3330));
+
+ DECLARE  INIT_NULL_BYTES    BIT(64) STATIC INIT(X(FFFFFFFFFFFFFFFF));
+ DECLARE  NULL_BYTES         CHAR(8) BASED(ADDR(INIT_NULL_BYTES));
+
+ DECLARE  INIT_END_OF_CHAIN  BIT(24) STATIC INIT('0'B);
+ DECLARE  END_OF_CHAIN       CHAR(3) BASED(ADDR(INIT_END_OF_CHAIN));
+
+ DECLARE  LOW_KEY  CHAR(4) BASED(ADDR(LOW_KEY_BASE));
+ DECLARE
+     1  LOW_KEY_BASE,
+        2  FILLER  BIT(8) INIT('0'B),
+        2  CI_KEY  CHAR(3);
+1/* LAYOUTS FOR THE CATALOG RECORDS */
+
+ /* ACTUAL AREA MAPPED BY STRUCTURES BELOW */
+ DECLARE  VSAM_REC  CHAR(505);
+
+ /* TEMPERARY AREA USED FOR SAVING ABOVE AREA */
+ DECLARE  REC_SAVE  CHAR(505);
+
+ /* WORK POINTERS FOR STRUCTURES BELOW */
+ DECLARE  FIELDPTR  PTR;
+ DECLARE  SOFPTR    PTR;
+
+ DECLARE
+     1  CAT_REC  UNALIGNED BASED(ADDR(VSAM_REC)),
+        2  CAT_KEY,
+           3  FILLER1              CHAR(1),
+           3  CI_NO                CHAR(3),
+           3  FILLER2              CHAR(40),
+        2  ID                   CHAR(1),
+        2  RECORD_SIZE          FIXED BINARY,
+        2  CNT_VARLENGTH        BIT(8),
+        2  LENGTH_FIXED_FIELDS  BIT(8),
+        2  TRUE_DSNAME          CHAR(44),
+        2  RMDR1                CHAR(14),
+        2  RMDR2                CHAR(1),
+        2  RMDR3                CHAR(397);
+1DECLARE
+     1  EXTENDED_PART  UNALIGNED BASED(ADDR(RMDR1)),
+        2  OWNERID   CHAR(8),
+        2  CRDT      FIXED DECIMAL(5),
+        2  EXDT      FIXED DECIMAL(5),
+        2  ATTR1,
+           3  SPEED          BIT(1),
+           3  UNIQUE         BIT(1),
+           3  REUSABLE       BIT(1),
+           3  ERASE          BIT(1),
+           3  RECOVERABLE    BIT(1),
+           3  INHIBIT_INPUT  BIT(1),
+           3  TEMP_EXPORT    BIT(1),
+           3  TRK_OVERFLOW   BIT(1),
+        2  ATTR2,
+           3  SHR_IN_SYS     BIT(2),
+           3  SHR_OVER_SYS   BIT(2),
+           3  FILLER         BIT(4),
+        2  FILLER1   CHAR(1),
+        2  BUFSIZE   FIXED BINARY(31),
+        2  PRIMSPAC  BIT(24),
+        2  SCONSPAC  BIT(24),
+        2  SPACOPTN,
+           3  TYPE_REQUEST   BIT(2),
+           3  FILLER         BIT(6),
+        2  FILLER2   CHAR(8),
+        2  LRECL_AVE FIXED BINARY(31),
+        2  FILLER3   CHAR(2),
+        2  EXCPEXIT  CHAR(8),
+        2  RMDR4     CHAR(1);
+
+ DECLARE
+     1  GDG_PART  UNALIGNED BASED(ADDR(RMDR2)),
+        2  GDGLIMIT    BIT(8),
+        2  GDGATTR,
+           3  EMPTY    BIT(1),
+           3  SCRATCH  BIT(1),
+           3  FILLER   BIT(6);
+
+ DECLARE
+     1  C_G_ATTR  UNALIGNED BASED(ADDR(RMDR2)),
+        2  UPGRADE_SET  BIT(1),
+        2  FILLER       BIT(5),
+        2  SWAPSPACE    BIT(1),
+        2  PAGESPACE    BIT(1);
+1DECLARE
+     1  FIELD_PTRS  UNALIGNED BASED(FIELDPTR),
+        2  HORIZONTAL_PTR       CHAR(5),
+        2  #SET_OF_FIELDS_PTRS  BIT(8),
+        2  SET_OF_FIELDS_PTR(#SET REFER(#SET_OF_FIELDS_PTRS)),
+           3  VERTICAL_PTR_BASE,
+              4  FILLER        CHAR(1),
+              4  DISPLACEMENT  FIXED BINARY,
+           3  VERTICAL      BIT(1),
+           3  DEL_BIT       BIT(1),
+           3  TYPE_CODE     BIT(6),
+           3  SEQ_NUMBER    BIT(8),
+        2  BEGIN_SET_OF_FIELDS  CHAR(1);
+
+ DECLARE
+     1  V_FIELD_PTRS  UNALIGNED BASED(FIELDPTR),
+        2  V_HORIZONTAL_PTR       CHAR(5),
+        2  V_#SET_OF_FIELDS_PTRS  BIT(8),
+        2  SET_OF_FIELDS_PTR(V_#SET REFER(V_#SET_OF_FIELDS_PTRS)),
+           3  V_VERTICAL_PTR_BASE,
+              4  FILLER        CHAR(1),
+              4  V_DISPLACEMENT  FIXED BINARY,
+           3  V_VERTICAL      BIT(1),
+           3  V_DEL_BIT       BIT(1),
+           3  V_TYPE_CODE     BIT(6),
+           3  V_SEQ_NUMBER    FIXED BINARY,
+        2  V_BEGIN_SET_OF_FIELDS  CHAR(1);
+
+ DECLARE
+     1  SET_OF_FIELDS  UNALIGNED BASED(SOFPTR),
+        2  #VAR_LENGTH   BIT(8),
+        2  LEN_FIXED     BIT(8),
+        2  TYPE_FIELD    CHAR(1),
+        2  NAME_CI#      CHAR(3);
+1DECLARE
+     1  DATA_SPACE_GRP_FIELDS  UNALIGNED BASED(SOFPTR),
+        2  FILLER        CHAR(15),
+        2  SPHDFLG,
+           3  UNIQUE_DATA_SPACE    BIT(1),
+           3  AUTOMATICALLY_BUILT  BIT(1),
+           3  FILLER1              BIT(2),
+           3  CATALOG_SPACE        BIT(1),
+           3  FILLER2              BIT(3),
+        2  NODSPEXT      CHAR(1),
+        2  DSPSOPT,
+           3  TYPE_REQUEST         BIT(2),
+           3  FILLER               BIT(6),
+        2  DSPSSQ        BIT(24),
+        2  SPEXTENT(16),
+           3  TT                   FIXED BINARY,
+           3  NN                   FIXED BINARY;
+
+ DECLARE
+     1  VOL_FIELD  UNALIGNED BASED(SOFPTR),
+        2  FILLER1       CHAR(2),
+        2  DEVTYP        CHAR(4),
+        2  VOLSER        CHAR(6),
+        2  FILESEQ       FIXED BINARY,
+        2  FILLER2       CHAR(25),
+        2  LOKEYV        CHAR(64) VARYING;
+ DECLARE  HIKEYV  CHAR(64) VARYING BASED(HIKEYV_PTR);
+ DECLARE  HIKEYV_PTR  PTR;
+
+ DECLARE
+     1  PSWD_FIELD  UNALIGNED BASED(SOFPTR),
+        2  FILLER         CHAR(2),
+        2  MASTER_PSWD    CHAR(8),
+        2  CONTROL_PSWD   CHAR(8),
+        2  UPDATE_PSWD    CHAR(8),
+        2  READ_PSWD      CHAR(8),
+        2  PASSPRMT       CHAR(8),
+        2  PASSATMP       FIXED BINARY,
+        2  USVRMDUL       CHAR(8),
+        2  USERAREC       CHAR(254) VARYING;
+1DECLARE
+     1  AMDSB_FIELD  UNALIGNED BASED(SOFPTR),
+        2  FILLER1        CHAR(3),
+        2  AMDATTR,
+           3  AMDDST      BIT(1),
+           3  AMDWCK      BIT(1),
+           3  AMDSDT      BIT(1),
+           3  AMDREPL     BIT(1),
+           3  AMDORDER    BIT(1),
+           3  AMDRANGE    BIT(1),
+           3  AMDRRDS     BIT(1),
+           3  AMDSPAN     BIT(1),
+        2  FILLER2        CHAR(2),
+        2  AMDAKRKP       FIXED BINARY,
+        2  AMDRKP         FIXED BINARY,
+        2  AMDKEYLN       FIXED BINARY,
+        2  AMDPCTCA       BIT(8),
+        2  AMDPCTCI       BIT(8),
+        2  FILLER3        CHAR(8),
+        2  AMDCINV        FIXED BINARY(31),
+        2  AMDLRECL       FIXED BINARY(31),
+        2  FILLER4        CHAR(12),
+        2  AMDATTR3,
+           3  AMDUNQ      BIT(1),
+           3  AMDFAULT    BIT(1),
+           3  AMDBIND     BIT(1),
+           3  AMDWAIT     BIT(1),
+           3  AMDLM       BIT(1),
+           3  FILLER      BIT(3),
+        2  FILLER5        CHAR(7);
+     /* 2  AMDSTAT        CHAR(48) */
+ %DEACTIVATE X;
+1ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ ON ENDFILE(VSAMSEQ) MORE_VSAMSEQ = NO;
+
+ ON ENDFILE(VSAMDIR) BEGIN;
+     CLOSE FILE(VSAMDIR);
+     OPEN FILE(VSAMDIR);
+     END;
+
+ ON KEY(VSAMDIR) BEGIN;
+     IF ONCODE = 51
+         THEN DO;
+              PUT SKIP EDIT('*** KEY NOT FOUND FOR FILE ', ONFILE,
+                  ' IN PROCEDURE ', ONLOC, ', ?DSN?=', DSN) (A);
+              CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+              END;
+         ELSE DO;
+              PUT SKIP EDIT('*** UNEXPECTED KEY ERROR, ONCODE=', ONCODE,
+                  ', FILE ', ONFILE, ' IN PROCEDURE ', ONLOC, ',
+                  ?DSN?=', DSN) (A, F(10), A, A, A, A, A, A);
+              CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+              SIGNAL ERROR;
+              END;
+     END;
+
+ ON UNDEFINEDFILE(DEL) NO_DELETES = YES;
+1OPEN FILE(DEL);
+
+ PSWD = SUBSTR(PARM, 1);
+
+ CALL DUMPDCB(DCBPTR);  /* OPEN DUMPPRT */
+
+ CALL TSOSET;
+
+ READ FILE(VSAMSEQ) IGNORE(2);
+ READ FILE(VSAMSEQ) INTO(VSAM_REC);
+ CALL GET_TARGET;
+
+ CALL GETINPT;
+
+ DO WHILE(MORE_SYSIN);
+     SELECT;
+         WHEN(CNTL = 'ENTIRE') CALL ENTIRE_CATLG;
+         WHEN(SUBSTR(CNTL, 1, 4) = 'DSN=') CALL DATA_SET;
+         WHEN(SUBSTR(CNTL, 1, 6) = 'ALIAS=') CALL ALIAS_CHAIN;
+         OTHERWISE PUT SKIP EDIT('*** INVALID INPUT=', CNTL) (A);
+         END;
+     CALL GETINPT;
+     END;
+
+ CALL TSORST;
+
+ CALL DUMPDCB(DCBPTR);  /*CLOSE DUMPPRT */
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* CONTROL SEQUENCE PROCEDURES.                                      */
+ /*                                                                   */
+ /*********************************************************************/
+1DATA_SET:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* USE THE CATALOG RECORD PROCEDURES TO OBTAIN INFORMATION ABOUT A   */
+ /* PARTICULAR DATA SET OR CLUSTER OR PAGESPACE ETC.  THIS PROCEDURE  */
+ /* IS INVOKED THROUGH CONTROL CARD SELECTION.                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ /* FIND THE BEGINNING OF THE ALIAS CHAIN BY USING THE HIGH INDEX */
+ HIGH_KEY = SUBSTR(CNTL, 5);
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(HIGH_KEY);
+ CI_KEY = SUBSTR(VSAM_REC, 45, 3);
+
+ /* GET THE LOW INDEX RECORD */
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+
+ /* SELECT THE APPROPRIATE RECORD TYPE */
+ SELECT(ID);
+     WHEN('A')  /* NONVSAM */
+         CALL DEF_NONVSAM;
+     WHEN('B')  /* GDG BASE */
+         CALL DEF_GDG;
+     WHEN('C')  /* CLUSTER */
+         CALL DEF_CLUSTER;
+     WHEN('G')  /* ALTERNATE INDEX */
+         CALL DEF_CLUSTER;
+     WHEN('R')  /* PATH */
+         CALL DEF_PATH;
+     WHEN('U')  /* USER-CATALOG */
+         CALL DEF_USERCAT;
+     WHEN('X')  /* ALIAS */
+         CALL DEF_ALIAS;
+     WHEN('V')  /* VOLUME */
+         CALL DEF_CANDIDATE;
+     OTHERWISE DO;
+         PUT SKIP EDIT('*** TERMINATING DUE TO INVALID REQUEST:  ',
+             CNTL) (A);
+         SIGNAL ERROR;
+         END;
+     END;
+
+ END DATA_SET;
+1ENTIRE_CATLG:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* READS SEQUENTIALLY THROUGH THE ENTIRE CATALOG LOW INDEX LEVEL     */
+ /* PROCESSING SETS OF RECORDS.  THIS PROCEDURE IS INVOKED THROUGH    */
+ /* CONTROL CARD SELECTION.                                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DO WHILE(MORE_VSAMSEQ);
+     /* THE RECORDS WHICH CONTAIN A CALL STATEMENT ARE THE MAJOR RECORD
+        FORMATS AND THE OTHERS ARE MINOR (TERMINOLOGY MINE), ALL OF THE
+        PROCEDURES WHICH CONTROL THESE FORMATS START WITH "DEF_" */
+     SELECT(ID);
+         WHEN('A')  /* NONVSAM */
+             CALL DEF_NONVSAM;
+         WHEN('B')  /* GDG BASE */
+             CALL DEF_GDG;
+         WHEN('C')  /* CLUSTER */
+             CALL DEF_CLUSTER;
+         WHEN('D'); /* DATA */
+         WHEN('F'); /* FREE */
+         WHEN('G')  /* ALTERNATE INDEX */
+             CALL DEF_CLUSTER;
+         WHEN('L'); /* CATALOG CONTROL RECORD */
+         WHEN('I'); /* INDEX */
+         WHEN('E'); /* EXTENSION */
+         WHEN('R')  /* PATH */
+             CALL DEF_PATH;
+         WHEN('U')  /* USER-CATALOG */
+             CALL DEF_USERCAT;
+         WHEN('X')  /* ALIAS */
+             CALL DEF_ALIAS;
+         WHEN('Y'); /* UPGRADE SET */
+         WHEN('V')  /* VOLUME */
+             CALL DEF_CANDIDATE;
+         WHEN('W'); /* EXTENSION FOR A VOLUME RECORD */
+         OTHERWISE CALL DUMP(DUMPPRT,VSAM_REC,IN_LENGTH,DUMP_OPTIONS);
+         END;
+     READ FILE(VSAMSEQ) INTO(VSAM_REC);
+     /* STOP IF GOING INTO HIGH RANGE OF INDEX */
+     IF STRING(CAT_KEY) > ' '
+         THEN MORE_VSAMSEQ = NO;
+     END;
+ END ENTIRE_CATLG;
+1ALIAS_CHAIN:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* FOLLOWS A SPECIFIC ALIAS CHAIN FOR A NONVSAM DATASET OR USER      */
+ /* CATALOG.  THIS PROCEDURE IS INVOKED THROUGH CONTROL CARD          */
+ /* SELECTION.                                                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ /* SET FLAG FOR OTHER ROUTINES */
+ TRAV_ALIAS = YES;
+
+ /* FIND THE BEGINNING OF THE ALIAS CHAIN BY USING THE HIGH INDEX */
+ HIGH_KEY = SUBSTR(CNTL, 7);
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(HIGH_KEY);
+ CI_KEY = SUBSTR(VSAM_REC, 45, 3);
+
+ /* GET THE LOW INDEX RECORD FOR THE SPECIFIED DATASET */
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+ RELDSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+1/* INITIALIZE */
+ CI_KEY = END_OF_CHAIN;
+
+ /* GIVE THE REAL NAME DEFINE FOR THE SPECIFIED DATASET */
+ SELECT(ID);
+     WHEN('A')  /* NONVSAM */
+         CALL DEF_NONVSAM;
+     WHEN('U')  /* USER-CATALOG */
+         CALL DEF_USERCAT;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#1 ', RELDSN,
+             ' CANNOT HAVE AN ALIAS CHAIN') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         TRAV_ALIAS = NO;
+         END;
+     END;
+
+ /* FOLLOW THROUGH THE ENTIRE CHAIN */
+ DO WHILE(CI_KEY ª= END_OF_CHAIN);
+     READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+     CALL DEF_ALIAS;
+     END;
+
+ /* RESET FLAG SO AS NOT TO INTERFERE WITH ANY OTHER CONTROL CARDS */
+ TRAV_ALIAS = NO;
+
+ END ALIAS_CHAIN;
+1/*********************************************************************/
+ /*                                                                   */
+ /* MAJOR CATALOG RECORD PROCESSING PROCEDURES.                       */
+ /*                                                                   */
+ /*********************************************************************/
+1DEF_ALIAS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS AN ALIAS MAJOR CATALOG RECORD.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ CALL DELETE_STMT('ALIAS');
+
+ VAROUT = ' DEF ALIAS(NAME(''' || DSN || ''') ';
+
+ FIELDPTR = ADDR(RMDR1);
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR1);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR1);
+
+ IF ªTRAV_ALIAS
+     THEN DO;
+          READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+          RELDSN = SUBSTR(TRUE_DSNAME, 1,
+              INDEX(TRUE_DSNAME||' ', ' ')-1);
+          END;
+
+ IF LENGTH(VAROUT) + LENGTH('REL(''' || RELDSN || ''')) ') < 72
+     THEN VAROUT = VAROUT || 'REL(''' || RELDSN || ''')) ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || 'REL(''' || RELDSN || ''')) ';
+          END;
+
+ CALL CATALOG_STMT(DEF);
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DEF_ALIAS.                          */
+ /* PROCESS AN ALIAS RECORD SET OF FIELDS.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_FIELD);
+     WHEN('U')  /* USER CATALOG */
+         IF ªTRAV_ALIAS
+             THEN CI_KEY = NAME_CI#;
+     WHEN('X')  /* ALIAS */
+         IF TRAV_ALIAS & SET# = 3
+             THEN CI_KEY = NAME_CI#;
+     WHEN('A')  /* NONVSAM */
+         IF ªTRAV_ALIAS
+             THEN CI_KEY = NAME_CI#;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#2') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+
+ END SET;
+
+ END DEF_ALIAS;
+1DEF_NONVSAM:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS A NONVSAM MAJOR CATALOG RECORD.                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ /* PRODUCE DELETE STATEMENT */
+ CALL DELETE_STMT('NVSAM');
+
+
+ /* PRODUCE DEFINE STATEMENT */
+
+ VAROUT = ' DEF NVSAM(NAME(''' || DSN || ''') ';
+
+ /* NO MEANS PROCESS BOTH OWNER AND EXPDT */
+ CALL OWNER_EXPDT(NO);
+
+ FIELDPTR = ADDR(RMDR2);
+
+ DEVICE_TYPE, VOLUME_SERS, FILE_NUMS = '';
+
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR2);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR2);
+1IF DEVICE_TYPE = ''
+     THEN DO;
+          PUT SKIP EDIT(ERRIND, '#3') (A);
+          CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+          DEVICE_TYPE = 'DEVT(&DSK)';
+          END;
+     ELSE DEVICE_TYPE = 'DEVT(' ||
+              SUBSTR(DEVICE_TYPE, 1, LENGTH(DEVICE_TYPE)-1) || ') ';
+
+ IF LENGTH(VAROUT) + LENGTH(DEVICE_TYPE) < 72
+     THEN VAROUT = VAROUT || DEVICE_TYPE;
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || DEVICE_TYPE;
+          END;
+
+ CALL ADD_VOLUMES;
+
+ IF FILE_NUMS ª= ''
+     THEN FILE_NUMS = 'FSEQN(' ||
+              SUBSTR(FILE_NUMS, 1, LENGTH(FILE_NUMS)-1) || ') ';
+
+ IF LENGTH(VAROUT) + LENGTH(FILE_NUMS) < 71
+     THEN VAROUT = VAROUT || FILE_NUMS;
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || FILE_NUMS;
+          END;
+
+ SUBSTR(VAROUT, LENGTH(VAROUT)) = ')';
+ VAROUT = VAROUT || ' ';
+
+ CALL CATALOG_STMT(DEF);
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DEF_NONVSAM.                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000010'B)
+         SELECT(TYPE_FIELD);
+             WHEN('B'); /* GDG BASE */
+             WHEN('X')  /* ALIAS */
+                 IF TRAV_ALIAS
+                     THEN CI_KEY = NAME_CI#;
+             OTHERWISE DO;
+                 PUT SKIP EDIT(ERRIND, '#4') (A);
+                 CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+                 END;
+             END;
+1    WHEN('000011'B) DO;
+         SELECT(DEVTYP);
+             WHEN(DISK3380) DEVICE_TYPE = DEVICE_TYPE || '3380 ';
+             WHEN(DISK3350) DEVICE_TYPE = DEVICE_TYPE || '3350 ';
+             WHEN(DISK3330) DEVICE_TYPE = DEVICE_TYPE || '3330-1 ';
+             OTHERWISE DEVICE_TYPE = DEVICE_TYPE || '&DSK ';
+             END;
+         VOLUME_SERS = VOLUME_SERS ||
+             SUBSTR(VOLSER, 1, INDEX(VOLSER||' ', ' ')-1) || ' ';
+         IF FSEQN ª= 0
+             THEN DO;
+                  FSEQN = FILESEQ;
+                  FILE_NUMS = FILE_NUMS ||
+                      SUBSTR(FSEQN, VERIFY(FSEQN, ' ')) || ' ';
+                  END;
+         END;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#5') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END DEF_NONVSAM;
+1DEF_CLUSTER:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS A CLUSTER, PAGESPACE, SWAPSPACE OR AIX MAJOR CATALOG      */
+ /* RECORD.                                                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ /* PRODUCE DELETE STATEMENT */
+ IF ID = 'C'
+     THEN DO;
+          AIX = NO;
+          IF PAGESPACE | SWAPSPACE
+              THEN CALL DELETE_STMT('PGSPC');
+              ELSE CALL DELETE_STMT('CL');
+          END;
+     ELSE DO;
+          AIX = YES;
+          CALL DELETE_STMT('AIX');
+          END;
+
+
+ /* PRODUCE DEFINE STATEMENT */
+
+ IF AIX
+     THEN DO;
+          VAROUT = ' DEF AIX(NAME(''' || DSN || ''') ';
+          IF UPGRADE_SET
+              THEN VAROUT = VAROUT || 'UPG ';
+          END;
+     ELSE SELECT;
+              WHEN(PAGESPACE) VAROUT =
+                  ' DEF PGSPC(NAME(''' || DSN || ''') ';
+              WHEN(SWAPSPACE) VAROUT =
+                  ' DEF PGSPC(NAME(''' || DSN || ''') SWAP ';
+              OTHERWISE VAROUT = ' DEF CL(NAME(''' || DSN || ''') ';
+              END;
+1FIELDPTR = ADDR(RMDR3);
+ DATA_CI#, INDEX_CI#, ENTRY_CI# = ' ';
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR3);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR3);
+
+ /* NO MEANS PROCESS BOTH OWNER AND EXPDT */
+ CALL OWNER_EXPDT(NO);
+
+ IF ENTRY_CI# ª= ' '
+     THEN DO;
+          CI_KEY = ENTRY_CI#;
+          READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+          RELDSN = SUBSTR(TRUE_DSNAME,1,INDEX(TRUE_DSNAME||' ',' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('REL(''' || RELDSN || ''') ') < 72
+              THEN VAROUT = VAROUT || 'REL(''' || RELDSN || ''') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'REL(''' || RELDSN || ''') ';
+                   END;
+          END;
+
+ IF DATA_CI# = ' '
+     THEN DO;
+          PUT SKIP EDIT(ERRIND, '#6', ' NO DATA COMPONENT ON ', DSN)(A);
+          CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+          END;
+     ELSE IF PAGESPACE | SWAPSPACE
+              THEN CALL PAGE_COMPONENT;
+              ELSE CALL DATA_COMPONENT;
+
+ IF INDEX_CI# ª= ' '
+     THEN CALL INDEX_COMPONENT;
+
+ SUBSTR(VAROUT, LENGTH(VAROUT)) = ')';
+ VAROUT = VAROUT || ' ';
+
+ CALL CATALOG_STMT(DEF);
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DEF_CLUSTER.                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000010'B)
+         SELECT(TYPE_FIELD);
+             WHEN('I') /* INDEX */
+                 INDEX_CI# = NAME_CI#;
+             WHEN('D')  /* DATA */
+                 DATA_CI# = NAME_CI#;
+             WHEN('G'); /* ALT INDEX (FOR CLUSTER) */
+             WHEN('C')  /* CLUSTER (FOR AIX) */
+                 ENTRY_CI# = NAME_CI#;
+             WHEN('R'); /* ALIAS PATH */
+             OTHERWISE DO;
+                 PUT SKIP EDIT(ERRIND, '#7') (A);
+                 CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+                 END;
+             END;
+     WHEN('000100'B)  /* PASSWORD SET OF FIELDS */
+         CALL PASSWORD_FIELDS;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#8') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END DEF_CLUSTER;
+1DEF_PATH:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS A PATH MAJOR CATALOG RECORD.                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ /* PRODUCE DELETE STATEMENT */
+ CALL DELETE_STMT('PATH');
+
+
+ /* PRODUCE DEFINE STATEMENT */
+
+ VAROUT = ' DEF PATH(NAME(''' || DSN || ''') ';
+ IF ªUPGRADE_SET
+     THEN VAROUT = VAROUT || 'NUPD ';
+
+ /* NO MEANS PROCESS BOTH OWNER AND EXPDT */
+ CALL OWNER_EXPDT(NO);
+
+ FIELDPTR = ADDR(RMDR3);
+
+ ENTRY_CI# = ' ';
+
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR3);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR3);
+1IF ENTRY_CI# = ' '
+     THEN DO;
+          PUT SKIP EDIT(ERRIND, '#9', ' NO PATHENTRY FOR ', DSN) (A);
+          CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+          END;
+     ELSE DO;
+          CI_KEY = ENTRY_CI#;
+          READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+          RELDSN = SUBSTR(TRUE_DSNAME,1,INDEX(TRUE_DSNAME||' ',' ')-1);
+          IF LENGTH(VAROUT)+ LENGTH('PENT(''' || RELDSN || ''') ') < 72
+              THEN VAROUT = VAROUT || 'PENT(''' || RELDSN || ''') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'PENT(''' || RELDSN || ''') ';
+                   END;
+          END;
+
+ SUBSTR(VAROUT, LENGTH(VAROUT)) = ')';
+ VAROUT = VAROUT || ' ';
+
+ CALL CATALOG_STMT(DEF);
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DEF_PATH.                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000010'B)
+         SELECT(TYPE_FIELD);
+             WHEN('G')  /* AIX */
+                 ENTRY_CI# = NAME_CI#;
+             WHEN('C')  /* CLUSTER */
+                 ENTRY_CI# = NAME_CI#;
+             WHEN('D'); /* DATA */
+             WHEN('I'); /* INDEX */
+             OTHERWISE DO;
+                 PUT SKIP EDIT(ERRIND, '#10') (A);
+                 CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+                 END;
+             END;
+     WHEN('000100'B)  /* PASSWORD SET OF FIELDS */
+         CALL PASSWORD_FIELDS;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#11') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END DEF_PATH;
+1DEF_GDG:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PROCESSES THE GENERATION DATA GROUP BASE CATALOG   */
+ /* RECORD.  THIS IS A MAJOR CATALOG RECORD.  THE ACTUAL GDG'S ARE    */
+ /* IN NONVSAM CATALOG RECORDS.                                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ /* DELETE STATEMENT */
+ CALL DELETE_STMT('GDG');
+
+
+ /* DEFINE STATEMENT */
+
+ VAROUT = ' DEF GDG(NAME(''' || DSN || ''') ';
+
+ FULLWORD = 0;
+ SUBSTR(BIT_FULLWORD, 25, 8) = GDGLIMIT;
+ EDIT_NUM1 = FULLWORD;
+ IF LENGTH(VAROUT) + 8 < 72
+     THEN VAROUT = VAROUT || 'LIM(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || 'LIM(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+          END;
+
+ IF EMPTY
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'EMP ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'EMP ';
+                   END;
+1IF SCRATCH
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'SCR ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'SCR ';
+                   END;
+
+ /* NO MEANS PROCESS BOTH OWNER AND EXPDT */
+ CALL OWNER_EXPDT(NO);
+
+ END DEF_GDG;
+1DEF_USERCAT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS A USER CATALOR MAJOR CATALOG RECORD.  NOTE THAT SINCE A   */
+ /* USER CATALOG IS REALLY DEFINED WITHIN ITSELF ONLY A PARTIAL       */
+ /* DEFINE STATEMENT MAY BE PRODUCED.                                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ /* PRODUCE DELETE STATEMENT */
+ CALL DELETE_STMT('UCAT');
+
+
+ /* PRODUCE PARTIAL DEFINE STATEMENT */
+
+ VAROUT = ' DEF UCAT(NAME(''' || DSN || ''') ';
+
+ FIELDPTR = ADDR(RMDR1);
+
+ DEVICE_TYPE, VOLUME_SERS = '';
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR1);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR1);
+
+ IF DEVICE_TYPE = ''
+     THEN DO;
+          PUT SKIP EDIT(ERRIND, '#12') (A);
+          CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+          DEVICE_TYPE = 'DEVT(&DSK)';
+          END;
+     ELSE DEVICE_TYPE = 'DEVT(' ||
+              SUBSTR(DEVICE_TYPE, 1, LENGTH(DEVICE_TYPE)-1) || ') ';
+1IF LENGTH(VAROUT) + LENGTH(DEVICE_TYPE) < 72
+     THEN VAROUT = VAROUT || DEVICE_TYPE;
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || DEVICE_TYPE;
+          END;
+
+ CALL ADD_VOLUMES;
+
+ SUBSTR(VAROUT, LENGTH(VAROUT)) = ')';
+ VAROUT = VAROUT || ' ';
+
+ CALL CATALOG_STMT(DEF);
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DEF_USERCAT.                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000010'B)
+         IF TRAV_ALIAS
+             THEN CI_KEY = NAME_CI#;
+     WHEN('000011'B) DO;
+         SELECT(DEVTYP);
+             WHEN(DISK3380) DEVICE_TYPE = DEVICE_TYPE || '3380 ';
+             WHEN(DISK3350) DEVICE_TYPE = DEVICE_TYPE || '3350 ';
+             WHEN(DISK3330) DEVICE_TYPE = DEVICE_TYPE || '3330-1 ';
+             OTHERWISE DEVICE_TYPE = DEVICE_TYPE || '&DSK ';
+             END;
+         VOLUME_SERS = VOLUME_SERS ||
+             SUBSTR(VOLSER, 1, INDEX(VOLSER||' ', ' ')-1) || ' ';
+         END;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#13') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END DEF_USERCAT;
+1DEF_CANDIDATE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS A VOLUME MAJOR CATALOG RECORD.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, 6);
+
+ CALL DELETE_STMT('SPC');
+
+ VAROUT = ' DEF SPC(CAN VOL(' || DSN || ')) ';
+ CALL CATALOG_STMT(DEF);
+
+ OFFSET = 127;
+ FIELDPTR = LOADAD(OFFSET, ADDR(VSAM_REC));
+
+ REC_SAVE = VSAM_REC;
+
+ CALL V_FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ OFFSET = 127;
+ FIELDPTR = LOADAD(OFFSET, ADDR(VSAM_REC));
+
+ CALL V_HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ OFFSET = 127;
+ FIELDPTR = LOADAD(OFFSET, ADDR(VSAM_REC));
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DEF_CANDIDATE.                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = V_DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(V_BEGIN_SET_OF_FIELDS));
+
+ SELECT(V_TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000101'B); /* SPACE MAP */
+     WHEN('000110'B) CALL DEFSPACE;
+     WHEN('001000'B); /* DATA SET DIR ENTRY */
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#14') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END DEF_CANDIDATE;
+1DEFSPACE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PRODUCES A UNIQUE DEFINE STATEMENT BUT IS NOT      */
+ /* BUILT FROM A UNIQUE MAJOR CATALOG RECORD.  IT IS SUBSERVIENT TO   */
+ /* DEF_CANDIDATE.                                                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF UNIQUE_DATA_SPACE | AUTOMATICALLY_BUILT | CATALOG_SPACE
+     THEN RETURN;
+
+ VAROUT = ' DEF SPC(VOL(' || DSN || ') ';
+
+ FULLWORD = 0;
+ DO POS = 1 TO 16;
+     FULLWORD = FULLWORD + NN(POS);
+     END;
+ EDIT_NUM1 = FULLWORD;
+
+ FULLWORD = 0;
+ SUBSTR(BIT_FULLWORD, 9, 24) = DSPSSQ;
+ EDIT_NUM2 = FULLWORD;
+1SELECT(DSPSOPT.TYPE_REQUEST);
+     WHEN('10'B) ALLOCATION = 'TRK(';
+     WHEN('11'B) ALLOCATION = 'CYL(';
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#15') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ IF LENGTH(VAROUT) + 17 < 72
+     THEN VAROUT = VAROUT || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+          END;
+
+
+ SUBSTR(VAROUT, LENGTH(VAROUT)) = ')';
+ VAROUT = VAROUT || ' ';
+
+ CALL CATALOG_STMT(DEF);
+
+ END DEFSPACE;
+1/*********************************************************************/
+ /*                                                                   */
+ /* MINOR CATALOG RECORD PROCESSING PROCEDURES.                       */
+ /*                                                                   */
+ /*********************************************************************/
+1DATA_COMPONENT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ANALYSES THE DATA RECORD FOR A VSAM CLUSTER.                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CI_KEY = DATA_CI#;
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ FIELDPTR = ADDR(RMDR4);
+ VOLUME_SERS = '';
+ KEYRANGES = '';
+
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR4);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR4);
+1IF KEYRANGES ª= ''
+     THEN DO;
+          KEYRANGES = 'KRNG(' ||
+              SUBSTR(KEYRANGES, 1, LENGTH(KEYRANGES)-1) || ') ';
+          IF LENGTH(VAROUT) + LENGTH(KEYRANGES) < 72
+              THEN VAROUT = VAROUT || KEYRANGES;
+              ELSE DO WHILE(LENGTH(KEYRANGES) > 0);
+                       VAROUT = VAROUT || '+';
+                       CALL PUTOUT(DEF);
+                       IF LENGTH(KEYRANGES) < 66
+                           THEN DO;
+                                VAROUT = '     ' || KEYRANGES;
+                                KEYRANGES = '';
+                                END;
+                           ELSE DO;
+                                POS = INDEX(SUBSTR(KEYRANGES, 40), ') ')
+                                    + 40;
+                                VAROUT = '     ' ||
+                                    SUBSTR(KEYRANGES, 1, POS);
+                                KEYRANGES = SUBSTR(KEYRANGES, POS+1);
+                                END;
+                       END;
+          END;
+
+ /* YES MEANS OWNER ONLY */
+ CALL OWNER_EXPDT(YES);
+
+ IF SPEED
+     THEN IF LENGTH(VAROUT) + 6 < 72
+              THEN VAROUT = VAROUT || 'SPEED ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'SPEED ';
+                   END;
+
+ IF UNIQUE
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'UNQ ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'UNQ ';
+                   END;
+1IF REUSABLE
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'RUS ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'RUS ';
+                   END;
+
+ IF ERASE
+     THEN IF LENGTH(VAROUT) + 6 < 72
+              THEN VAROUT = VAROUT || 'ERASE ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'ERASE ';
+                   END;
+
+ EDIT_NUM1 = BUFSIZE;
+ IF LENGTH(VAROUT) + 25 < 72
+     THEN VAROUT = VAROUT || 'BUFSP(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || 'BUFSP(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+          END;
+
+ EDIT_NUM1 = LRECL_AVE;
+ EDIT_NUM2 = LRECL_MAX;
+ IF LENGTH(VAROUT) + 25 < 72
+     THEN VAROUT = VAROUT || 'RECSZ(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || 'RECSZ(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+          END;
+1SELECT(SHR_IN_SYS);
+     WHEN('00') INSYS = 1;
+     WHEN('01') INSYS = 2;
+     WHEN('10') INSYS = 3;
+     WHEN('11') INSYS = 4;
+     END;
+
+ SELECT(SHR_OVER_SYS);
+     WHEN('10') OVERSYS = 3;
+     WHEN('11') OVERSYS = 4;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#16') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ IF INSYS ª= 1 | OVERSYS ª= 3
+     THEN IF LENGTH(VAROUT) + 9 < 72
+              THEN VAROUT = VAROUT || 'SHR(' || INSYS || ' ' || OVERSYS
+                       || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'SHR(' || INSYS || ' ' || OVERSYS
+                       || ') ';
+                   END;
+
+ FULLWORD = 0;
+ SUBSTR(BIT_FULLWORD, 9, 24) = PRIMSPAC;
+ EDIT_NUM1 = FULLWORD;
+ SUBSTR(BIT_FULLWORD, 9, 24) = SCONSPAC;
+ EDIT_NUM2 = FULLWORD;
+
+ SELECT(SPACOPTN.TYPE_REQUEST);
+     WHEN('10'B) ALLOCATION = 'TRK(';
+     WHEN('11'B) ALLOCATION = 'CYL(';
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#17') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+1IF LENGTH(VAROUT) + 17 < 72
+     THEN VAROUT = VAROUT || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+          END;
+
+ IF EXCPEXIT ª= NULL_BYTES
+     THEN IF LENGTH(VAROUT) + LENGTH('EEXT(' || SUBSTR(EXCPEXIT, 1,
+          INDEX(EXCPEXIT||' ', ' ')-1) || ') ') < 72
+              THEN VAROUT = VAROUT || 'EEXT(' || SUBSTR(EXCPEXIT, 1,
+                       INDEX(EXCPEXIT||' ', ' ')-1) || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'EEXT(' || SUBSTR(EXCPEXIT, 1,
+                       INDEX(EXCPEXIT||' ', ' ')-1) || ') ';
+                   END;
+
+ CALL ADD_VOLUMES;
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO DATA_COMPONENT.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000001'B)  /* STATS */
+         CALL DATASTATS;
+     WHEN('000010'B); /* ASSOCIATION */
+1    WHEN('000011'B) DO; /* VOLUME */
+         VOLUME_SERS = VOLUME_SERS ||
+             SUBSTR(VOLSER, 1, INDEX(VOLSER||' ', ' ')-1) || ' ';
+         OFFSET = LENGTH(LOKEYV) + 2;
+         HIKEYV_PTR =LOADAD(OFFSET,ADDR(LOKEYV));
+         IF LENGTH(LOKEYV) > 0 & LENGTH(HIKEYV) > 0
+             THEN DO;
+                  IF VERIFY(LOKEYV, CHARS) ª= 0
+                      THEN DO;
+                           CALL INTOHEX(LOKEYV, HEXKEY);
+                           KEYRANGES = KEYRANGES || '(X''' ||
+                               HEXKEY || ''' ';
+                           END;
+                      ELSE KEYRANGES= KEYRANGES || '(' || LOKEYV || ' ';
+                  IF VERIFY(HIKEYV, CHARS) ª= 0
+                      THEN DO;
+                           CALL INTOHEX(HIKEYV, HEXKEY);
+                           KEYRANGES = KEYRANGES || 'X''' ||
+                               HEXKEY || ''') ';
+                           END;
+                      ELSE KEYRANGES = KEYRANGES || HIKEYV || ') ';
+                  END;
+         END;
+     WHEN('000100'B)  /* PASSWORD SET OF FIELDS */
+         CALL PASSWORD_FIELDS;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#18') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END DATA_COMPONENT;
+1INDEX_COMPONENT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ANALYSES THE INDEX RECORD FOR A VSAM CLUSTER.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CI_KEY = INDEX_CI#;
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+
+ SUBSTR(VAROUT, LENGTH(VAROUT), 1) = ')';
+ IF LENGTH(VAROUT) < 71
+     THEN VAROUT = VAROUT || ' +';
+     ELSE VAROUT = VAROUT || '+';
+ CALL PUTOUT(DEF);
+
+ DSN = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+ VAROUT = '   INDEX(NAME(''' || DSN || ''') ';
+
+ VOLUME_SERS = '';
+ FIELDPTR = ADDR(RMDR4);
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR4);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR4);
+
+ /* YES MEANS OWNER ONLY */
+ CALL OWNER_EXPDT(YES);
+
+ IF UNIQUE
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'UNQ ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'UNQ ';
+                   END;
+1IF REUSABLE
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'RUS ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'RUS ';
+                   END;
+
+ SELECT(SHR_IN_SYS);
+     WHEN('00') INSYS = 1;
+     WHEN('01') INSYS = 2;
+     WHEN('10') INSYS = 3;
+     WHEN('11') INSYS = 4;
+     END;
+
+ SELECT(SHR_OVER_SYS);
+     WHEN('10') OVERSYS = 3;
+     WHEN('11') OVERSYS = 4;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#19') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ IF INSYS ª= 1 | OVERSYS ª= 3
+     THEN IF LENGTH(VAROUT) + 9 < 72
+              THEN VAROUT = VAROUT || 'SHR(' || INSYS || ' ' || OVERSYS
+                       || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'SHR(' || INSYS || ' ' || OVERSYS
+                       || ') ';
+                   END;
+1FULLWORD = 0;
+ SUBSTR(BIT_FULLWORD, 9, 24) = PRIMSPAC;
+ EDIT_NUM1 = FULLWORD;
+ SUBSTR(BIT_FULLWORD, 9, 24) = SCONSPAC;
+ EDIT_NUM2 = FULLWORD;
+
+ SELECT(SPACOPTN.TYPE_REQUEST);
+     WHEN('10'B) ALLOCATION = 'TRK(';
+     WHEN('11'B) ALLOCATION = 'CYL(';
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#20') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ IF LENGTH(VAROUT) + 17 < 72
+     THEN VAROUT = VAROUT || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ' ' ||
+              SUBSTR(EDIT_NUM2, VERIFY(EDIT_NUM2, ' ')) || ') ';
+          END;
+
+ IF EXCPEXIT ª= NULL_BYTES
+     THEN IF LENGTH(VAROUT) + LENGTH('EEXT(' || SUBSTR(EXCPEXIT, 1,
+          INDEX(EXCPEXIT||' ', ' ')-1) || ') ') < 72
+              THEN VAROUT = VAROUT || 'EEXT(' || SUBSTR(EXCPEXIT, 1,
+                       INDEX(EXCPEXIT||' ', ' ')-1) || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'EEXT(' || SUBSTR(EXCPEXIT, 1,
+                       INDEX(EXCPEXIT||' ', ' ')-1) || ') ';
+                   END;
+
+ CALL ADD_VOLUMES;
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO INDEX_COMPONENT.                    */
+ /* PROCESS AN ALIAS RECORD SET OF FIELDS.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000001'B)  /* STATS */
+         CALL INDEXSTATS;
+     WHEN('000010'B); /* ASSOCIATION */
+     WHEN('000011'B)  /* VOLUME */
+         VOLUME_SERS = VOLUME_SERS ||
+             SUBSTR(VOLSER, 1, INDEX(VOLSER||' ', ' ')-1) || ' ';
+     WHEN('000100'B)  /* PASSWORD SET OF FIELDS */
+         CALL PASSWORD_FIELDS;
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#21') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END INDEX_COMPONENT;
+1PAGE_COMPONENT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ANALYSES THE DATA RECORD FOR A PAGE OR SWAP DATASET.              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CI_KEY = DATA_CI#;
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+ IF UNIQUE
+     THEN IF LENGTH(VAROUT) + 7 < 72
+              THEN VAROUT = VAROUT || 'UNIQUE ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'UNIQUE ';
+                   END;
+
+ FULLWORD = 0;
+ SUBSTR(BIT_FULLWORD, 9, 24) = PRIMSPAC;
+ EDIT_NUM1 = FULLWORD;
+
+ SELECT(SPACOPTN.TYPE_REQUEST);
+     WHEN('10'B) ALLOCATION = 'TRK(';
+     WHEN('11'B) ALLOCATION = 'CYL(';
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#22') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ IF LENGTH(VAROUT) + 17 < 72
+     THEN VAROUT = VAROUT || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || ALLOCATION ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+          END;
+1FIELDPTR = ADDR(RMDR4);
+ VOLUME_SERS = '';
+
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR4);
+
+ CALL HORIZONTAL_EXTN(SET);
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR4);
+
+ CALL ADD_VOLUMES;
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO PAGE_COMPONENT.                     */
+ /* PROCESS AN ALIAS RECORD SET OF FIELDS.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000001'B); /* STATS */
+     WHEN('000010'B); /* ASSOCIATION */
+     WHEN('000011'B)  /* VOLUME */
+         VOLUME_SERS = VOLUME_SERS ||
+             SUBSTR(VOLSER, 1, INDEX(VOLSER||' ', ' ')-1) || ' ';
+     WHEN('000100'B); /* PASSWORD SET OF FIELDS */
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#23') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END PAGE_COMPONENT;
+1/*********************************************************************/
+ /*                                                                   */
+ /* GENERAL PURPOSE PROCEDURES.                                       */
+ /*                                                                   */
+ /*********************************************************************/
+1PUTOUT:  PROCEDURE(OUTFILE);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* WRITES THE OUTPUT RECORD TO THE FILE WHICH IS DETERMINED BY THE   */
+ /* OUTFILE PARAMETER.  BEFORE THE RECORD IS WRITTEN THE RECORD IS    */
+ /* PADDED ON THE RIGHT WITH BLANKS BY ASSIGNING VARIABLE TO FIXED    */
+ /* CHARACTER STRINGS.  THIS IS A GENERAL PURPOSE ROUTINE WHICH IS    */
+ /* INVOKED FOR ALL DEL/DEF OUTPUT.                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  OUTFILE  FILE VARIABLE;
+
+
+ OUTPUT_REC = VAROUT;
+
+ WRITE FILE(OUTFILE) FROM(OUTPUT_REC);
+
+
+ END PUTOUT;
+1GETINPT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE OBTAINS INPUT FROM THE SYSIN CONTROL FILE.         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ON CONVERSION BEGIN;
+     CNTL = ONSOURCE;
+     PUT SKIP EDIT('INPUT:  ', CNTL) (A);
+     ONSOURCE = (16) '0';
+     END;
+
+ /* NNN IS A DUMMY VARIABLE TO GET CNTL WITHOUT QUOTES */
+ DO UNTIL(NNN = 0) WHILE(MORE_SYSIN);
+     GET FILE(SYSIN) LIST(NNN);
+     END;
+
+
+ END GETINPT;
+1DELETE_STMT:  PROCEDURE(EXTRA);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* OUTPUT A DELETE STATEMENT FOR THE CATALOG ENTRY BEING PROCESSED.  */
+ /* THIS PROCEDURE IS NULL IF THE DEL FILE IS UNDEFINED.              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  EXTRA  CHAR(*);
+
+
+ IF NO_DELETES
+     THEN RETURN;
+
+ VAROUT = ' DEL ''' || DSN || ''' ' || EXTRA || ' ';
+
+ CALL CATALOG_STMT(DEL);
+
+
+ END DELETE_STMT;
+1CATALOG_STMT:  PROCEDURE(OUTFILE);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* APPEND THE CATALOG INFORMATION TO THE END OF A DEL/DEF STATEMENT. */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  OUTFILE  FILE VARIABLE;
+
+
+ IF LENGTH(VAROUT) + LENGTH(STRING(CATALOG_DIRECT)) < 65
+     THEN VAROUT = VAROUT || STRING(CATALOG_DIRECT);
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(OUTFILE);
+          VAROUT = '   ' || STRING(CATALOG_DIRECT);
+          END;
+
+ CALL PUTOUT(OUTFILE);
+
+
+ END CATALOG_STMT;
+1HORIZONTAL_EXTN:  PROCEDURE(SET) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CHECK FOR A HORIZONTAL EXTENSION RECORD (IE. A RECORD WHICH       */
+ /* CONTINUES THE SET OF FIELDS PTRS).  IF THERE IS HORIZONTAL        */
+ /* EXTENSION(S) THEN PROCESS THEIR SET OF FIELDS PTRS BY CALLING     */
+ /* FIELDSET.  MULTIPLE HORIZONTAL EXTENSIONS ARE ALLOWED FOR BY      */
+ /* RECURSIVE CALL.                                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET  ENTRY(FIXED BINARY) VARIABLE;
+ DECLARE  REC_SAVE  CHAR(505);
+
+
+ IF UNSPEC(HORIZONTAL_PTR) = NO
+     THEN RETURN;
+
+ CI_KEY = SUBSTR(HORIZONTAL_PTR, 1, 3);
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+
+ REC_SAVE = VSAM_REC;
+ FIELDPTR = ADDR(TRUE_DSNAME);
+
+ CALL FIELDSETS(SET);
+
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(TRUE_DSNAME);
+
+ CALL HORIZONTAL_EXTN(SET);
+
+ END HORIZONTAL_EXTN;
+1FIELDSETS:  PROCEDURE(SET) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS THE SET OF FIELDS PTRS STACKING ANY WHICH POINT TO A      */
+ /* VERTICAL EXTENSION RECORD (IE. A RECORD WHICH CONTAINS MORE       */
+ /* SET OF FIELDS).  THE VERTICAL EXTENSION RECORDS ARE PROCESSED     */
+ /* AFTER ALL THE FIELDS ON THE PRESENT RECORD ARE PROCESSED.  THIS   */
+ /* IS DONE RECURSIVELY TO ALLOW FOR ALL COMBINATIONS.  THE ACTUAL    */
+ /* SET PROCESSING IS ACCOMPLISHED BY THE CALLING PROCEDURES OWN      */
+ /* SET ROUTINE WHOSE ENTRY IS PASSED AS A PARAMETER.                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET   ENTRY(FIXED BINARY) VARIABLE;
+
+ DECLARE  SET#  FIXED BINARY;
+ DECLARE  EXTN  FIXED BINARY;
+ DECLARE  VP    FIXED BINARY INIT(0);
+ DECLARE  VERTPTR(110)  CHAR(3);
+
+ DECLARE  VERTICAL_PTR  CHAR(3) BASED(ADDR(VERTICAL_PTR_BASE(SET#)));
+1DO SET# = 1 TO #SET_OF_FIELDS_PTRS;
+      IF ªDEL_BIT(SET#)  /* IGNORE DELETED SETS */
+          THEN IF VERTICAL(SET#)
+                   THEN DO;  /* STACK VERTICALS */
+                        VP = VP + 1;
+                        VERTPTR(VP) = VERTICAL_PTR;
+                        END;
+                   ELSE CALL SET(SET#);  /* PROCESS IN THIS RECORD */
+      END;
+
+ FIELDPTR = ADDR(TRUE_DSNAME);
+
+ /* SORT TO ENABLE REMOVAL OF DUPLICATE VERTICAL EXTENSION PTRS */
+ CALL QCKSORT(VERTPTR, 1, VP);
+
+ /* PROCESS VERTICAL EXTENSION RECORDS */
+ DO EXTN = 1 TO VP;
+     IF EXTN = 1  |  VERTPTR(EXTN) ª= VERTPTR(EXTN-1)
+         THEN DO;
+              CI_KEY = VERTPTR(EXTN);
+              READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+              CALL FIELDSETS(SET);
+              END;
+     END;
+
+ END FIELDSETS;
+1OWNER_EXPDT:  PROCEDURE(OWNER_ONLY);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* EXTRACT THE OWNER AND EXPERATION DATE FROM ANY CATALOG RECORD.    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  OWNER_ONLY  BIT(1);
+
+ IF OWNERID ª= NULL_BYTES
+     THEN DO;
+          OWNER = SUBSTR(OWNERID, 1, INDEX(OWNERID||' ', ' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('OWNER(' || OWNER || ') ') < 72
+              THEN VAROUT = VAROUT || 'OWNER(' || OWNER || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'OWNER(' || OWNER || ') ';
+                   END;
+          END;
+
+ IF OWNER_ONLY
+     THEN RETURN;
+
+ IF EXDT ª= ''
+     THEN DO;
+          EXPDT = EXDT;
+          IF LENGTH(VAROUT) + LENGTH('TO(' || EXPDT || ') ') < 72
+              THEN VAROUT = VAROUT || 'TO(' || EXPDT || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'TO(' || EXPDT || ') ';
+                   END;
+          END;
+
+ END OWNER_EXPDT;
+1PASSWORD_FIELDS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ADDS THE PASSWORD FIELDS TO ANY TYPE DEFINE STATEMENT.            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF MASTER_PSWD ª= NULL_BYTES
+     THEN DO;
+          INS = SUBSTR(MASTER_PSWD, 1, INDEX(MASTER_PSWD||' ',  ' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('MRPW(' || INS || ') ') < 72
+              THEN VAROUT = VAROUT || 'MRPW(' || INS || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'MRPW(' || INS || ') ';
+                   END;
+          END;
+
+ IF CONTROL_PSWD ª= NULL_BYTES
+     THEN DO;
+          INS = SUBSTR(CONTROL_PSWD, 1, INDEX(CONTROL_PSWD||' ',' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('CTLPW(' || INS || ') ') < 72
+              THEN VAROUT = VAROUT || 'CTLPW(' || INS || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'CTLPW(' || INS || ') ';
+                   END;
+          END;
+
+ IF UPDATE_PSWD ª= NULL_BYTES
+     THEN DO;
+          INS = SUBSTR(UPDATE_PSWD, 1, INDEX(UPDATE_PSWD||' ',  ' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('UPDPW(' || INS || ') ') < 72
+              THEN VAROUT = VAROUT || 'UPDPW(' || INS || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'UPDPW(' || INS || ') ';
+                   END;
+          END;
+1IF READ_PSWD ª= NULL_BYTES
+     THEN DO;
+          INS = SUBSTR(READ_PSWD, 1, INDEX(READ_PSWD||' ', ' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('RDPW(' || INS || ') ') < 72
+              THEN VAROUT = VAROUT || 'RDPW(' || INS || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'RDPW(' || INS || ') ';
+                   END;
+          END;
+
+ IF PASSPRMT ª= NULL_BYTES
+     THEN DO;
+          INS = SUBSTR(PASSPRMT, 1, INDEX(PASSPRMT||' ', ' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('CODE(' || INS || ') ') < 72
+              THEN VAROUT = VAROUT || 'CODE(' || INS || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'CODE(' || INS || ') ';
+                   END;
+          END;
+
+ IF USVRMDUL ª= NULL_BYTES
+     THEN DO;
+          INS = SUBSTR(USVRMDUL, 1, INDEX(USVRMDUL||' ', ' ')-1);
+          IF LENGTH(VAROUT) + LENGTH('AUTH(' || INS) < 70
+              THEN VAROUT = VAROUT || 'AUTH(' || INS;
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'AUTH(' || INS;
+                   END;
+          IF #VAR_LENGTH = '00000001'B
+              THEN IF LENGTH(VAROUT)+LENGTH(','''||USERAREC||''') ') <72
+                       THEN VAROUT = VAROUT|| ',''' ||USERAREC|| ''') ';
+                       ELSE DO;
+                            VAROUT = VAROUT || '+';
+                            CALL PUTOUT(DEF);
+                            VAROUT = '     '|| ','''||USERAREC|| ''') ';
+                            END;
+              ELSE VAROUT = VAROUT || ') ';
+          END;
+1IF PASSATMP ª= 2
+     THEN DO;
+          EDIT_NUM1 = PASSATMP;
+          IF LENGTH(VAROUT) + 9 < 72
+              THEN VAROUT = VAROUT || 'ATT(' || SUBSTR(EDIT_NUM1,
+                       VERIFY(EDIT_NUM1, ' ')) || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'ATT(' || SUBSTR(EDIT_NUM1,
+                       VERIFY(EDIT_NUM1, ' ')) || ') ';
+                   END;
+          END;
+
+ END PASSWORD_FIELDS;
+1ADD_VOLUMES:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ADDS THE VOLUME INFORMATION TO ANY TYPE DEFINE STATEMENT.         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF VOLUME_SERS = ''
+     THEN DO;
+          PUT SKIP EDIT(ERRIND, '#24') (A);
+          CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+          VOLUME_SERS = 'VOL(&VOLSR)';
+          END;
+     ELSE VOLUME_SERS = 'VOL(' ||
+              SUBSTR(VOLUME_SERS, 1, LENGTH(VOLUME_SERS)-1) ||     ') ';
+
+ IF LENGTH(VAROUT) + LENGTH(VOLUME_SERS) < 71
+     THEN VAROUT = VAROUT || VOLUME_SERS;
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || VOLUME_SERS;
+          END;
+
+ END ADD_VOLUMES;
+1DATASTATS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ANALYSES THE ACCESS METHOD DATA STATISTICS BLOCK (AMDSB) SET OF   */
+ /* FIELDS.  THIS PROCEDURE PROCESSES ONLY THOSE FIELDS WHICH ARE     */
+ /* UNIQUE TO THE DATA COMPONENT.  COMMON FIELDS BETWEEN THE DATA AND */
+ /* INDEX COMPONETS ARE PROCESSED BY COMMONSTATS.                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF ªAMDDST  &  ªAIX  /* NOT INDEXED AND NOT AIX */
+     THEN IF AMDRRDS /* RELATIVE */
+              THEN IF LENGTH(VAROUT) + 5 < 72
+                       THEN VAROUT = VAROUT || 'NUMD ';
+                       ELSE DO;
+                            VAROUT = VAROUT || '+';
+                            CALL PUTOUT(DEF);
+                            VAROUT = '     ' || 'NUMD ';
+                            END;
+              ELSE IF LENGTH(VAROUT) + 5 < 72
+                       THEN VAROUT = VAROUT || 'NIXD ';
+                       ELSE DO;
+                            VAROUT = VAROUT || '+';
+                            CALL PUTOUT(DEF);
+                            VAROUT = '     ' || 'NIXD ';
+                            END;
+1/* CLUSTER LEVEL DEFINE IS NOW COMPLETE,
+    PREPARE FOR DATA COMPONENT */
+
+ SUBSTR(VAROUT, LENGTH(VAROUT), 1) = ')';
+ IF LENGTH(VAROUT) < 71
+     THEN VAROUT = VAROUT || ' +';
+     ELSE VAROUT = VAROUT || '+';
+ CALL PUTOUT(DEF);
+ VAROUT = '   DATA(NAME(''' || DSN || ''') ';
+
+ LRECL_MAX = AMDLRECL;
+
+ IF AMDUNQ
+     THEN IF LENGTH(VAROUT) + 5 < 72
+              THEN VAROUT = VAROUT || 'UNQK ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'UNQK ';
+                   END;
+
+ IF AMDSPAN  &  ªAIX
+     THEN IF LENGTH(VAROUT) + 5 < 72
+              THEN VAROUT = VAROUT || 'SPND ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'SPND ';
+                   END;
+
+ IF AMDKEYLN ª= 0
+     THEN DO;
+          EDIT_NUM1 = AMDKEYLN;
+          EDIT_NUM2 = AMDRKP;
+          IF LENGTH(VAROUT) + 20 < 72
+              THEN VAROUT = VAROUT || 'KEYS(' || SUBSTR(EDIT_NUM1,
+                       VERIFY(EDIT_NUM1, ' ')) ||' '|| SUBSTR(EDIT_NUM2,
+                       VERIFY(EDIT_NUM2, ' ')) || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'KEYS(' || SUBSTR(EDIT_NUM1,
+                       VERIFY(EDIT_NUM1, ' ')) ||' '|| SUBSTR(EDIT_NUM2,
+                       VERIFY(EDIT_NUM2, ' ')) || ') ';
+                   END;
+          END;
+1FULLWORD = 0;
+ SUBSTR(BIT_FULLWORD, 25, 8) = AMDPCTCI;
+ EDIT_NUM1 = FULLWORD;
+
+ SUBSTR(BIT_FULLWORD, 25, 8) = AMDPCTCA;
+ EDIT_NUM2 = FULLWORD;
+
+ IF EDIT_NUM1 ª= 0 | EDIT_NUM2 ª= 0
+     THEN IF LENGTH(VAROUT) + 12 < 72
+              THEN VAROUT = VAROUT || 'FSPC(' || SUBSTR(EDIT_NUM1,
+                       VERIFY(EDIT_NUM1, ' ')) ||' '|| SUBSTR(EDIT_NUM2,
+                       VERIFY(EDIT_NUM2, ' ')) || ') ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'FSPC(' || SUBSTR(EDIT_NUM1,
+                       VERIFY(EDIT_NUM1, ' ')) ||' '|| SUBSTR(EDIT_NUM2,
+                       VERIFY(EDIT_NUM2, ' ')) || ') ';
+                   END;
+
+ CALL COMMONSTATS;
+
+ END DATASTATS;
+1INDEXSTATS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ANALYSES THE ACCESS METHOD DATA STATISTICS BLOCK (AMDSB) SET OF   */
+ /* FIELDS.  THIS PROCEDURE PROCESSES ONLY THOSE FIELDS WHICH ARE     */
+ /* UNIQUE FOR THE INDEX COMPONENT.  COMMON FIELDS BETWEEN DATA AND   */
+ /* INDEX ARE PROCESSED BY COMMONSTATS.                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF AMDSDT
+     THEN IF LENGTH(VAROUT) + 5 < 72
+              THEN VAROUT = VAROUT || 'IMBD ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'IMBD ';
+                   END;
+ IF AMDREPL
+     THEN IF LENGTH(VAROUT) + 5 < 72
+              THEN VAROUT = VAROUT || 'REPL ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'REPL ';
+                   END;
+
+ CALL COMMONSTATS;
+
+ END INDEXSTATS;
+1COMMONSTATS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ANALYSES THE ACCESS METHOD DATA STATISTICS BLOCK (AMDSB) SET OF   */
+ /* FIELDS.  THIS PROCEDURE PROCESSES THOSE FIELD WHICH THE DATA AND  */
+ /* INDEX COMPONENTS HAVE IN COMMON.                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF AMDWCK
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'WCK ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'WCK ';
+                   END;
+
+ IF AMDORDER
+     THEN IF LENGTH(VAROUT) + 4 < 72
+              THEN VAROUT = VAROUT || 'ORD ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'ORD ';
+                   END;
+
+ EDIT_NUM1 = AMDCINV;
+ IF LENGTH(VAROUT) + 15 < 72
+     THEN VAROUT = VAROUT || 'CISZ(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+     ELSE DO;
+          VAROUT = VAROUT || '+';
+          CALL PUTOUT(DEF);
+          VAROUT = '     ' || 'CISZ(' ||
+              SUBSTR(EDIT_NUM1, VERIFY(EDIT_NUM1, ' ')) || ') ';
+          END;
+1IF AMDFAULT
+     THEN IF LENGTH(VAROUT) + 5 < 72
+              THEN VAROUT = VAROUT || 'CYLF ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'CYLF ';
+                   END;
+
+ IF AMDBIND
+     THEN IF LENGTH(VAROUT) + 5 < 72
+              THEN VAROUT = VAROUT || 'BIND ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'BIND ';
+                   END;
+
+ IF AMDFAULT & AMDBIND
+     THEN DO;
+          PUT SKIP EDIT(ERRIND, '#25',
+              ' BIND AND CYLF BOTH SPECIFIED ON ', DSN)(A);
+          CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+          END;
+
+ IF AMDWAIT
+     THEN IF LENGTH(VAROUT) + 6 < 72
+              THEN VAROUT = VAROUT || 'DSTGW ';
+              ELSE DO;
+                   VAROUT = VAROUT || '+';
+                   CALL PUTOUT(DEF);
+                   VAROUT = '     ' || 'DSTGW ';
+                   END;
+
+ END COMMONSTATS;
+1/*********************************************************************/
+ /*                                                                   */
+ /* LOWER USAGE PROCEDURES AND                                        */
+ /*                                                                   */
+ /* DUPLICATE ROUTINES FOR VOLUME SET OF FIELDS PROCESSING.  THESE    */
+ /* ROUTINES ARE REQUIRED DUE TO THE DIFFERENCE IN LENGTH OF THE      */
+ /* SEQUENCE FIELD IN THE POINTER TO THE SET OF FIELDS.               */
+ /*                                                                   */
+ /*********************************************************************/
+1V_HORIZONTAL_EXTN:  PROCEDURE(SET) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CHECK FOR A HORIZONTAL EXTENSION RECORD (IE. A RECORD WHICH       */
+ /* CONTINUES THE SET OF FIELDS PTRS).  IF THERE IS HORIZONTAL        */
+ /* EXTENSION(S) THEN PROCESS THEIR SET OF FIELDS PTRS BY CALLING     */
+ /* FIELDSET.  MULTIPLE HORIZONTAL EXTENSIONS ARE ALLOWED FOR BY      */
+ /* RECURSIVE CALL.                                                   */
+ /*                                                                   */
+ /* NOTE THAT THE "V_" PROCEDURES COULD BE 'HARDWIRED' INTO THE       */
+ /* DEF_CANDIDATE PROCEDURE AS THE VOLUME RECORD IS THE ONLY RECORD   */
+ /* WHICH USES THEM.  THEY ARE KEPT SEPERATE WITH THE SAME CALLING    */
+ /* SEQUENCE AS THEIR REGULAR COUNTERPARTS FOR CLARITY SAKE.  IF THEY */
+ /* WERE MADE INTERNAL SET WOULD NOT NEED TO BE PASSED AS A PARAMETER.*/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET  ENTRY(FIXED BINARY) VARIABLE;
+ DECLARE  REC_SAVE  CHAR(505);
+
+
+ IF UNSPEC(V_HORIZONTAL_PTR) = NO
+     THEN RETURN;
+
+ CI_KEY = SUBSTR(V_HORIZONTAL_PTR, 1, 3);
+ READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+
+ REC_SAVE = VSAM_REC;
+ FIELDPTR = ADDR(TRUE_DSNAME);
+
+ CALL V_FIELDSETS(SET);
+
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(TRUE_DSNAME);
+
+ CALL V_HORIZONTAL_EXTN(SET);
+
+ END V_HORIZONTAL_EXTN;
+1V_FIELDSETS:  PROCEDURE(SET) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCESS THE SET OF FIELDS PTRS STACKING ANY WHICH POINT TO A      */
+ /* VERTICAL EXTENSION RECORD (IE. A RECORD WHICH CONTAINS MORE       */
+ /* SET OF FIELDS).  THE VERTICAL EXTENSION RECORDS ARE PROCESSED     */
+ /* AFTER ALL THE FIELDS ON THE PRESENT RECORD ARE PROCESSED.  THIS   */
+ /* IS DONE RECURSIVELY TO ALLOW FOR ALL COMBINATIONS.  THE ACTUAL    */
+ /* SET PROCESSING IS ACCOMPLISHED BY THE CALLING PROCEDURES OWN      */
+ /* SET ROUTINE WHOSE ENTRY IS PASSED AS A PARAMETER.                 */
+ /*                                                                   */
+ /* NOTE THAT THE "V_" PROCEDURES COULD BE 'HARDWIRED' INTO THE       */
+ /* DEF_CANDIDATE PROCEDURE AS THE VOLUME RECORD IS THE ONLY RECORD   */
+ /* WHICH USES THEM.  THEY ARE KEPT SEPERATE WITH THE SAME CALLING    */
+ /* SEQUENCE AS THEIR REGULAR COUNTERPARTS FOR CLARITY SAKE.  IF THEY */
+ /* WERE MADE INTERNAL SET WOULD NOT NEED TO BE PASSED AS A PARAMETER.*/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET  ENTRY(FIXED BINARY) VARIABLE;
+
+ DECLARE  SET#  FIXED BINARY;
+ DECLARE  EXTN  FIXED BINARY;
+ DECLARE  VP    FIXED BINARY INIT(0);
+ DECLARE  VERTPTR(85)  CHAR(3);
+
+ DECLARE  VERTICAL_PTR  CHAR(3) BASED(ADDR(V_VERTICAL_PTR_BASE(SET#)));
+1DO SET# = 1 TO V_#SET_OF_FIELDS_PTRS;
+      IF ªV_DEL_BIT(SET#)  /* IGNORE DELETE SETS */
+          THEN IF V_VERTICAL(SET#)
+                   THEN DO;  /* STACK ONES IN VERTICAL EXTENSION */
+                        VP = VP + 1;
+                        VERTPTR(VP) = VERTICAL_PTR;
+                        END;
+                   ELSE CALL SET(SET#);  /* PROCESS ONES IN THIS REC */
+      END;
+
+ FIELDPTR = ADDR(TRUE_DSNAME);
+
+ /* SORT TO ENABLE REMOVAL OF DUPLICATE VERTICAL EXTENSION PTRS */
+ CALL QCKSORT(VERTPTR, 1, VP);
+
+ /* PROCESS VERTICAL EXTENSION RECORDS */
+ DO EXTN = 1 TO VP;
+     IF EXTN = 1  |  VERTPTR(EXTN) ª= VERTPTR(EXTN-1)
+         THEN DO;
+              CI_KEY = VERTPTR(EXTN);
+              READ FILE(VSAMDIR) INTO(VSAM_REC) KEY(LOW_KEY);
+              CALL V_FIELDSETS(SET);
+              END;
+     END;
+
+ END V_FIELDSETS;
+1GET_TARGET:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE OBTAINS THE CATALOG INFORMATION FOR THE CATALOG    */
+ /* BEING PROCESSED.  THIS INFORMATION APPEARS ON ALL THE CONTROL     */
+ /* CARDS PRODUCED AS OUTPUT.                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ TARGET_CAT = SUBSTR(TRUE_DSNAME, 1, INDEX(TRUE_DSNAME||' ', ' ')-1);
+
+ FIELDPTR = ADDR(RMDR3);
+ REC_SAVE = VSAM_REC;
+
+ CALL FIELDSETS(SET);
+
+ VSAM_REC = REC_SAVE;
+ FIELDPTR = ADDR(RMDR3);
+
+ CALL HORIZONTAL_EXTN(SET);
+
+ /* NECESSARY TO RESET FIELDPTR IF ANY CODE PLACED BELOW THIS POINT */
+1SET:  PROCEDURE(SET#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO GET_TARGET.                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SET#  FIXED BINARY;
+
+ OFFSET = DISPLACEMENT(SET#);
+ SOFPTR = LOADAD(OFFSET, ADDR(BEGIN_SET_OF_FIELDS));
+
+ SELECT(TYPE_CODE(SET#));
+     WHEN('000000'B); /* ASPT */
+     WHEN('000010'B);
+     WHEN('000100'B)  /* PASSWORD SET OF FIELDS */
+         IF MASTER_PSWD ª= NULL_BYTES
+             THEN TARGET_PSWD = SUBSTR(MASTER_PSWD, 1,
+                      INDEX(MASTER_PSWD||' ',  ' ')-1);
+     OTHERWISE DO;
+         PUT SKIP EDIT(ERRIND, '#26') (A);
+         CALL DUMP(DUMPPRT, VSAM_REC, IN_LENGTH, DUMP_OPTIONS);
+         END;
+     END;
+
+ END SET;
+
+ END GET_TARGET;
+
+
+ END VSAMCAT;
+

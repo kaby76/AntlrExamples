@@ -1,0 +1,178 @@
+*PROCESS NM;
+ TITVERT:  PROCEDURE(PARM) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+    INIT('TITVERT V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(4K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM TAKE INPUT OF ANY LRECL AND "WRAPS" OR "UNWRAPS" IT  */
+ /* TO ANY OUTPUT LRECL.  THE INPUT AND OUTPUT ARE SEQUENTIAL BUT     */
+ /* ALSO MAY BE SUBDIVIDED BY TITLE RECORDS.  THE TITLE RECORDS DO    */
+ /* NOT WRAP WITH THE REST OF THE DATA UPON OUTPUT.                   */
+ /*                                                                   */
+ /* AN EXAMPLE OF A USE FOR THIS PROGRAM IS TO STORE PRINT DATA SETS  */
+ /* (LRECL=121,133) IN A PANVALET LIBRARY (MEMBER'S LRECL=80).  MORE  */
+ /* THAN ONE PRINT OUTPUT COULD BE STORED IN A SINGLE MEMBER SINCE IT */
+ /* WOULD BE NECESSARY TO RUN IN THROUGH THIS PROGRAM BEFORE PRINTING */
+ /* IN ANY CASE.  THIS PROGRAM ALLOWS SELECTION OF WHICH PART OF THE  */
+ /* PRINT OUTPUT TO PROCESS BY ITS TITLE.                             */
+ /*                                                                   */
+ /* TITLE FORMAT:                                                     */
+ /* /$TITLE   $/DESCRIPTION                                           */
+ /* /$          - COLUMNS 1-2                                         */
+ /* TITLE       - COLUMNS 3-10                                        */
+ /* $/          - COLUMNS 11-12                                       */
+ /* DESCRIPTION - COLUMNS 13-(72) (IF OUTPUT LRECL < 72 THEN          */
+ /*     THE TITLE WILL BECOME TWO RECORDS ON OUTPUT.  IF INPUT LRECL  */
+ /*     < 72 THEN THE TITLE IS EXPECTED TO BE TWO RECORDS ALTHOUGH    */
+ /*     THE SECOND ONE IS IGNORED.)                                   */
+ /*                                                                   */
+ /* FILES: IN, OUT, WHICH                                             */
+ /*        (DCB ATTRIBUTES MUST BE SPECIFIED FOR "IN" AND "OUT")      */
+ /*                                                                   */
+ /* PARM='/TITLE'   - COPY THE TITLE RECORDS TO THE OUTPUT FILE       */
+ /* PARM=''         - ONLY THE DATA RECORDS ARE TO BE COPIED          */
+ /* PARM='/RETITLE' - INTERACTIVELY CHANGE THE TITLE RECORDS          */
+ /*                                                                   */
+ /* "WHICH" FILE FORMAT:  A(8),X(8),A(8),X(8),...  THIS ALLOWS THE    */
+ /*     NUMBER COLUMNS (73-80) ON JCL CARDS TO BE SKIPPED OVER.       */
+ /* IF THE WHICH FILE IS NULL OR THE DDCARD MISSING THE WHICH FILE    */
+ /* DEFAULTS TO THE VALUE "ALL" OR "ALL" MAY BE ENTERED AS THE ONLY   */
+ /* SELECTION.  ANOTHER SPECIAL VALUE IS "NONE" WHICH SHOULD ONLY BE  */
+ /* USED WITH THE "TITLE" PARM.                                       */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /* EXAMPLES:                                                         */
+ /* 1)  WRAP INPUT TO A SMALLER LRECL (SAY 133 TO 80)                 */
+ /*     A)  MANUALLY PLACE TITLE RECORDS INTO INPUT DATA              */
+ /*     B)  USE PARM='/TITLE' AND A NULL WHICH FILE                   */
+ /*     C)  ALLOC THE OUT FILE WITH LRECL=80                          */
+ /* 2)  LIST ONLY THE TITLES IN THE INPUT FILE                        */
+ /*     A)  USE PARM='/TITLE' AND "NONE" AS INPUT TO WHICH FILE       */
+ /*     B)  TITLES WILL BE DOUBLE SPACED IN OUT FILE                  */
+ /* 3)  UNWRAP A FEW TITLES (SAY BACK FROM 80 TO 133)                 */
+ /*     A)  DO NOT PASS A PARM TO THE PROGRAM                         */
+ /*     B)  SELECT THE TITLES, COLUMNS 1-8, 17-24, 33-40, ETC.        */
+ /*     C)  ALLOC THE OUT FILE WITH LRECL=133                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ DECLARE  SUBSTR  BUILTIN;
+ DECLARE  GETDCB  ENTRY;
+
+ DECLARE  WHICH    FILE STREAM INPUT ENV(RECSIZE(80));
+ DECLARE  OUT      FILE STREAM OUTPUT;
+ DECLARE  IN       FILE RECORD INPUT;
+ DECLARE  SYSIN    FILE STREAM INPUT;
+ DECLARE  SYSPRINT FILE STREAM OUTPUT PRINT;
+1DECLARE  STRT  CHAR(2) STATIC INIT('/$');
+ DECLARE  FIN   CHAR(2) STATIC INIT('$/');
+ DECLARE  YES   BIT(1)  STATIC INIT('1'B);
+ DECLARE  NO    BIT(1)  STATIC INIT('0'B);
+
+ DECLARE  MORE_IN     BIT(1) INIT('1'B);
+ DECLARE  MORE_WHICH  BIT(1) INIT('1'B);
+
+ DECLARE  CHOSEN  CHAR(8);
+ DECLARE  DESC    CHAR(60);
+ DECLARE  TITLE   CHAR(8) INIT(' ');
+ DECLARE  ANSW    CHAR(1);
+ DECLARE  REC     CHAR(*) CONTROLLED;
+
+ DECLARE
+     1  IN_PARM,
+        2  I_RECFM,
+           3  I_FIXED      BIT(1),
+           3  I_VARIABLE   BIT(1),
+           3  I_UNDEFINED  BIT(1),
+           3  I_BLOCKED    BIT(1),
+           3  I_SPANNED    BIT(1),
+           3  I_A_CNTL     BIT(1),
+           3  I_M_CNTL     BIT(1),
+           3  I_TRK_OVFL   BIT(1),
+        2  I_LRECL    FIXED BINARY,
+        2  I_BLKSIZE  FIXED BINARY;
+1ON ENDFILE(IN) MORE_IN = NO;
+ ON ENDFILE(WHICH) MORE_WHICH = NO;
+ ON UNDEFINEDFILE(WHICH) BEGIN;
+     MORE_WHICH = NO;
+     GOTO NOWHICH;
+     END;
+
+ /* FIND IN LRECL AND ALLOCATE REC TO THAT SIZE */
+ CALL GETDCB(IN, IN_PARM);
+ ALLOC REC CHAR(I_LRECL);
+
+ /* SEE IF THEIR IS ANY SELECTION OF TITLES */
+ GET FILE(WHICH) EDIT(CHOSEN) (A(8));
+ NOWHICH:
+ IF ªMORE_WHICH
+     THEN CHOSEN = 'ALL';
+
+ READ FILE(IN) INTO(REC);
+ CONVERT:  /* WRAP OR UNWRAP THE DATA */
+ DO WHILE(MORE_IN);
+
+     /* IS IT A TITLE RECORD? */
+     IF SUBSTR(REC, 1, 2) = STRT  &  SUBSTR(REC, 11, 2) = FIN
+         THEN DO;
+
+              /* IF THE LAST TITLE WAS CHOSEN GET NEXT CHOICE */
+              IF CHOSEN = TITLE
+                  THEN DO;
+                       GET FILE(WHICH) EDIT(CHOSEN) (X(8), A(8));
+                       IF ªMORE_WHICH | CHOSEN = ' '
+                           THEN LEAVE CONVERT;
+                       END;
+
+              /* GET THE PARTS OF THE TITLE RECORD */
+              TITLE = SUBSTR(REC, 3, 8);
+              IF I_LRECL >= 72
+                  THEN DESC = SUBSTR(REC, 13, 60);
+                  ELSE DO;
+                       DESC = SUBSTR(REC, 13);
+                       READ FILE(IN) INTO(REC);
+                       END;
+1             IF PARM = 'RETITLE'
+                  THEN DO;
+                       PUT FILE(SYSPRINT) SKIP EDIT('TITLE/DESC: ',
+                           TITLE, ' ', DESC) (A);
+                       PUT FILE(SYSPRINT) SKIP EDIT('CHANGE? Y/N') (A);
+                       GET FILE(SYSIN) EDIT(ANSW) (A(1));
+                       IF ANSW = 'Y'
+                           THEN DO;
+                                PUT FILE(SYSPRINT) EDIT('TITLE') (A);
+                                GET FILE(SYSIN) EDIT(TITLE) (A(8));
+                                PUT FILE(SYSPRINT) EDIT('DESC') (A);
+                                GET FILE(SYSIN) EDIT(DESC) (A(60));
+                                END;
+                       END;
+
+              /* SHOULD WE OUTPUT THE TITLE RECORD? */
+              IF PARM = 'TITLE' | PARM = 'RETITLE'
+                  THEN PUT FILE(OUT) SKIP
+                           EDIT(STRT, TITLE, FIN, DESC) (A);
+
+              /* DATA OUTPUT SHOULD START ON A NEW RECORD */
+              PUT FILE(OUT) SKIP;
+
+              /* GET FIRST DATA RECORD */
+              READ FILE(IN) INTO(REC);
+              END;
+
+     /* SHOULD THIS DATA BE OUTPUT? */
+     IF (CHOSEN ª= 'NONE')  &  (CHOSEN = 'ALL'  |  CHOSEN = TITLE)
+         THEN PUT FILE(OUT) EDIT(REC) (A);
+
+     READ FILE(IN) INTO(REC);
+
+     END CONVERT;
+
+ END TITVERT;
+

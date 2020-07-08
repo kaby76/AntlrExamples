@@ -1,0 +1,363 @@
+ %DCL FORMAT1 CHAR;
+ %FORMAT1 = 'YES';
+ /********************************************************************/
+ /*                                                                  */
+ /*                     PL/I VERSION OF IECSDSL1                     */
+ /*                                                                  */
+ /*      ******************************************************      */
+ /*                                                                  */
+ /*      BEFORE THE INCLUDE STATEMENT FOR THIS MACRO, THE            */
+ /*      VARIABLES CORRESPONDING TO THE DSCB'S TO BE MAPPED          */
+ /*      MUST BE INITIALIZED IN THE FOLLOWING MANNER -               */
+ /*                                                                  */
+ /*      DSCBPTR MUST BE A POINTER VARIABLE.                         */
+ /*                                                                  */
+ /*      FOR A FORMAT 1 DSCB -                                       */
+ /*      FORMAT1 MUST BE A MACRO VARIABLE SET TO 'YES'.              */
+ /*                                                                  */
+ /*      FOR A FORMAT 2 DSCB -                                       */
+ /*      FORMAT2 MUST BE A MACRO VARIABLE SET TO 'YES'.              */
+ /*                                                                  */
+ /*      FOR A FORMAT 3 DSCB -                                       */
+ /*      FORMAT3 MUST BE A MACRO VARIABLE SET TO 'YES'.              */
+ /*                                                                  */
+ /*      FOR A FORMAT 4 DSCB -                                       */
+ /*      FORMAT4 MUST BE A MACRO VARIABLE SET TO 'YES'.              */
+ /*                                                                  */
+ /*      FOR A FORMAT 5 DSCB -                                       */
+ /*      FORMAT5 MUST BE A MACRO VARIABLE SET TO 'YES'.              */
+ /*                                                                  */
+ /*      FOR A FORMAT 6 DSCB -                                       */
+ /*      FORMAT6 MUST BE A MACRO VARIABLE SET TO 'YES'.              */
+ /*                                                                  */
+ /*      NOTE THAT MORE THAN ONE DSCB CAN BE MAPPED PER INCLUDE      */
+ /*      STATEMENT BY SETTING MORE THAN ONE MACRO VARIABLE TO        */
+ /*      'YES'.  HOWEVER, THE DSCB'S WILL BE MAPPED IN ASCENDING     */
+ /*      NUMERIC SEQUENCE.  TO MAP THE DSCB'S IN NON-ASCENDING       */
+ /*      NUMERIC ORDER, SEPARATE POINTER VARIABLES MUST BE USED.     */
+ /*                                                                  */
+ /********************************************************************/
+ %IF FORMAT1 ª= 'YES'                   /* IF FORMAT1 = YES, THEN    */
+     %THEN %GOTO F2;                    /* BUILD A FORMAT 1 DSCB     */
+ /*                    FORMAT 1 DSCB                                 */
+ DCL 1 IECSDSL1 BASED(DSCBPTR),         /* START OF THE FORMAT 1 DSCB*/
+         2 DS1DSNAM    CHAR(44),        /* DATA SET NAME             */
+         2 DS1FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS1DSSN     CHAR(6),         /* DATA SET SERIAL NUMBER    */
+         2 DS1VOLSQ    CHAR(2),         /* VOLUME SEQUENCE NUMBER    */
+         2 DS1CREDT    CHAR(3),         /* CREATION DATE             */
+         2 DS1EXPDT    CHAR(3),         /* EXPIRATION DATE           */
+         2 DS1NOEPV    CHAR(1),         /* NUMBER OF EXTENTS ON VOL  */
+         2 DS1NOBDB    CHAR(1),         /* NUMBER OF BYTES USED IN
+                                           LAST DIRECTORY BLOCK      */
+         2 FILLER1     CHAR(1),         /* RESERVED                  */
+         2 DS1SYSCD    CHAR(13),        /* SYSTEM CODE               */
+         2 DS1REFD     CHAR(3),         /* DATE LAST         @G60ASBJ*/
+                                        /* REFERENCED OR ZERO@G60ASBJ*/
+                                        /* IF NOT MAINTAINED @G60ASBJ*/
+         2 FILLER2     CHAR(4),         /* RESERVED          @G60ASBJ*/
+         2 DS1DSORG,                    /* DATA SET ORGANIZATION     */
+          3 DS1DSRG1,                   /* FIRST BYTE OF DS1DSORG@01A*/
+           4 DS1DSGIS BIT(1),           /* IS - INDEXED          @01A
+                                           SEQUENTIAL ORGANIZATION   */
+           4 DS1DSGPS BIT(1),           /* PS - PHYSICAL         @01A
+                                           SEQUENTIAL ORGANIZATION   */
+           4 DS1DSGDA BIT(1),           /* DA - DIRECT           @01A
+                                                      ORGANIZATION   */
+           4 DS1DSGCX BIT(1),           /* CX - BTAM OR QTAM LINE@01A
+                                            GROUP                    */
+           4 F1  BIT(1),                /* RESERVED              @01A*/
+           4 F2  BIT(1),                /* RESERVES              @01A*/
+           4 DS1DSGPO BIT(1),           /* PO - PARTITIONED      @01A
+                                            ORGANIZATION             */
+           4 DS1DSGU BIT(1),            /* U - UNMOVABLE, THE    @01A
+                                            DATA CONTAINS LOCATION
+                                            DEPENDENT INFORMATION    */
+          3 DS1DSRG2,                  /* SECOND BYTE OF DS1DSORG@01A*/
+           4 DS1DSGGS BIT(1),           /* GS - GRAPHICS         @01A
+                                            ORGANIZATION             */
+           4 DS1DSGTX BIT(1),           /* TX - TCAM LINE GROUP  @01A*/
+           4 DS1DSGTQ BIT(1),          /* TQ - TCAM MESSAGE QUEUE@01A*/
+           4 F3  BIT(1),                /* RESERVED              @01A*/
+           4 DS1ACBM BIT(1),            /* ACCESS METHOD CONTROL @01A
+                                            BLOCK                    */
+           4 DS1DSGTR BIT(1),           /* TR - TCAM 3705        @01A*/
+           4 F4 BIT(2),                 /*  RESERVED             @01A*/
+         2 DS1RECFM    CHAR(1),         /* RECORD FORMAT             */
+         2 DS1OPTCD    CHAR(1),         /* OPTION CODE               */
+         2 DS1BLKL     CHAR(2),         /* BLOCK LENGTH              */
+         2 DS1LRECL    CHAR(2),         /* RECORD LENGTH             */
+         2 DS1KEYL     CHAR(1),         /* KEY LENGTH                */
+         2 DS1RKP      CHAR(2),         /* RELATIVE KEY POSITION     */
+         2 DS1DSIND,                    /* DATA SET INDICATORS       */
+          3 DS1IND80    BIT(1),         /* LAST VOLUME ON    @G60ASBJ*/
+                                        /* WHICH A DATA SET  @G60ASBJ*/
+                                        /* RESIDES.          @G60ASBJ*/
+          3 DS1IND40    BIT(1),         /* DATA SET IS RACF  @G60ASBJ*/
+                                        /* DEFINED           @G60ASBJ*/
+          3 DS1IND20    BIT(1),         /* BLOCK LENGTH IS A @G60ASBJ*/
+                                        /* MULTIPLE OF 8 BYTE@G60ASBJ*/
+          3 DS1IND10    BIT(1),         /* PASSWORD IS       @G60ASBJ*/
+                                        /* REQUIRED TO READ  @G60ASBJ*/
+                                        /* OR WRITE OR BOTH- @G60ASBJ*/
+                                        /* SEE DS1IND04      @G60ASBJ*/
+          3 DS1IND08    BIT(1),         /* RESERVED.         @G60ASBJ*/
+          3 DS1IND04    BIT(1),         /* IF DS1IND10 IS 1  @G60ASBJ*/
+                                        /* THEN IF DS1IND04  @G60ASBJ*/
+                                        /* IS . . .          @G60ASBJ*/
+                                        /* 1 - PASSWORD IS   @G60ASBJ*/
+                                        /* REQUIRED TO WRITE @G60ASBJ*/
+                                        /* BUT NOT TO READ   @G60ASBJ*/
+                                        /* 0 - PASSWORD IS   @G60ASBJ*/
+                                        /* REQUIRED TO WRITE @G60ASBJ*/
+                                        /* AND TO READ       @G60ASBJ*/
+          3 DS1IND02    BIT(1),         /* DATASET HAS BEEN  @G60ASBJ*/
+                                        /* OPENED FOR OTHER  @G60ASBJ*/
+                                        /* THAN INPUT SINCE  @G60ASBJ*/
+                                        /* LAST BACKUP COPY  @G60ASBJ*/
+                                        /* WAS MADE.         @G60ASBJ*/
+          3 DS1IND01    BIT(1),         /* RESERVED          @ZA46658*/
+         2 DS1SCALO    CHAR(4),         /* SECONDARY ALLOCATION      */
+         2 DS1LSTAR    CHAR(3),         /* LAST USED TRACK AND LAST
+                                           BLOCK ON TRACK            */
+         2 DS1TRBAL    CHAR(2),         /* BYTES REMAINING ON LAST
+                                           TRACK USED                */
+         2 FILLER3     CHAR(2),         /* RESERVED                  */
+         2 DS1EXNTS,                    /* THREE EXTENT FIELDS   @01A*/
+           3 DS1EXT1     CHAR(10),      /* FIRST EXTENT DESCRIP. @01C
+                                           FIRST BYTE
+                                             EXTENT TYPE INDICATOR
+                                           SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER
+                                           THIRD - SIXTH BYTES
+                                             LOWER LIMIT
+                                           SEVENTH - TENTH BYTES
+                                             UPPER LIMIT            */
+           3 DS1EXT2     CHAR(10),      /* SECOND EXTENT DESCRIP.@01C*/
+           3 DS1EXT3     CHAR(10),      /* THIRD EXTENT DESCRIP. @01C*/
+         2 DS1PTRDS    CHAR(5),         /* POSSIBLE PTR TO A FORMAT
+                                           2 OR 3 DSCB               */
+         2 DS1END      CHAR(0);         /* END OF THE FORMAT 1 DSCB  */
+ %F2: ;
+ %IF FORMAT2 ª= 'YES'                   /* IF FORMAT2 = YES, THEN    */
+     %THEN %GOTO F3;                    /* BUILD A FORMAT 2 DSCB     */
+ /*                    FORMAT 2 DSCB                                 */
+ DCL 1 IECSDSL2 BASED(DSCBPTR),         /* START OF THE FORMAT 2 DSCB*/
+         2 FILLER1     CHAR(1),         /* KEY IDENTIFIER            */
+         2 DS22MIND    CHAR(7),         /* ADDRESS OF 2ND LEVEL
+                                           MASTER INDEX              */
+         2 DS2L2MEN    CHAR(5),         /* LAST 2ND LEVEL MASTER
+                                           INDEX ENTRY               */
+         2 DS23MIND    CHAR(7),         /* ADDRESS OF 3RD LEVEL
+                                           MASTER INDEX              */
+         2 DS2L3MIN    CHAR(5),         /* LAST 3RD LEVEL MASTER
+                                           INDEX ENTRY               */
+         2 FILLER2     CHAR(11),        /* RESERVED                  */
+         2 DS2LPDT     CHAR(8),         /* LAST PRIME TRACK ON THE
+                                           LAST PRIME CYLINDER       */
+         2 DS2FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS2NOLEV    CHAR(1),         /* NUMBER OF INDEX LEVELS    */
+         2 DS2DVIND    CHAR(1),         /* HIGH LEVEL INDEX
+                                           DEVELOPMENT INDICATOR     */
+         2 DS21RCYL    CHAR(3),         /* FIRST DATA RECORD ON
+                                           EACH CYLINDER             */
+         2 DS2LTCYL    CHAR(2),         /* LAST DATA TRACK ON
+                                           EACH CYLINDER             */
+         2 DS2CYLOV    CHAR(1),         /* NUMBER OF TRACKS FOR
+                                           CYLINDER OVERFLOW         */
+         2 DS2HIRIN    CHAR(1),         /* HIGHEST 'R' ON HIGH-LEVEL
+                                           INDEX TRACK               */
+         2 DS2HIRPR    CHAR(1),         /* HIGHEST 'R' ON PRIME
+                                           DATA TRACKS               */
+         2 DS2HIROV    CHAR(1),         /* HIGHEST 'R' ON OVERFLOW
+                                           DATA TRACKS               */
+         2 DS2RSHTR    CHAR(1),         /* 'R' OF LAST DATA RECORD
+                                           ON A SHARED TRACK         */
+         2 DS2HIRTI    CHAR(1),         /* HIGHEST 'R' ON UNSHARED
+                                           TRACK OF THE TRACK INDEX  */
+         2 DS2HIIOV    CHAR(1),         /* HIGHEST 'R' FOR INDEPENDENT
+                                           OVERFLOW DATA TRACKS      */
+         2 DS2TAGDT    CHAR(2),         /* TAG DELETION COUNT        */
+         2 DS2RORG3    CHAR(3),         /* NON-FIRST OVERFLOW
+                                           REFERENCE COUNT           */
+         2 DS2NOBYT    CHAR(2),         /* NUMBER OF BYTES FOR
+                                           HIGHEST-LEVEL INDEX       */
+         2 DS2NOTRK    CHAR(1),         /* NUMBER OF TRACKS FOR
+                                           HIGHEST-LEVEL INDEX       */
+         2 DS2PRCTR    CHAR(4),         /* PRIME RECORD COUNT        */
+         2 DS2STIND    CHAR(1),         /* STATUS INDICATORS         */
+         2 DS2CYLAD    CHAR(7),         /* ADDRESS OF CYLINDER INDEX */
+         2 DS2ADLIN    CHAR(7),         /* ADDRESS OF LOWEST LEVEL
+                                           MASTER INDEX              */
+         2 DS2ADHIN    CHAR(7),         /* ADDRESS OF HIGHEST LEVEL
+                                           MASTER INDEX              */
+         2 DS2LPRAD    CHAR(8),         /* LAST PRIME DATA RECORD
+                                           ADDRESS                   */
+         2 DS2LTRAD    CHAR(5),         /* LAST TRACK INDEX ENTRY
+                                           ADDRESS                   */
+         2 DS2LCYAD    CHAR(5),         /* LAST CYLINDER INDEX
+                                           ENTRY ADDRESS             */
+         2 DS2LMSAD    CHAR(5),         /* LAST MASTER INDEX ENTRY
+                                           ADDRESS                   */
+         2 DS2LOVAD    CHAR(8),         /* LAST INDEPENDENT OVERFLOW
+                                           RECORD ADDRESS            */
+         2 DS2BYOVL    CHAR(2),         /* BYTES REMAINING ON
+                                           OVERFLOW TRACK            */
+         2 DS2RORG2    CHAR(2),         /* TRACKS REMAINING IN
+                                           INDEPENDENT OVERFLOW AREA */
+         2 DS2OVRCT    CHAR(2),         /* OVERFLOW RECORD COUNT     */
+         2 DS2RORG1    CHAR(2),         /* CYLINDER OVERFLOW AREA
+                                           COUNT                     */
+         2 DS2NIRT     CHAR(3),         /* DUMMY TRACK INDEX ENTRY
+                                           ADDRESS                   */
+         2 DS2PTRDS    CHAR(5),         /* POSSIBLE POINTER TO A
+                                           FORMAT 3 DSCB             */
+         2 DS2END      CHAR(0);         /* END OF THE FORMAT 2 DSCB  */
+ %F3: ;
+ %IF FORMAT3 ª= 'YES'                   /* IF FORMAT3 = YES, THEN    */
+     %THEN %GOTO F4;                    /* BUILD A FORMAT 3 DSCB     */
+ /*                    FORMAT 3 DSCB                                 */
+ DCL 1 IECSDSL3 BASED(DSCBPTR),         /* START OF THE FORMAT 3 DSCB*/
+         2 FILLER1     CHAR(4),         /* KEY IDENTIFIER            */
+         2 DS3EXTNT    CHAR(40),        /* FOUR EXTENT DESCRIPTIONS
+                                           FIRST BYTE
+                                             EXTENT TYPE INDICATOR
+                                           SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER
+                                           THIRD - SIXTH BYTES
+                                             LOWER LIMIT
+                                           SEVENTH - TENTH BYTES
+                                             UPPER LIMIT             */
+         2 DS3FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS3ADEXT    CHAR(90),        /* NINE ADDITIONAL EXTENT
+                                           DESCRIPTIONS              */
+         2 DS3PTRDS    CHAR(5),         /* RESERVED                  */
+         2 DS3END      CHAR(0);         /* END OF THE FORMAT 3 DSCB  */
+
+ DCL 1 DS3EXTBL(4) DEFINED(DS3EXTNT),   /* ONE EXTENT DESCRIPTION
+                                           (FOUR TIMES)              */
+         2 DS3EXTYP  CHAR(1),           /* FIRST BYTE
+                                             EXTENT TYPE INDICATOR   */
+         2 DS3EXTSN  CHAR(1),           /* SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER  */
+         2 DS3EXTLL  CHAR(4),           /* THIRD - SIXTH BYTES
+                                             LOWER LIMIT             */
+         2 DS3EXTUL  CHAR(4);           /* SEVENTH - TENTH BYTES
+                                             UPPER LIMIT             */
+
+ DCL 1 DS3ADTBL(9) DEFINED(DS3ADEXT),   /* ONE ADDITIONAL EXTENT
+                                           DESCRIPTION (NINE TIMES)  */
+         2 DS3ADTYP  CHAR(1),           /* FIRST BYTE
+                                             EXTENT TYPE INDICATOR   */
+         2 DS3ADTSN  CHAR(1),           /* SECOND BYTE
+                                             EXTENT SEQUENCE NUMBER  */
+         2 DS3ADTLL  CHAR(4),           /* THIRD - SIXTH BYTES
+                                             LOWER LIMIT             */
+         2 DS3ADTUL  CHAR(4);           /* SEVENTH - TENTH BYTES
+                                             UPPER LIMIT             */
+
+ %F4: ;
+ %IF FORMAT4 ª= 'YES'                   /* IF FORMAT4 = YES, THEN    */
+     %THEN %GOTO F5;                    /* BUILD A FORMAT 4 DSCB     */
+ /*                    FORMAT 4 DSCB                                 */
+ DCL 1 IECSDSL4 BASED(DSCBPTR),         /* START OF THE FORMAT 4 DSCB*/
+         2 FILLER1     CHAR(44),
+         2 DS4IDFMT    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS4HPCHR    CHAR(5),         /* HIGHEST ADDRESS OF A
+                                           FORMAT 1 DSCB             */
+         2 DS4DSREC    CHAR(2),         /* NUMBER OF AVAILABLE DSCB'S*/
+         2 DS4HCCHH    CHAR(4),         /* CCHH OF NEXT AVAILABLE
+                                           ALTERNATE TRACK           */
+         2 DS4NOATK    CHAR(2),         /* NUMBER OF REMAINING
+                                           ALTERNATE TRACKS          */
+         2 DS4VTOCI,                    /* VTOC INDICATORS       @01C*/
+          3 DS4DOSBT    BIT(1),         /* DOS BIT               @01A*/
+          3 FILLER2     BIT(2),         /* RESERVED              @01A*/
+          3 DS4DSTKP    BIT(1),         /* DOS STACKED PACK      @01A*/
+          3 DS4DOCVT    BIT(1),         /* DOS CONVERTED VTOC    @01A*/
+          3 DS4DIRF     BIT(1),         /* DIRF BIT              @01A*/
+          3 DS4DICVT    BIT(1),         /* DIRF RECLAIMED        @01A*/
+          3 DS4IVTOC    BIT(1),         /* VOLUME USES AN INDEXED
+                                           VTOC                  @01A*/
+         2 DS4NOEXT    CHAR(1),         /* NUMBER OF EXTENTS IN VTOC */
+         2 FILLER3     CHAR(2),         /* RESERVED                  */
+         2 DS4DEVCT,                    /* DEVICE CONSTANTS          */
+          3 DS4DEVSZ    CHAR(4),        /* DEVICE SIZE               */
+          3 DS4DEVTK    CHAR(2),        /* DEVICE TRACK LENGTH       */
+          3 DS4DEVOV,                   /* KEYED RECORD OVERHEAD     */
+           4 DS4DEVI     CHAR(1),       /* - NON-LAST KEYED RECORD
+                                             OVERHEAD                */
+           4 DS4DEVL     CHAR(1),       /* - LAST KEYED RECORD
+                                             OVERHEAD                */
+          3 DS4DEVK     CHAR(1),        /* NON-KEYED RECORD OVERHEAD
+                                           DIFFERENTIAL              */
+          3 DS4DEVFG    CHAR(1),        /* FLAG BYTE                 */
+          3 DS4DEVTL    CHAR(2),        /* DEVICE TOLERANCE          */
+          3 DS4DEVDT    CHAR(1),        /* NUMBER OF DSCB'S PER TRACK*/
+          3 DS4DEVDB    CHAR(1),        /* NUMBER OF DIRECTORY
+                                           BLOCKS PER TRACK          */
+         2 DS4AMTIM    CHAR(8),         /* VSAM TIME STAMP           */
+         2 DS4AMCAT,                    /* VSAM CATALOG INDICATOR    */
+          3 DS4VSIND,                   /* VSAM INDICATORS           */
+           4 DS4VSREF    BIT(1),        /* A VSAM CATALOG REFERENCES
+                                           THIS VOLUME               */
+           4 DS4VSBAD    BIT(1),        /* VSAM DATA SETS ON VOLUME
+                                           ARE UNUSABLE              */
+           4 FILLER4     BIT(6),        /* RESERVED                  */
+          3 DS4VSCRA    BIT(16)         /* RELATIVE TRACK LOCATION
+                                           OF THE CRA                */
+         2 DS4R2TIM    CHAR(8),         /* VSAM VOLUME/CATALOG MATCH
+                                           TIME STAMP                */
+         2 FILLER5     CHAR(5),         /* RESERVED                  */
+         2 DS4DSCBPTR  CHAR(5),         /* POINTER TO FIRST FORMAT
+                                           6 DSCB                    */
+         2 DS4VTOCE    CHAR(10),        /* VTOC EXTENT DESCRIPTION   */
+         2 FILLER6     CHAR(25),        /* RESERVED                  */
+         2 DS4END      CHAR(0);         /* END OF THE FORMAT 4 DSCB  */
+ %F5: ;
+ %IF FORMAT5 ª= 'YES'                   /* IF FORMAT5 = YES, THEN    */
+     %THEN %GOTO F6;                    /* BUILD A FORMAT 5 DSCB     */
+ /*                    FORMAT 5 DSCB                                 */
+ DCL 1 IECSDSL5 BASED(DSCBPTR),         /* START OF THE FORMAT 5 DSCB*/
+         2 DS5KEYID    CHAR(4),         /* KEY IDENTIFIER            */
+         2 DS5AVEXT    CHAR(5),         /* AVAILABLE EXTENT
+                                           BYTES 1 - 2
+                                             RELATIVE TRACK ADDRESS
+                                             OF THE FIRST TRACK IN
+                                             THE EXTENT
+                                           BYTES 3 - 4
+                                             NUMBER OF UNUSED
+                                             CYLINDERS IN THE EXTENT
+                                           BYTE 5
+                                             NUMBER OF ADDITIONAL
+                                             UNUSED TRACKS           */
+         2 DS5EXTAV    CHAR(35),        /* SEVEN AVAILABLE EXTENTS   */
+         2 DS5FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS5MAVET    CHAR(90),        /* EIGHTEEN AVAILABLE EXTENTS*/
+         2 DS5PTRDS    CHAR(5),         /* POINTER TO NEXT FORMAT 5
+                                           DSCB                      */
+         2 DS5END      CHAR(0);         /* END OF THE FORMAT 5 DSCB  */
+ %F6: ;
+ %IF FORMAT6 ª= 'YES'                   /* IF FORMAT6 = YES, THEN    */
+     %THEN %GOTO MACROEND;              /* BUILD A FORMAT 6 DSCB     */
+ /*                    FORMAT 6 DSCB                                 */
+ DCL 1 IECSDSL6 BASED(DSCBPTR),         /* START OF THE FORMAT 6 DSCB*/
+         2 DS6KEYID    CHAR(4),         /* KEY IDENTIFIER            */
+         2 DS6AVEXT    CHAR(5),         /* SHARED EXTENT DESCRIPTION
+                                           BYTES 1 - 2
+                                             RELATIVE TRACK ADDRESS
+                                             OF THE FIRST CYLINDER
+                                           BYTES 3 - 4
+                                             NUMBER OF FULL
+                                             CYLINDERS BEING SHARED
+                                           BYTE 5
+                                             NUMBER OF DATA SETS
+                                             SHARING THE EXTENT      */
+         2 DS6EXTAV    CHAR(35),        /* SEVEN SHARED EXTENTS      */
+         2 DS6FMTID    CHAR(1),         /* FORMAT IDENTIFIER         */
+         2 DS6MAVET    CHAR(90),        /* EIGHTEEN SHARED EXTENTS   */
+         2 DS6PTRDS    CHAR(5),         /* POINTER TO NEXT FORMAT 6
+                                           DSCB                      */
+         2 DS6END      CHAR(0);         /* END OF THE FORMAT 6 DSCB  */
+ %MACROEND: ;
+

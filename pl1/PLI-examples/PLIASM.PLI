@@ -1,0 +1,896 @@
+*PROCESS;
+ PLIASM:  PROCEDURE OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PLIASM  V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(9) VARYING INIT('ISA(200K)') STATIC EXTERNAL;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THE PURPOSE OF THIS PROGRAM IS TO TAKE A PL/I PROGRAM AND DO      */
+ /* INITIAL PREPARATION FOR CONVERSION TO ASSEMBLER LANGUAGE CODE.    */
+ /* TO DO THIS IT RELIES ON THE OPTIMIZING COMPLILER TO PROVIDE THE   */
+ /* ASM CODE.  THIS PROGRAM TAKES A PL/I PROGRAM LISTING WITH THE     */
+ /* LIST OPTION SPECIFIED AND RECONSTRUCTS THAT INTO AN ASM FORMAT    */
+ /* DATASET.  TO HELP IN THE CONVERSION THE PL/I CODE IS INCLUDED     */
+ /* BEFORE THE ASM CODE IN COMMENT FORM AND AN XREF INDEX OF COMPILER */
+ /* LABELS IS PRODUCED.  THIS IS MERELY THE FIRST DRAFT OF A MORE     */
+ /* AMBITIOUS PROJECT WHICH ONE DAY MAY DEVELOP INTO A CROSS LANGUAGE */
+ /* TRANSLATOR.                                                       */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /*  THE FOLLOWING JCL IS WHAT IS NECESSARY TO RUN THIS PROGRAM:      */
+ /*                                                                   */
+ /*  //COMP    EXEC PLIXC,PARM.PLI='NM,A,X,AG,LC(60),LIST,MAP'        */
+ /*  //PLI.SYSPRINT DD DSN=&&LISTING,UNIT=SYSDA,SPACE=(CYL,(1,1)),    */
+ /*  //            DISP=(,PASS),DCB=(RECFM=VBA,LRECL=125,BLKSIZE=6125)*/
+ /*  //PLIASM  EXEC PGM=PLIASM,COND=(8,LE)                            */
+ /*  //LISTING  DD DSN=&&LISTING,DISP=(OLD,DELETE)                    */
+ /*  //COMMENT  DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //ASMLIST  DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //SORTIN   DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //SORTOUT  DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //SORTWK01 DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //SORTWK02 DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //SORTWK03 DD UNIT=SYSDA,SPACE=(CYL,(1,1))                       */
+ /*  //ASMPGM   DD DSN=ASMPGM.ASM,DISP=(,CATLG),UNIT=DISK,            */
+ /*  //         DD VOL=SER=TSO010,SPACE=(TRK,(30,10),RLSE),           */
+ /*  //         DD DCB=BLKSIZE=6160                                   */
+ /*  //SYSPRINT DD SYSOUT=*                                           */
+ /*  //SORTMSG  DD SYSOUT=*                                           */
+ /*                                                                   */
+ /*                                                                   */
+ /* REQUIRED FILES:                                                   */
+ /* FILE      EXPLANATION                                             */
+ /* ====      ===========                                             */
+ /* LISTING   CONTAINS COMPILER OUTPUT / INPUT TO PLIASM              */
+ /* COMMENT   SOURCE PLI IN ASM COMMENT FORM / WORK FILE              */
+ /* ASMLIST   PSEUDO ASM SOURCE CODE LISTING / WORK FILE              */
+ /* SORTIN    COMMENT FILE WITH SEQ NO ATTACHED / WORK FILE           */
+ /* SORTOUT   COMMENT FILE SORTED BY SEQ NO /WORK FILE                */
+ /* SORTMSG   MESSAGES FROM SORT ROUTINE / SORT OUTPUT                */
+ /* SORTWK01  REQUIRED FOR SORT / WORK FILE                           */
+ /* SORTWK02  REQUIRED FOR SORT / WORK FILE                           */
+ /* SORTWK03  REQUIRED FOR SORT / WORK FILE                           */
+ /* SYSPRINT  ERROR MESSAGE FILE / EXCEPTION REPORT                   */
+ /* ASMPGM    PSEUDO ASM SOURCE CODE LISTING WITH COMMENTS            */
+ /*           XREF LISTINGS:  COMPILER LABELS, SEQ, STMT              */
+ /*           / PLIASM OUTPUT                                         */
+ /*                                                                   */
+ /*********************************************************************/
+1/* ENTRY DECLARATIONS */
+ DECLARE  LINK  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (ADDR, STRING, SUBSTR, NULL, INDEX, PLIRETV, UNSPEC)  BUILTIN;
+
+ /* POINTER DECLARATIONS */
+ DECLARE  LBL_START  PTR STATIC INIT(NULL);
+ DECLARE  LS_PTR     PTR;
+ DECLARE  OS_PTR     PTR;
+
+ /* FIXED BINARY DECLARATIONS */
+ /* SUBSCRIPT FOR SAVE_COL2 */
+ DECLARE  SC2  FIXED BINARY(31);
+ /* SUBSCRIPT FOR STMT_ORDER */
+ DECLARE  SO   FIXED BINARY(31) STATIC INIT(1);
+ DECLARE  (I, J, K)  FIXED BINARY(31);
+
+ /* CHARACTER DECLARATIONS */
+ DECLARE  SAVE_STMT_NO  CHAR(8) STATIC INIT('       1');
+ DECLARE  SAVE_SEQ_NO   CHAR(8) STATIC INIT('       0');
+ DECLARE  LBL_OCCURED   CHAR(8);
+ DECLARE  SCAN_OPRD     CHAR(58);
+ DECLARE  NO_STMTS  PIC '(8)9';
+ DECLARE  EDIT_SO   PIC '(7)Z9';
+
+ /* BIT STRING DECLARATIONS */
+ DECLARE  YES  BIT(1) STATIC INIT('1'B);
+ DECLARE  NO   BIT(1) STATIC INIT('0'B);
+ DECLARE  MORE_LISTING  BIT(1);
+ DECLARE  MORE_SORTOUT  BIT(1);
+ DECLARE  MORE_ASMLIST  BIT(1);
+ DECLARE  MORE_COMMENT  BIT(1);
+
+ /* FILE DECLARATIONS */
+ DECLARE  LISTING  FILE RECORD INPUT ENVIRONMENT(VB);
+ DECLARE  (SORTIN, SORTOUT)  FILE RECORD
+          ENVIRONMENT(FB RECSIZE(90) BLKSIZE(6210));
+ DECLARE  (COMMENT, ASMLIST)  FILE
+          ENVIRONMENT(FB RECSIZE(80) BLKSIZE(6160));
+ DECLARE  ASMPGM   FILE RECORD ENVIRONMENT(FB RECSIZE(80));
+ DECLARE  SYSPRINT FILE STREAM OUTPUT PRINT;
+1/* THE REAL AREA WHICH LISTING IS READ INTO */
+ DECLARE  INPUT_AREA  CHAR(121);
+
+ DECLARE  /* MAP FOR THE PL/I SOURCE CODE IN THE PL/I PART OFLISTING */
+     1  INPUT_LISTING  DEFINED INPUT_AREA,
+        2  PAGE_CTL    CHAR(1),
+        2  IN_STMT_NO  CHAR(8),
+        2  FILLER      CHAR(9),
+        2  LT_MARGIN   CHAR(1),
+        2  IN_SOURCE   CHAR(71),
+        2  RT_MARGIN   CHAR(1),
+        2  FILLER2     CHAR(30);
+
+ DECLARE  /* MAP FOR COMMENTS IN THE ASM PART OF LISTING */
+     1  OBJECT_COMMENTS  DEFINED INPUT_AREA,
+        2  FILLER           CHAR(1),
+        2  OBJ_COMMENT1,
+           3  STAR1         CHAR(2),
+           3  EXPLANATION1  CHAR(56),
+           3  FILLER        CHAR(2),
+        2  OBJ_COMMENT2,
+           3  STAR2         CHAR(2),
+           3  FILLER        CHAR(57);
+
+ DECLARE  /* MAP FOR ASM CODE IN THE ASM PART OF LISTING */
+     1  OBJECT_CODE  DEFINED INPUT_AREA,
+        2  FILLER    CHAR(27),
+        2  LABEL1    CHAR(8),
+        2  OPCODE1   CHAR(6),
+        2  OPRANDS1  CHAR(18),
+        2  FILLER2   CHAR(28),
+        2  COL2      CHAR(32),
+        2  FILLER3   CHAR(1);
+
+ /* TEMPORARY WORK AREA SO THAT COLUMN TWO OF ASM PART OF LISTING
+    MAY BE PROCESSED AFTER COLUMN ONE, WHICH IS PROCESSED AS IT */
+ DECLARE  /* IS READ IN */
+     1  SAVE_COL2(57),
+        2  LABEL2    CHAR(8),
+        2  OPCODE2   CHAR(6),
+        2  OPRANDS2  CHAR(18),
+        2  FILLER    CHAR(25);
+
+ DECLARE  /* MAP FOR COMMENTS IN THE ASM PART OF LISTING COL 2 */
+     1  SAVE_COMMENT2(57) DEFINED SAVE_COL2,
+        2  SAVE_STAR      CHAR(2),
+        2  EXPLANATION2   CHAR(55);
+1DECLARE  /* INPUT/OUTPUT AREA FOR AN ASM TYPE STATEMENT */
+     1  ASM_AREA,
+        2  POS1     CHAR(1),
+        2  SOURCE   CHAR(71),
+        2  STMT_NO  CHAR(8);
+
+ DECLARE  /* MAP TO CONSTRUCT AN ASM STATEMENT FROM THE LISTING */
+     1  CODE_AREA  DEFINED ASM_AREA,
+        2  LABEL   CHAR(8),
+        2  OPCODE  CHAR(6),
+        2  OPRD1   CHAR(18),
+        2  OPRD2   CHAR(18),
+        2  OPRD3   CHAR(18),
+        2  RMDR    CHAR(4),
+        2  FILLER  CHAR(8);
+
+ DECLARE  /* MAP TO FILL IN STMT NO COMMENTS WITH SEQ NO */
+     1  NUMBER_STMT  DEFINED ASM_AREA,
+        2  FILLER        CHAR(2),
+        2  STATEMENT_NO  CHAR(16),
+        2  FILLER2       CHAR(12),
+        2  SEQUENCE_NO   CHAR(15),
+        2  FILLER3       CHAR(1),
+        2  SEQ_NUM       CHAR(8),
+        2  FILLER4       CHAR(26);
+
+ DECLARE  /* RECORD AREA FOR SORTING PL/I SOURCE FOR COMMENTS */
+     1  SORT_FILE,
+        2 SORT_RECORD,
+            3  S_POS1     CHAR(1),
+            3  S_SOURCE   CHAR(71),
+            3  S_STMT_NO  CHAR(8),
+        2   SORT_SEQUENCE,
+            3  S_SEQ_NO   CHAR(8),
+            3  S_SUB_SEQ  FIXED BINARY;
+
+ DECLARE  /* CONTROL PARAMETER FOR SORT PROGRAM */
+     1  SORT_PARM           STATIC,
+        2  BYTE_COUNT       FIXED BINARY  INIT(28),
+        2  BEGIN_SORT_STMT  PTR,
+        2  END_SORT_STMT    PTR,
+        2  BEGIN_REC_STMT   PTR,
+        2  END_REC_STMT     PTR,
+        2  ADDR_E15         FIXED BINARY(31)  INIT(0),
+        2  ADDR_E35         FIXED BINARY(31)  INIT(0),
+        2  STORAGE          FIXED BINARY(31)  INIT(131072),
+        2  SORTCARD  CHAR(25)  INIT(' SORT FIELDS=(81,10,CH,A)'),
+        2  RECCARD   CHAR(24)  INIT(' RECORD LENGTH=90,TYPE=F'),
+        2  RECEND    CHAR(1)   INIT(' ');
+1DECLARE  /* CONFIGURATION OF THE COMPILER LABEL BINARY TREE */
+     1  LBL_SEG BASED(LS_PTR),
+        2  LT_PTR      PTR,
+        2  RT_PTR      PTR,
+        2  OCCURS_PTR  PTR,
+        2  LBL         CHAR(8),
+        2  DEFN_STMT   CHAR(8);
+
+ DECLARE  /* CONFIGURATION OF THE OCCUR LIST OFF THE LABEL BIN TREE */
+     1  OCCURS_SEG  BASED(OS_PTR),
+        2   OCCURENCE(10)    CHAR(8),
+        2   NEXT_OCCURS_SEG  PTR;
+
+ DECLARE  /* FRAME FOR STATEMENT/SEQUENCE NUMBER XREF LISTING LINE */
+     1  XREF_LINE    STATIC,
+        2   FILLER0  CHAR(1)  INIT('*'),
+        2   FILLER1  CHAR(9)  INIT('  INDEX='),
+        2   INDEXNO  CHAR(8),
+        2   FILLER2  CHAR(13) INIT(',       STMT='),
+        2   STMTNUM  CHAR(8),
+        2   FILLER3  CHAR(12) INIT(',       SEQ='),
+        2   SEQNUMB  CHAR(8),
+        2   FILLER4  CHAR(21) INIT(' ');
+
+ DECLARE  /* FRAME FOR COMPILER LABEL XREF LISTING LINE */
+     1  CL_LINE STATIC,
+        2   FILLER0   CHAR(1) INIT('*'),
+        2   DEFNSTMT  CHAR(8),
+        2   FILLER1   CHAR(2) INIT(' '),
+        2   LABELNAME CHAR(8),
+        2   OCCURNUM1 CHAR(8),
+        2   OCCURNUM2 CHAR(8),
+        2   OCCURNUM3 CHAR(8),
+        2   OCCURNUM4 CHAR(8),
+        2   OCCURNUM5 CHAR(8),
+        2   FILLER2   CHAR(21) INIT(' ');
+1ON ENDFILE(LISTING) MORE_LISTING = NO;
+
+ MORE_LISTING = YES;
+ POS1 = '*';
+
+ /* INPUT THE PL/I SOURCE FOR COMMENTS TO THE ASM PROGRAM */
+ CALL READ_LISTING;
+ DO WHILE((IN_STMT_NO ª= 'DCL NO.') & MORE_LISTING);
+     IF LT_MARGIN = '|' & RT_MARGIN = '|' & (IN_SOURCE ª= ' ')
+         THEN DO;
+              SOURCE = IN_SOURCE;
+              IF IN_STMT_NO ª= ' '
+                  THEN SAVE_STMT_NO = IN_STMT_NO;
+              STMT_NO = SAVE_STMT_NO;
+              PUT FILE(COMMENT) EDIT(ASM_AREA) (A);
+              END;
+     CALL READ_LISTING;
+     END;
+
+ NO_STMTS = SAVE_STMT_NO;
+ CLOSE FILE(COMMENT);
+1BEGIN_BLOCK:  BEGIN;
+ /* NEW BLOCK TO PROCESS COMMENT OUTPUT AS INPUT AND TO ALLOCATE
+    WORK STORAGE NOW THAT WE KNOW HOW MAY STATEMENTS ARE IN THE
+    PL/I PROGRAM */
+
+ DECLARE  STMT_ORDER(NO_STMTS)  CHAR(8);
+ DECLARE  SEQ_ORDER(NO_STMTS)   CHAR(8);
+ DECLARE  SORT_STMT(NO_STMTS)   DEFINED SEQ_ORDER PIC '(7)Z9';
+
+ ON ENDFILE(COMMENT) MORE_COMMENT = NO;
+
+ /* INITIALIZE STMT_ORDER */
+ DO I = 1 TO NO_STMTS;
+     STMT_ORDER(I) = '       0';
+     END;
+
+
+
+ /* FUTURE PLACE TO PROCESS OTHER PARTS OF LISTING SUCH AS THE MAP
+    OUTPUT TO GENERATE STORAGE AREAS */
+ /* FOR NOW SKIP DOWN TO ASM/OBJ LISTING */
+ DO WHILE((EXPLANATION1 ª= 'OBJECT LISTING') & MORE_LISTING);
+     CALL READ_LISTING;
+     END;
+
+
+1/* SAVE COLUMN TWO WHICH STARTS BEFORE COLUMN ONE ON FIRST PAGE */
+ SC2 = 1;
+ IF STAR2 = '*'
+     THEN STRING(SAVE_COL2(SC2)) = STRING(OBJ_COMMENT2);
+     ELSE STRING(SAVE_COL2(SC2)) = COL2;
+ SC2 = SC2 + 1;
+ CALL READ_LISTING;
+ IF STAR2 = '*'
+     THEN STRING(SAVE_COL2(SC2)) = STRING(OBJ_COMMENT2);
+     ELSE STRING(SAVE_COL2(SC2)) = COL2;
+ SC2 = SC2 + 1;
+ CALL READ_LISTING;
+ IF STAR2 = '*'
+     THEN STRING(SAVE_COL2(SC2)) = STRING(OBJ_COMMENT2);
+     ELSE STRING(SAVE_COL2(SC2)) = COL2;
+ SC2 = SC2 + 1;
+ CALL READ_LISTING;
+
+ /* INITIALIZE */
+ STRING(ASM_AREA) = ' ';
+
+
+ SOURCE_WHILE:  /* PROCESS UNTIL END OF LISTING */
+ DO WHILE((STRING(OBJ_COMMENT1) ª= 'COMPILER DIAGNOSTIC MESSAGES')
+     & MORE_LISTING);
+ /* LOOP NOT INDENTED */
+1PAGE_WHILE:  /* PROCESS ONE PAGE OF LISTING, DEFER COLUMN TWO */
+ DO WHILE((PAGE_CTL ª= '1') & MORE_LISTING);
+
+     /* PROCESS COLUMN ONE OF THE ASM LISTING */
+     IF STAR1 = '*'
+
+         /* PROCESS AS A COMMENT */
+         THEN COL1_COM:  DO;
+              CALL PUTOUT;
+              STRING(ASM_AREA) = STRING(OBJ_COMMENT1);
+              IF STATEMENT_NO = 'STATEMENT NUMBER'
+                  THEN DO;
+                       EDIT_SO = SO;
+                       SEQUENCE_NO = 'SEQUENCE NUMBER';
+                       SEQ_NUM = EDIT_SO;
+                       STMT_ORDER(SO) =
+                           RIGHT_JUSTIFY(SUBSTR(EXPLANATION1, 18, 8));
+                       SO = SO + 1;
+                       END;
+              END COL1_COM;
+1        /* PROCESS AS AN ASM STATEMENT */
+         ELSE COL1_NOT_COM:  DO;
+              IF LABEL1 ª= ' '
+                  THEN  CALL ADDLBL(LABEL1);
+              IF OPCODE1 ª= ' '
+                  /* FIRST LINE OR ONE LINE ASM STATEMENT */
+                  THEN DO;
+                       CALL PUTOUT;
+                       LABEL = LABEL1;
+                       OPCODE = OPCODE1;
+                       OPRD1 = OPRANDS1;
+                       END;
+                  /* CONTINUATION OF AN ASM STATEMTENT */
+                  ELSE IF OPRANDS1 ª= ' '
+                           THEN SELECT;
+                                    WHEN (OPRD2 = ' ') OPRD2 = OPRANDS1;
+                                    WHEN (OPRD3 = ' ') OPRD3 = OPRANDS1;
+                                    OTHERWISE DO;
+                                        I = INDEX(OPRANDS1, ' ');
+                                        IF I < 5
+                                            THEN RMDR = OPRANDS1;
+                                            ELSE DO;
+                                                 CALL PUTOUT;
+                                                 OPRD1 = OPRANDS1;
+                                                 END;
+                                        END;
+                                    END;
+              END COL1_NOT_COM;
+
+     /* SAVE COLUMN TWO OF THE ASM LISTING UNTIL DONE WITH COLUMN ONE */
+     IF STAR2 = '*'
+         THEN STRING(SAVE_COL2(SC2)) = STRING(OBJ_COMMENT2);
+         ELSE STRING(SAVE_COL2(SC2)) = COL2;
+     SC2 = SC2 + 1;
+
+     CALL READ_LISTING;
+     END PAGE_WHILE;
+1DEFERED_COL:  /* PROCESS COLUMN TWO THAT WAS DEFERED IN PAGE_WHILE */
+ DO SC2 = 1 TO 57;
+
+     /* PROCESS COLUMN TWO OF THE ASM LISTING */
+     IF SAVE_STAR(SC2) = '*'
+
+         /* PROCESS AS A COMMENT */
+         THEN COL2_COM:  DO;
+              CALL PUTOUT;
+              STRING(ASM_AREA) = STRING(SAVE_COL2(SC2));
+              IF STATEMENT_NO = 'STATEMENT NUMBER'
+                  THEN DO;
+                       EDIT_SO = SO;
+                       SEQUENCE_NO = 'SEQUENCE NUMBER';
+                       SEQ_NUM = EDIT_SO;
+                       STMT_ORDER(SO) =
+                          RIGHT_JUSTIFY(SUBSTR(EXPLANATION2(SC2),18,8));
+                       SO = SO + 1;
+                       END;
+              END COL2_COM;
+
+1        /* PROCESS AS AN ASM STATEMENT */
+         ELSE COL2_NOT_COM:  DO;
+              IF LABEL2(SC2) ª= ' '
+                  THEN CALL ADDLBL(LABEL2(SC2));
+              IF OPCODE2(SC2) ª= ' '
+                  /* FIRST LINE OR ONE LINE ASM STATEMENT */
+                  THEN DO;
+                       CALL PUTOUT;
+                       LABEL = LABEL2(SC2);
+                       OPCODE = OPCODE2(SC2);
+                       OPRD1 = OPRANDS2(SC2);
+                       END;
+                  /* CONTINUATION OF AN ASM STATEMTENT */
+                  ELSE IF OPRANDS2(SC2) ª= ' '
+                           THEN SELECT;
+                                    WHEN(OPRD2 = ' ')
+                                       OPRD2 = OPRANDS2(SC2);
+                                    WHEN(OPRD3 = ' ')
+                                        OPRD3 = OPRANDS2(SC2);
+                                    OTHERWISE DO;
+                                        CALL PUTOUT;
+                                        OPRD1 = OPRANDS2(SC2);
+                                        END;
+                                    END;
+              END COL2_NOT_COM;
+
+     END DEFERED_COL;
+
+ /* REINITIALIZE FOR NEXT TIME AROUND */
+ DO I = 1 TO 57;
+     STRING(SAVE_COL2(SC2)) = ' ';
+     END;
+ SC2 = 1;
+
+ CALL READ_LISTING;
+ END SOURCE_WHILE;
+1CLOSE FILE(ASMLIST);
+
+ /* INITIALIZE SEQ_ORDER (DEFINED SORT_STMT) */
+ DO I = 1 TO NO_STMTS;
+     SORT_STMT(I) = 0;
+     END;
+
+ /* FILL IN VALUES FOR SEQ_ORDER (DEFINED SORT_STMT) */
+ DO I = 1 TO NO_STMTS;
+     IF STMT_ORDER(I) ª= '       0'
+         THEN SORT_STMT(STMT_ORDER(I)) = I;
+     END;
+
+ /* INITIALIZE */
+ MORE_COMMENT = YES;
+ S_SUB_SEQ = 0;
+
+ READ FILE(COMMENT) INTO(ASM_AREA);
+ CREATE_SORTIN:  /* CREATE SORTIN FROM THE PL/I SOURCE IN COMMENT */
+ DO WHILE(MORE_COMMENT);
+     S_POS1 = POS1;
+     S_SOURCE = SOURCE;
+     S_STMT_NO = STMT_NO;
+     IF SEQ_ORDER(STMT_NO) = '       0'
+         THEN S_SEQ_NO = SAVE_SEQ_NO;
+         ELSE DO;
+              S_SEQ_NO = SEQ_ORDER(STMT_NO);
+              SAVE_SEQ_NO = SEQ_ORDER(STMT_NO);
+              END;
+     S_SUB_SEQ = S_SUB_SEQ + 1;
+     WRITE FILE(SORTIN) FROM(SORT_FILE);
+     IF UNSPEC(S_SUB_SEQ) = '0111111111111111'B
+         THEN S_SUB_SEQ = 0;
+     READ FILE(COMMENT) INTO(ASM_AREA);
+     END CREATE_SORTIN;
+
+ /* SORT THE PL/I SOURCE INTO THE ORDER OF THE PSEUDO ASM CODE */
+ CLOSE FILE(SORTIN);
+ BEGIN_SORT_STMT = ADDR(SORTCARD);
+ END_SORT_STMT   = ADDR(RECCARD);
+ BEGIN_REC_STMT  = ADDR(RECCARD);
+ END_REC_STMT    = ADDR(RECEND);
+ CALL LINK('SORT    ', SORT_PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT EDIT('SORT ERROR, RETURN CODE=', PLIRETV) (A, F(4));
+          SIGNAL ERROR;
+          END;
+1BEGIN_BLOCK2:  BEGIN;
+ /* REINITIALIZE ENDFILE FOR SORTOUT SO WE CAN READ IT */
+
+ ON ENDFILE(SORTOUT) MORE_SORTOUT = NO;
+ ON ENDFILE(ASMLIST) MORE_ASMLIST = NO;
+
+ /* INITIALIZE */
+ SAVE_SEQ_NO = '       0';
+ MORE_SORTOUT = YES;
+ MORE_ASMLIST = YES;
+
+ READ FILE(SORTOUT) INTO(SORT_FILE);
+ READ FILE(ASMLIST) INTO(ASM_AREA);
+ MERGE:  /* MERGE THE ASMLIST WITH THE SORTED PL/I SOURCE COMMENTS */
+ DO WHILE(MORE_ASMLIST);
+     IF SEQUENCE_NO = 'SEQUENCE NUMBER'
+         THEN ADD_COM:  DO;
+
+              DO WHILE((SEQ_NUM > S_SEQ_NO) & MORE_SORTOUT);
+                  WRITE FILE(ASMPGM) FROM(SORT_RECORD);
+                  READ FILE(SORTOUT) INTO(SORT_FILE);
+                  END;
+
+              SAVE_SEQ_NO = SEQ_NUM;
+              WRITE FILE(ASMPGM) FROM(ASM_AREA);
+
+              DO WHILE((SEQ_NUM = S_SEQ_NO) & MORE_SORTOUT);
+                  WRITE FILE(ASMPGM) FROM(SORT_RECORD);
+                  READ FILE(SORTOUT) INTO(SORT_FILE);
+                  END;
+              END ADD_COM;
+
+         ELSE ADD_CODE:  DO;
+              CALL SCAN_OPERAND;
+              WRITE FILE(ASMPGM) FROM(ASM_AREA);
+              END ADD_CODE;
+
+     READ FILE(ASMLIST) INTO(ASM_AREA);
+     END MERGE;
+1/* OUTPUT ANYTHING OF PL/I SOURCE LEFT OVER FROM MERGE */
+ DO WHILE(MORE_SORTOUT);
+     WRITE FILE(ASMPGM) FROM(SORT_RECORD);
+     READ FILE(SORTOUT) INTO(SORT_FILE);
+     END;
+
+ /* ADD STATEMENT/SEQUENCE XREF LISTING */
+ DO I = 1 TO NO_STMTS;
+     EDIT_SO = I;
+     INDEXNO = EDIT_SO;
+     SEQNUMB = SEQ_ORDER(I);
+     STMTNUM = STMT_ORDER(I);
+     WRITE FILE(ASMPGM) FROM(XREF_LINE);
+     END;
+
+ /* ADD COMPILER LABEL XREF LISTING */
+ CALL PRINT_COMP_LABELS(LBL_START);
+
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1SCAN_OPERAND:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE FINDS ALL COMPILER LABELS IN THE OPERAND FIELD OF  */
+ /* AN INSTRUCTION.  IF ANY ARE FOUND IT CALLS FIND_LABEL TO UPDATE   */
+ /* THE LIST OF COMPILER LABELS.                                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ SCAN_OPRD = OPRD1 || OPRD2 || OPRD3 || RMDR;
+ I = INDEX(SCAN_OPRD, 'CL.');
+
+ DO WHILE(I > 0);
+     J = INDEX(SUBSTR(SCAN_OPRD, I+4), ' ');
+     K = INDEX(SUBSTR(SCAN_OPRD, I+4), ',');
+     IF J > K
+         THEN J = J + I + 3;
+         ELSE J = K + I + 3;
+     LBL_OCCURED = SUBSTR(SCAN_OPRD, I, J-I);
+     CALL FIND_LABEL(LBL_START);
+     SCAN_OPRD = SUBSTR(SCAN_OPRD, J+1);
+     I = INDEX(SCAN_OPRD, 'CL.');
+     END;
+
+ END SCAN_OPERAND;
+1FIND_LABEL:  PROCEDURE(SEG_PTR)  RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE FINDS A COMPILER LABEL IN THE BINARY TREE LIST     */
+ /* STRUCTURE LBL_SEG.  IF IT IS NOT IN THE BINARY TREE PORTION IT IS */
+ /* ADDED AND THEN ITS OCCURENCE IS LISTED, IF IT IS FOUND ITS        */
+ /* OCCURENCE IS LISTED.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SEG_PTR  PTR;
+
+ SELECT;
+
+     /* LEFT SUBTREE */
+     WHEN(SEG_PTR-> LBL  >  LBL_OCCURED)
+         IF SEG_PTR-> LT_PTR = NULL
+             THEN DO;
+                  ALLOCATE LBL_SEG;
+                  SEG_PTR-> LT_PTR = LS_PTR;
+                  LT_PTR = NULL;
+                  RT_PTR = NULL;
+                  OCCURS_PTR = NULL;
+                  LBL = LBL_OCCURED;
+                  DEFN_STMT = '********';
+                  CALL FIND_LABEL(LS_PTR);
+                  END;
+             ELSE CALL FIND_LABEL(SEG_PTR-> LT_PTR);
+1    /* RIGHT SUBTREE */
+     WHEN(SEG_PTR-> LBL  <  LBL_OCCURED)
+         IF SEG_PTR-> RT_PTR = NULL
+             THEN DO;
+                  ALLOCATE LBL_SEG;
+                  SEG_PTR-> RT_PTR = LS_PTR;
+                  LT_PTR = NULL;
+                  RT_PTR = NULL;
+                  OCCURS_PTR = NULL;
+                  LBL = LBL_OCCURED;
+                  DEFN_STMT = '********';
+                  CALL FIND_LABEL(LS_PTR);
+                  END;
+             ELSE CALL FIND_LABEL(SEG_PTR-> RT_PTR);
+
+     /* FOUND IT */
+     OTHERWISE
+         IF SEG_PTR-> OCCURS_PTR  =  NULL
+             THEN DO;
+                  ALLOCATE OCCURS_SEG;
+                  SEG_PTR-> OCCURS_PTR = OS_PTR;
+                  OCCURENCE(1) = SAVE_SEQ_NO;
+                  NEXT_OCCURS_SEG = NULL;
+                  DO I = 2 TO 10;
+                      OCCURENCE(I) = ' ';
+                      END;
+                  END;
+             ELSE CALL ADD_OCCURENCE(SEG_PTR-> OCCURS_PTR);
+     END;
+
+ END FIND_LABEL;
+1ADD_OCCURENCE:  PROCEDURE(PASSED_PTR)  RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE ADDS A COMPILER LABEL OCCURENCE TO THE LIST OF     */
+ /* OCCURENCES.  NOTE THAT 10 OCCURENCES ARE GROUPED TO AN OCCURENCE  */
+ /* SEGMENT.                                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PASSED_PTR  PTR;
+
+ OS_PTR = PASSED_PTR;
+ IF NEXT_OCCURS_SEG ª= NULL
+     THEN DO;
+          CALL ADD_OCCURENCE(NEXT_OCCURS_SEG);
+          RETURN;
+          END;
+
+ DO I = 2 TO 10  WHILE(OCCURENCE(I) ª= ' ');
+     END;
+
+ IF I = 11
+     THEN DO;
+          ALLOCATE OCCURS_SEG;
+          PASSED_PTR-> NEXT_OCCURS_SEG = OS_PTR;
+          OCCURENCE(1) = SAVE_SEQ_NO;
+          NEXT_OCCURS_SEG = NULL;
+          DO I = 2 TO 10;
+              OCCURENCE(I) = ' ';
+              END;
+          END;
+     ELSE OCCURENCE(I) = SAVE_SEQ_NO;
+
+ END ADD_OCCURENCE;
+
+
+ END BEGIN_BLOCK2;
+1ADDLBL:  PROCEDURE(LABEL);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS THE INTERFACE TO THE RECURSIVE PROCEDURES       */
+ /* LCHILD AND RCHILD.  THE PURPOSE OF THIS SET OF PROCEDURES IS TO   */
+ /* ADD THE DEFINITION OF A COMPILER LABEL TO THE BINARY TREE WHICH   */
+ /* HOLDS THEIR DEFINITION AND LISTS THEIR OCCURENCES.                */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  LABEL  CHAR(*);
+
+ IF LBL_START = NULL
+
+     /* START TREE */
+     THEN DO;
+          ALLOCATE LBL_SEG;
+          LBL_START = LS_PTR;
+          LT_PTR = NULL;
+          RT_PTR = NULL;
+          DEFN_STMT = STMT_ORDER(SO-1);
+          OCCURS_PTR = NULL;
+          LBL = LABEL;
+          END;
+
+     /* ADD TO TREE */
+     ELSE IF LABEL  <  LBL_START-> LBL
+              THEN CALL LCHILD(LBL_START);
+              ELSE CALL RCHILD(LBL_START);
+1LCHILD:  PROCEDURE(LAST_PTR) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DESCENDS THE LEFT SUBTREE OF THE BINARY TREE OF    */
+ /* COMPILER LABELS.  IT IS MUTUALLY RECURSIVE WITH RCHILD AND        */
+ /* INTERNAL TO ADDLBL.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  LAST_PTR  PTR;
+
+ IF LAST_PTR-> LT_PTR  =  NULL
+     THEN DO;
+          ALLOCATE LBL_SEG;
+          LAST_PTR-> LT_PTR = LS_PTR;
+          LT_PTR = NULL;
+          RT_PTR = NULL;
+          OCCURS_PTR = NULL;
+          LBL = LABEL;
+          DEFN_STMT = STMT_ORDER(SO-1);
+          RETURN;
+          END;
+
+ IF LABEL  <   LAST_PTR-> LT_PTR-> LBL
+     THEN CALL LCHILD(LAST_PTR-> LT_PTR);
+     ELSE CALL RCHILD(LAST_PTR-> LT_PTR);
+
+ END LCHILD;
+1RCHILD:  PROCEDURE(LAST_PTR) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DESCENDS THE RIGHT SUBTREE OF THE BINARY TREE OF   */
+ /* COMPILER LABELS.  IT IS MUTUALLY RECURSIVE WITH LCHILD AND        */
+ /* INTERNAL TO ADDLBL.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  LAST_PTR  PTR;
+
+ IF LAST_PTR-> RT_PTR = NULL
+     THEN DO;
+          ALLOCATE LBL_SEG;
+          LAST_PTR-> RT_PTR = LS_PTR;
+          LT_PTR = NULL;
+          RT_PTR = NULL;
+          OCCURS_PTR = NULL;
+          LBL = LABEL;
+          DEFN_STMT = STMT_ORDER(SO-1);
+          RETURN;
+          END;
+
+ IF LABEL < LAST_PTR-> RT_PTR-> LBL
+     THEN CALL LCHILD(LAST_PTR-> RT_PTR);
+     ELSE CALL RCHILD(LAST_PTR-> RT_PTR);
+
+ END RCHILD;
+
+
+ END ADDLBL;
+1RIGHT_JUSTIFY:  PROCEDURE(INPUT) RETURNS(CHAR(8));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE RIGHT JUSTIFIES A EIGHT DIGIT NUMERIC FIELD WHICH  */
+ /* IS PASSED AS CHARACTER AND RETURNED AS CHARACTER.                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE INPUT CHAR(*);
+ DECLARE FIELD CHAR(8);
+
+ FIELD = INPUT;
+
+ DO I = 1 BY 1 WHILE(SUBSTR(FIELD, 8, 1) = ' ');
+     FIELD = ' ' || FIELD;
+     END;
+
+ RETURN(FIELD);
+
+ END RIGHT_JUSTIFY;
+1PUTOUT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DOES ALL OUTPUT TO THE ASMLIST FILE.               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF STRING(ASM_AREA) ª= ' '
+     THEN DO;
+          PUT FILE(ASMLIST) EDIT(ASM_AREA) (A);
+          STRING(ASM_AREA) = ' ';
+          END;
+
+ END PUTOUT;
+
+
+ END BEGIN_BLOCK;
+1READ_LISTING:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DOES ALL THE INPUT FROM THE COMPILER LISTING OF    */
+ /* THE PROGRAM BEING PROCESSED.                                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ INPUT_AREA = ' ';
+ READ FILE(LISTING) INTO(INPUT_AREA);
+
+ END READ_LISTING;
+1PRINT_COMP_LABELS:  PROCEDURE(LS_PTR) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DOES A PREORDER TRAVERSAL OF THE BINARY TREE WHICH */
+ /* CONTAINS THE COMPILER LABELS.  THIS PROCEDURE IS DONE AT THE END  */
+ /* OF THE PROCESSING TO PRODUCE THE XREF INDEX OF THE LABELS.  WHEN  */
+ /* A NODE IS VISITED THE PRINT_OCCURENCES PROCEDURE IS EXECUTED TO   */
+ /* FORMAT THE OCCURENCES ON THE LINE AFTER ITS DEFINITION.           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  LS_PTR  PTR;
+
+ DECLARE
+     1  LBL_SEG BASED(LS_PTR),
+        2  LT_PTR      PTR,
+        2  RT_PTR      PTR,
+        2  OCCURS_PTR  PTR,
+        2  LBL         CHAR(8),
+        2  DEFN_STMT   CHAR(8);
+
+ IF LT_PTR ª= NULL
+     THEN CALL PRINT_COMP_LABELS(LT_PTR);
+
+ DEFNSTMT = DEFN_STMT;
+ LABELNAME= LBL;
+ CALL PRINT_OCCURENCES(OCCURS_PTR);
+
+ IF RT_PTR ª= NULL
+     THEN CALL PRINT_COMP_LABELS(RT_PTR);
+1PRINT_OCCURENCES:  PROCEDURE(OS_PTR) RECURSIVE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE FORMATS ALL THE OCCURENCES OF A COMPILER LABEL FOR */
+ /* OUTPUT WITH THE PSEUDO ASM PROGRAM.                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  OS_PTR  PTR;
+
+ DECLARE
+     1  OCCURS_SEG  BASED(OS_PTR),
+        2   OCCURENCE(10)  CHAR(8),
+        2   NEXT_OCCURS_SEG  PTR;
+
+ IF OS_PTR = NULL
+     THEN DO;
+          OCCURNUM1 = ' ';
+          OCCURNUM2 = ' ';
+          OCCURNUM3 = ' ';
+          OCCURNUM4 = ' ';
+          OCCURNUM5 = ' ';
+          WRITE FILE(ASMPGM) FROM(CL_LINE);
+          RETURN;
+          END;
+
+ /* OUTPUT FIRST FIVE OCCURENCES */
+ OCCURNUM1 = OCCURENCE(1);
+ OCCURNUM2 = OCCURENCE(2);
+ OCCURNUM3 = OCCURENCE(3);
+ OCCURNUM4 = OCCURENCE(4);
+ OCCURNUM5 = OCCURENCE(5);
+ WRITE FILE(ASMPGM) FROM(CL_LINE);
+1IF OCCURENCE(6) = ' '
+     THEN RETURN;
+
+ /* OUTPUT SECOND FIVE OCCURENCES */
+ DEFNSTMT = ' ';
+ LABELNAME= ' ';
+ OCCURNUM1 = OCCURENCE(6);
+ OCCURNUM2 = OCCURENCE(7);
+ OCCURNUM3 = OCCURENCE(8);
+ OCCURNUM4 = OCCURENCE(9);
+ OCCURNUM5 = OCCURENCE(10);
+ WRITE FILE(ASMPGM) FROM(CL_LINE);
+
+ IF NEXT_OCCURS_SEG ª= NULL
+     THEN CALL PRINT_OCCURENCES(NEXT_OCCURS_SEG);
+
+ END PRINT_OCCURENCES;
+
+ END PRINT_COMP_LABELS;
+
+
+ END PLIASM;
+

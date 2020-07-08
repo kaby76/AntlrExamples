@@ -1,0 +1,43 @@
+*PROCESS NM;
+ PDSEXIT:  PROCEDURE(EXITOUT, STRING, CURRMEM) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PDSEXIT V1.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PDSEXIT IS ANY USER EXIT WRITTEN FOR PDSPRINT.  THE MODULE IS     */
+ /* LINK EDITTED SEPARATE FROM PDSPRINT AND IS FETCHED WHEN THE       */
+ /* USEREXIT OPTION IS SELECTED.                                      */
+ /*                                                                   */
+ /* THE FIRST PARM EXITOUT IS AN OUTPUT FILE WHICH MAY BE USED FOR    */
+ /* ANY TYPE DCB CHARACTERISTICS AND MAY BE EITHER STREAM OR RECORD.  */
+ /*                                                                   */
+ /* THE SECOND PARM STRING IS THE CURRENT RECORD IN THE CURRENT       */
+ /* MEMBER.                                                           */
+ /*                                                                   */
+ /* THE THIRD PARM CURRMEM IS THE NAME OF THE CURRENT MEMBER.         */
+ /*                                                                   */
+ /* THIS ROUTINE UNLOADS A PDS INTO SEQUENTIAL IEBUPDTE 80 BYTE       */
+ /* FORMAT.                                                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  EXITOUT  FILE VARIABLE;
+ DECLARE  CURRMEM  CHAR(*);
+ DECLARE  STRING   CHAR(*) VARYING;
+
+ DECLARE  LASTMEM  CHAR(8) STATIC INIT('');
+ DECLARE  REC      CHAR(80);
+
+ IF LASTMEM ^= CURRMEM
+     THEN DO;
+          LASTMEM = CURRMEM;
+          REC = './       ADD  NAME=' ]] CURRMEM;
+          WRITE FILE(EXITOUT) FROM(REC);
+          END;
+
+ REC = STRING;
+ WRITE FILE(EXITOUT) FROM(REC);
+
+ END PDSEXIT;
+

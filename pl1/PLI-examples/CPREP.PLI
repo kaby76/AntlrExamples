@@ -1,0 +1,64 @@
+*PROCESS NM;
+ CPREP:  PROCEDURE(PARM) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(33) VARYING STATIC EXTERNAL
+    INIT('CPREP V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(4K)');
+ /*********************************************************************/
+ /*                                                                   */
+ /* C LANGUAGE PRE-PREPROCESSOR.  THE PURPOSE IS TO CHANGE › TO       */
+ /* A LEFT BRACKET AND | TO A RIGHT BRACKET.  LOCAL INCLUDES ARE      */
+ /* ALSO CONVERTED TO MEMBER NAMES TO THE DATA SET NAME PASSED AS A   */
+ /* PARM.  NO VERIFICATION OF ANYTHING IS DONE.                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PARM  CHAR(*) VARYING;
+
+ DECLARE  SYSIN    FILE RECORD INPUT  ENV(RECSIZE(80));
+ DECLARE  SYSOUT   FILE RECORD OUTPUT ENV(RECSIZE(80));
+ DECLARE  (ADDR, INDEX, SUBSTR)  BUILTIN;
+
+ DECLARE  MORE_SYSIN  BIT(1) INIT('1'B);
+ DECLARE  NO          BIT(1)  STATIC INIT('0'B);
+
+ DECLARE  POS  FIXED BINARY(31);
+ DECLARE  LEN  FIXED BINARY(31);
+ DECLARE  MEM  CHAR(8) VARYING;
+ DECLARE  REC  CHAR(80);
+ DECLARE  LEFT_INIT      BIT(8)  STATIC INIT('10101101'B);
+ DECLARE  LEFT_BRACKET   CHAR(1) BASED(ADDR(LEFT_INIT));
+ DECLARE  RIGHT_INIT     BIT(8)  STATIC INIT('10111101'B);
+ DECLARE  RIGHT_BRACKET  CHAR(1) BASED(ADDR(RIGHT_INIT));
+1ON ENDFILE(SYSIN) MORE_SYSIN = NO;
+
+ READ FILE(SYSIN) INTO(REC);
+ DO WHILE(MORE_SYSIN);
+     POS = INDEX(REC, '›');
+     DO WHILE(POS ª= 0);
+         SUBSTR(REC, POS, 1) = LEFT_BRACKET;
+         POS = INDEX(REC, '›');
+         END;
+
+     POS = INDEX(REC, '|');
+     DO WHILE(POS ª= 0);
+         SUBSTR(REC, POS, 1) = RIGHT_BRACKET;
+         POS = INDEX(REC, '|');
+         END;
+
+     POS = INDEX(REC, '"');
+     IF ((POS ª= 0) & (SUBSTR(REC, 1, 8) = '#include'))
+         THEN DO;
+              POS = POS + 1;
+              LEN = INDEX(SUBSTR(REC, POS), '"');
+              LEN = LEN - 3;
+              MEM = SUBSTR(REC, POS, LEN) || '$H';
+              SUBSTR(REC, POS) = '''' || PARM || '(' || MEM || ')''"';
+              END;
+
+     WRITE FILE(SYSOUT) FROM(REC);
+     READ FILE(SYSIN) INTO(REC);
+     END;
+
+ END CPREP;
+

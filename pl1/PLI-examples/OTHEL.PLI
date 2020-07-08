@@ -1,0 +1,737 @@
+*PROCESS NM;
+ OTHEL:  PROCEDURE OPTIONS(MAIN) REORDER;
+
+ DECLARE  PGMID    CHAR(11) VARYING STATIC EXTERNAL
+     INIT('OTHEL V1.1 BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(8)  VARYING STATIC EXTERNAL INIT('ISA(16K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS IS AN ARRAY REPRESENTATION OF OTHELLO FOR ONE AGAINST THE    */
+ /* COMPUTER.                                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE
+     1  MOVES(30),
+        2  MOVESI   FIXED BINARY,
+        2  MOVESJ   FIXED BINARY;
+
+ DECLARE
+     1  MOVE,
+        2  MOVEI    FIXED BINARY,
+        2  MOVEJ    FIXED BINARY;
+
+ DECLARE
+     1  CORNERS(4) STATIC,
+        2  CORNI    FIXED BINARY INIT(2, 2, 9, 9),
+        2  CORNJ    FIXED BINARY INIT(2, 9, 2, 9);
+
+ DECLARE
+     1  AROUND(8)  STATIC,
+        2  AROUNDI  FIXED BINARY INIT(-1, 0, 1, 1, 1, 0, -1, -1),
+        2  AROUNDJ  FIXED BINARY INIT(-1, -1, -1, 0, 1, 1, 1, 0);
+1DECLARE  NUM_FLIP(30)      FIXED BINARY(31);
+ DECLARE  PLAYER_COLOR      FIXED BINARY;
+ DECLARE  COMP_COLOR        FIXED BINARY;
+ DECLARE  #CORNERS          FIXED BINARY;
+ DECLARE  #FOR_PLAYER       FIXED BINARY;
+ DECLARE  #FOR_COMP         FIXED BINARY;
+ DECLARE  DIRECTION(8, 30)  FIXED BINARY;
+ DECLARE  FAVORED           FIXED BINARY;
+ DECLARE  #MOVES            FIXED BINARY;
+ DECLARE  P_POSIBLE_MOVES   FIXED BINARY;
+ DECLARE  C_POSIBLE_MOVES   FIXED BINARY;
+ DECLARE  DIR_COUNT(30)     FIXED BINARY;
+ DECLARE  I                 FIXED BINARY;
+ DECLARE  J                 FIXED BINARY;
+ DECLARE  BOARD(10, 10)     FIXED BINARY;
+
+ DECLARE  SYSIN      FILE STREAM INPUT;
+ DECLARE  SYSPRINT   FILE STREAM OUTPUT PRINT;
+
+ DECLARE  YES        BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO         BIT(1) INIT('0'B) STATIC;
+ DECLARE  PLAYER     BIT(1) STATIC;
+ DECLARE  GOT_MOVE   BIT(1) STATIC;
+
+ DECLARE  ANSW       CHAR(4);
+1ANSW = 'YES';
+
+ DO WHILE(ANSW = 'YES');
+     DO I = 1 TO 10;
+          DO J = 1 TO 10;
+               IF I = 1 ] I = 10 ] J = 1 ] J = 10
+                   THEN BOARD(I, J) = 100;
+                   ELSE BOARD(I, J) = 0;
+               END;
+          END;
+     BOARD(5, 5) = 1;
+     BOARD(6, 5) = -1;
+     BOARD(5, 6) = -1;
+     BOARD(6, 6) = 1;
+
+     CALL GETANSW('THIS IS OTHELLO.  DO YOU WISH TO GO FIRST?');
+
+     IF ANSW = 'NO'
+         THEN DO;
+              PUT FILE(SYSPRINT) SKIP EDIT('YOU WILL BE BLACK.') (A);
+              PLAYER_COLOR = -1;
+              COMP_COLOR = 1;
+              CALL HANDCAP;
+              /* COMPUTER'S FIRST MOVE */
+              BOARD(7, 5) = COMP_COLOR;
+              BOARD(6, 5) = COMP_COLOR;
+              #MOVES = #CORNERS + 1;
+              CALL BOARD_PRINT(BOARD, #MOVES, #CORNERS);
+              END;
+         ELSE DO;
+              PUT FILE(SYSPRINT) SKIP EDIT('YOU WILL BE WHITE.') (A);
+              PLAYER_COLOR = 1;
+              COMP_COLOR = -1;
+              CALL HANDCAP;
+              #MOVES = #CORNERS;
+              CALL BOARD_PRINT(BOARD, #MOVES, #CORNERS);
+              END;
+1    PLAYER = YES;
+
+     MOVE_LOOP:  /* EXECUTE THIS LOOP WHILE POSSIBLE MOVES EXIST */
+     DO WHILE(#MOVES < 60);
+         IF PLAYER
+             THEN DO;
+                  CALL FIND_MOVES(BOARD, COMP_COLOR, MOVES, DIRECTION,
+                      DIR_COUNT, P_POSIBLE_MOVES, NUM_FLIP);
+                  IF P_POSIBLE_MOVES = 0
+                      THEN PUT FILE(SYSPRINT) SKIP
+                               EDIT('YOU CAN''T MOVE') (A);
+                      ELSE CALL PLAYER_MOVE;
+                  PLAYER = NO;
+                  END;
+             ELSE DO;
+                  CALL FIND_MOVES(BOARD, PLAYER_COLOR, MOVES, DIRECTION,
+                      DIR_COUNT, C_POSIBLE_MOVES, NUM_FLIP);
+                  IF C_POSIBLE_MOVES = 0
+                      THEN IF P_POSIBLE_MOVES = 0
+                               THEN DO;
+                                    PUT FILE(SYSPRINT) SKIP EDIT
+                                        ('NEITHER OF US CAN MOVE') (A);
+                                    LEAVE MOVE_LOOP;
+                                    END;
+                               ELSE PUT FILE(SYSPRINT) SKIP
+                                        EDIT('I CAN''T MOVE') (A);
+                      ELSE CALL COMPUTER_MOVE;
+                  PLAYER = YES;
+                  END;
+         END MOVE_LOOP;
+
+     #FOR_PLAYER = COUNT(BOARD, PLAYER_COLOR);
+     #FOR_COMP = COUNT(BOARD, COMP_COLOR);
+
+     SELECT;
+         WHEN(#FOR_PLAYER > #FOR_COMP) PUT FILE(SYSPRINT) SKIP
+             EDIT('CONGRATULATIONS TURKEY YOU WON') (A);
+         WHEN(#FOR_PLAYER < #FOR_COMP) PUT FILE(SYSPRINT) SKIP
+             EDIT('SORRY GUY YOU LOST...') (A);
+         OTHERWISE PUT FILE(SYSPRINT) SKIP
+             EDIT('TIED THAT ONE UP PRETTY TIGHT') (A);
+         END;
+     CALL GETANSW('DO YOU WANT TO PLAY AGAIN?');
+     END;
+1PLAYER_MOVE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE OBTAINS THE POSITION THE PLAYER WISHES TO MOVE AND */
+ /* VERIFIES THAT IT IS A VALID MOVE.  IT THEN PROCESSES THE MOVE.    */
+ /*                                                                   */
+ /*********************************************************************/
+
+ GOT_MOVE = NO;
+ PUT FILE(SYSPRINT) SKIP EDIT('WHAT IS YOUR MOVE? (I,J).') (A);
+ GET FILE(SYSIN) LIST(MOVEJ, MOVEI);
+
+ DO UNTIL(GOT_MOVE);
+     MOVEI = MOVEI + 1;
+     MOVEJ = MOVEJ + 1;
+     DO J = 1 TO P_POSIBLE_MOVES;
+         IF MOVESI(J) = MOVEI & MOVESJ(J) = MOVEJ
+             THEN DO;
+                  GOT_MOVE = YES;
+                  CALL BOARD_CHANGE(MOVES, J, BOARD,
+                      PLAYER_COLOR, DIRECTION, DIR_COUNT);
+                  #MOVES = #MOVES + 1;
+                  CALL BOARD_PRINT(BOARD, #MOVES, #CORNERS);
+                  END;
+         END;
+     IF ^GOT_MOVE
+         THEN DO;
+              PUT FILE(SYSPRINT) SKIP EDIT('INVALID MOVE, REENTER.')(A);
+              GET FILE(SYSIN) LIST(MOVEJ, MOVEI);
+              END;
+     END;
+
+ END PLAYER_MOVE;
+1COMPUTER_MOVE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*  THIS PROCEDURE IS THE SEQUENCE LOGIC FOR DETERMINING THE         */
+ /*  COMPUTER MOVE AND EXECUTING IT.                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+ CALL BEST_MOVE(BOARD, #MOVES, NUM_FLIP, DIRECTION, DIR_COUNT,
+     C_POSIBLE_MOVES, FAVORED);
+
+ PUT FILE(SYSPRINT) SKIP
+     EDIT('MY MOVE IS:  ', MOVESJ(FAVORED)-1, ' ', MOVESI(FAVORED)-1)
+     (A, F(1), A, F(1));
+
+ CALL BOARD_CHANGE(MOVES, FAVORED, BOARD, COMP_COLOR,
+     DIRECTION, DIR_COUNT);
+
+ #MOVES = #MOVES + 1;
+
+ CALL BOARD_PRINT(BOARD, #MOVES, #CORNERS);
+
+ END COMPUTER_MOVE;
+1FIND_MOVES:  PROCEDURE(BOARD, OPONENT_COLOR, MOVES, DIRECTION,
+     DIR_COUNT, POSIBLE_MOVES, NUM_FLIP);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE DETERMINES WHAT THE VALID MOVES ARE FOR EITHER THE */
+ /* PLAYER OR THE COMPUTER.                                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  BOARD(10, 10)  FIXED BINARY;
+ DECLARE  OPONENT_COLOR  FIXED BINARY;
+
+ DECLARE
+     1  MOVES(30),
+        2  MOVESI  FIXED BINARY,
+        2  MOVESJ  FIXED BINARY;
+
+ DECLARE  DIRECTION(8, 30)  FIXED BINARY;
+ DECLARE  DIR_COUNT(30)  FIXED BINARY;
+ DECLARE  POSIBLE_MOVES  FIXED BINARY;
+ DECLARE  NUM_FLIP(30)  FIXED BINARY(31);
+
+
+ DECLARE
+     1  POS,
+        2  POSI   FIXED BINARY,
+        2  POSJ   FIXED BINARY;
+
+ DECLARE
+     1  IJ,
+        2  I   FIXED BINARY,
+        2  J   FIXED BINARY;
+
+ DECLARE  INCR  FIXED BINARY;
+ DECLARE  GOT_SOMETHING  BIT(1);
+ DECLARE  D  FIXED BINARY;
+
+
+ /* INITIALIZE ARRAYS */
+ DIR_COUNT = 0;
+ NUM_FLIP = 0;
+
+ POSIBLE_MOVES = 0;
+1/* LOOK AT ALL POSIBLE POSITIONS */
+ DO I = 2 TO 9;
+     DO J = 2 TO 9;
+         /* IF A POSITION IS EMPTY */
+         IF BOARD(I, J) = 0
+             THEN DO;
+                  GOT_SOMETHING = NO;
+                  DO D = 1 TO 8;
+                      /* IF A SURROUNDING POS IS OTHER'S */
+                      IF BOARD(I+AROUNDI(D),J+AROUNDJ(D)) =OPONENT_COLOR
+                          THEN DO;
+                               INCR = 1;
+                               /* FIND END TO OTHER'S (EMPTY, EDGE, OR
+                                  CALLER'S COLOR) */
+                               DO UNTIL(BOARD(POSI, POSJ) ^=
+                                 OPONENT_COLOR);
+                                   INCR = INCR + 1;
+                                   POS = IJ + INCR * AROUND(D);
+                                   END;
+                               /* IF CALLER'S (NOT EMPTY NOR AN EDGE) */
+                               IF BOARD(POSI, POSJ) = -OPONENT_COLOR
+                                   THEN DO;
+                                        IF ^GOT_SOMETHING
+                                            THEN DO;
+                                                 POSIBLE_MOVES =
+                                                     POSIBLE_MOVES + 1;
+                                                 GOT_SOMETHING = YES;
+                                                 END;
+                                        NUM_FLIP(POSIBLE_MOVES) = INCR +
+                                            NUM_FLIP(POSIBLE_MOVES);
+                                        DIR_COUNT(POSIBLE_MOVES) =
+                                            DIR_COUNT(POSIBLE_MOVES)+1;
+                                        DIRECTION(
+                                            DIR_COUNT(POSIBLE_MOVES),
+                                            POSIBLE_MOVES) = D;
+                                        END;
+                               END;
+                      END;
+                  IF GOT_SOMETHING
+                      THEN DO;
+                           MOVESI(POSIBLE_MOVES) = I;
+                           MOVESJ(POSIBLE_MOVES) = J;
+                           END;
+                  END;
+         END;
+     END;
+ END FIND_MOVES;
+1BOARD_PRINT:  PROCEDURE(BOARD, #MOVES, #CORNERS);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PRINTS THE BOARD AFTER A MOVE IS MADE.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  FSMODE  ENTRY OPTIONS(ASM, INTER);
+
+ DECLARE  BOARD(10, 10)  FIXED BINARY;
+ DECLARE  #MOVES         FIXED BINARY;
+ DECLARE  #CORNERS       FIXED BINARY;
+
+ DECLARE  POUT(10, 10)  CHAR(1);
+ DECLARE  OUT(3)  CHAR(1) STATIC INIT('B',' ','W');
+ DECLARE  I  FIXED BINARY;
+ DECLARE  J  FIXED BINARY;
+
+
+ DELAY(3000);
+ CALL FSMODE('CLEAR');
+ PUT FILE(SYSPRINT) SKIP EDIT('BOARD POSITION AFTER ', #MOVES-#CORNERS,
+     ' MOVES') (A, F(2), A);
+ PUT FILE(SYSPRINT) SKIP EDIT(' J = 1  2  3  4  5  6  7  8') (A);
+ PUT FILE(SYSPRINT) SKIP EDIT(' I') (A);
+ PUT FILE(SYSPRINT) SKIP EDIT(' "') (A);
+
+ /* SET UP CHAR BOARD */
+ DO I = 2 TO 9;
+     DO J = 2 TO 9;
+         POUT(I, J) = OUT(BOARD(I, J)+2);
+         END;
+     END;
+
+ /* PRINT CHAR BOARD */
+ DO J = 2 TO 9;
+     PUT FILE(SYSPRINT) EDIT(J-1, (POUT(I, J) DO I = 2 TO 9))
+         (COL(1), X(1), F(1), X(3), 8(A(1), X(2)), SKIP(1));
+     END;
+
+ DELAY(1000);
+
+ END BOARD_PRINT;
+1BOARD_CHANGE:  PROCEDURE(MOVES, FAVORED, BOARD, CALLER_COLOR,
+     DIRECTION, DIR_COUNT);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PROCESSES A BOARD CHANGE, EITHER FOR REAL OR FOR   */
+ /* DETERMINING COMPUTER MOVES.                                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE
+     1  MOVES(30),
+        2  MOVESI  FIXED BINARY,
+        2  MOVESJ  FIXED BINARY;
+
+ DECLARE  FAVORED       FIXED BINARY;
+ DECLARE  BOARD(10, 10) FIXED BINARY;
+ DECLARE  CALLER_COLOR  FIXED BINARY;
+ DECLARE  DIRECTION(8, 30) FIXED BINARY;
+ DECLARE  DIR_COUNT(30) FIXED BINARY;
+
+ DECLARE
+     1  POS,
+        2  POSI   FIXED BINARY,
+        2  POSJ   FIXED BINARY;
+
+ DECLARE  INCR  FIXED BINARY;
+ DECLARE  DC    FIXED BINARY;
+
+
+ BOARD(MOVESI(FAVORED), MOVESJ(FAVORED)) = CALLER_COLOR;
+
+ DO DC = 1 TO DIR_COUNT(FAVORED);
+      INCR = 1;
+      POS = MOVES(FAVORED) + INCR * AROUND(DIRECTION(DC, FAVORED));
+      DO WHILE(BOARD(POSI, POSJ) ^= CALLER_COLOR);
+          BOARD(POSI, POSJ) = CALLER_COLOR;
+          INCR = INCR + 1;
+          POS = MOVES(FAVORED) + INCR * AROUND(DIRECTION(DC, FAVORED));
+          END;
+      END;
+
+ END BOARD_CHANGE;
+1GETANSW:  PROCEDURE(MSG);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PROCESSES CONVERSATION OUTPUT/INPUT AND TRANSLATES */
+ /* TO UPPER CASE.                                                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  MSG  CHAR(*);
+ DECLARE  UNSPEC BUILTIN;
+
+ PUT FILE(SYSPRINT) SKIP EDIT(MSG) (A);
+ GET FILE(SYSIN) EDIT(ANSW) (A(4));
+ UNSPEC(ANSW) = UNSPEC(ANSW) ] (4) '01000000'B;
+ SELECT(ANSW);
+     WHEN('Y') ANSW = 'YES';
+     WHEN('YE') ANSW = 'YES';
+     WHEN('N') ANSW = 'NO';
+     OTHERWISE;
+     END;
+
+ END GETANSW;
+1COUNT:  PROCEDURE(BOARD, CALLER_COLOR) RETURNS(FIXED BINARY);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE COUNTS HOW MANY POSITIONS A CONTENDER OCCUPIES.    */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  BOARD(10, 10) FIXED BINARY;
+ DECLARE  CALLER_COLOR  FIXED BINARY;
+
+ DECLARE  OCCURS  FIXED BINARY;
+ DECLARE  J  FIXED BINARY;
+ DECLARE  I  FIXED BINARY;
+
+
+ OCCURS = 0;
+ DO I = 2 TO 9;
+      DO J = 2 TO 9;
+           IF BOARD(I, J) = CALLER_COLOR
+               THEN OCCURS = OCCURS + 1;
+           END;
+      END;
+
+ RETURN(OCCURS);
+
+ END COUNT;
+1BEST_MOVE:  PROCEDURE(BOARD, #MOVES, NUM_FLIP, DIRECTION, DIR_COUNT,
+     POSIBLE_MOVES, FAVORED);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ONLY CALLED FOR THE COMPUTER'S MOVE.  THIS PROCEDURE DETERMINES   */
+ /* WHICH OF THE POSSIBLE MOVES TO MAKE.                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  BOARD(10, 10)  FIXED BINARY;
+ DECLARE  #MOVES         FIXED BINARY;
+ DECLARE  NUM_FLIP(30)   FIXED BINARY(31);
+ DECLARE  DIRECTION(8, 30) FIXED BINARY;
+ DECLARE  DIR_COUNT(30)  FIXED BINARY;
+ DECLARE  POSIBLE_MOVES  FIXED BINARY;
+ DECLARE  FAVORED        FIXED BINARY;
+
+ /* NOT USED EXCEPT IN CALL */
+ DECLARE  DUMMY(30) FIXED BINARY(31);
+ DECLARE  DIR_COUNT_2(30) FIXED BINARY;
+
+ DECLARE  DIRECTION_1(8, 30) FIXED BINARY;
+ DECLARE  TEMP  FIXED BINARY(31);
+ DECLARE  COUNT_COMP_EDGE  FIXED BINARY INIT(0);
+
+ DECLARE
+     1  POS,
+        2  POSI   FIXED BINARY,
+        2  POSJ   FIXED BINARY;
+ DECLARE  POSIBLE_MOVES_1  FIXED BINARY;
+ DECLARE  DIR_COUNT_1(30) FIXED BINARY;
+
+ DECLARE
+     1  MOVES_1(30),
+        2  MOVESI_1  FIXED BINARY,
+        2  MOVESJ_1  FIXED BINARY;
+
+ DECLARE  INCR FIXED BINARY;
+ DECLARE  BOARD_1(10, 10) FIXED BINARY;
+ DECLARE  I  FIXED BINARY;
+ DECLARE  J  FIXED BINARY;
+1FAVORED = 1;
+
+ IF #MOVES = 59
+     THEN RETURN;
+
+ DO J = 1 TO POSIBLE_MOVES;
+
+     /* NEXT TO CORNERS ARE BAD MOVES */
+     SELECT;
+         WHEN(MOVESI(J) = 3 & MOVESJ(J) = 3)
+             IF BOARD(2, 2) = 0
+                 THEN NUM_FLIP(J) = NUM_FLIP(J) - 50;
+         WHEN(MOVESI(J) = 3 & MOVESJ(J) = 8)
+             IF BOARD(2, 9) = 0
+                 THEN NUM_FLIP(J) = NUM_FLIP(J) - 50;
+         WHEN(MOVESI(J) = 8 & MOVESJ(J) = 3)
+             IF BOARD(9, 2) = 0
+                 THEN NUM_FLIP(J) = NUM_FLIP(J) - 50;
+         WHEN(MOVESI(J) = 8 & MOVESJ(J) = 8)
+             IF BOARD(9, 9) = 0
+                 THEN NUM_FLIP(J) = NUM_FLIP(J) - 50;
+         OTHERWISE;
+         END;
+
+     /* OUTSIDE POSITIONS ARE GOOD MOVES */
+     IF MOVESI(J) = 2 ] MOVESI(J) = 9 ] MOVESJ(J) = 2 ] MOVESJ(J) = 9
+         THEN DO;
+              COUNT_COMP_EDGE = COUNT_COMP_EDGE + 1;
+              NUM_FLIP(J) = NUM_FLIP(J) + 60;
+              END;
+1    IF MOVESI(J) >= 3 & MOVESI(J) <= 8 &
+        MOVESJ(J) >= 3 & MOVESJ(J) <= 8
+
+         /* IN THE MIDDLE IS SOMETIMES OK */
+         THEN DO I = 1 TO DIR_COUNT(J);
+
+                  /* FIND POS OUT WHICH IS NOT THE PLAYER'S */
+                  INCR = 1;
+                  DO UNTIL(BOARD(POSI, POSJ) ^= PLAYER_COLOR);
+                      INCR = INCR + 1;
+                      POS = MOVES(J) + INCR * AROUND(DIRECTION(I, J));
+                      END;
+
+                  /* SKIP THAT ONE (WHICH SHOULD BE COMPUTER'S)
+                     UNTIL REACHES A POS WHICH IS NOT COMPUTER'S */
+                  DO UNTIL(BOARD(POSI, POSJ) ^= COMP_COLOR);
+                      INCR = INCR + 1;
+                      POS = MOVES(J) + INCR * AROUND(DIRECTION(I, J));
+                      /* IF THIS IS THE PLAYER'S POS & THE POS NEXT
+                         TO THE SELECTED POS IS EMPTY, IT'S NOT GOOD */
+                      IF (BOARD(POSI, POSJ) = PLAYER_COLOR) &
+                        BOARD(MOVESI(J)-AROUNDI(DIRECTION(I,J)),
+                              MOVESJ(J)-AROUNDJ(DIRECTION(I,J))) = 0
+                          THEN NUM_FLIP(J) = NUM_FLIP(J) - 5;
+                      END;
+                  END;
+
+         /* OUTSIDE PARAMETER PROCESSING AGAIN */
+         ELSE NUM_FLIP(J) = NUM_FLIP(J) + 10;
+
+    END;
+1/* PASS TWO */
+ DO J = 1 TO POSIBLE_MOVES;
+     BOARD_1 = BOARD;
+
+     /* IF COMP DOES THIS MOVE THE BOARD WILL LOOK LIKE BOARD_1 */
+     CALL BOARD_CHANGE(MOVES, J, BOARD_1, COMP_COLOR, DIRECTION,
+         DIR_COUNT);
+
+     /* PLAYER'S POSIBLE MOVES FROM BOARD_1 */
+     CALL FIND_MOVES(BOARD_1, COMP_COLOR, MOVES_1, DIRECTION_1,
+         DIR_COUNT_1, POSIBLE_MOVES_1, DUMMY);
+
+     IF POSIBLE_MOVES_1 = 0
+         THEN NUM_FLIP(J) = NUM_FLIP(J) + 100;
+         ELSE CALL PROJECTED_MOVE(J);
+     END;
+
+
+ TEMP = -2147483647;
+ DO J = 1 TO POSIBLE_MOVES;
+     IF NUM_FLIP(J) > TEMP
+         THEN DO;
+              TEMP = NUM_FLIP(J);
+              FAVORED = J;
+              END;
+     END;
+1PROJECTED_MOVE:  PROCEDURE(J);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO BEST_MOVE.  IT IS CALLED IN PASS    */
+ /* TWO TO DETERMINE WHAT THE PLAYER CAN DO WITH EACH POSSIBLE        */
+ /* COMPUTER MOVE.                                                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  J  FIXED BINARY;
+
+ DECLARE  CMOVE_EDGE  FIXED BINARY INIT(0);
+ DECLARE  C_ON_EDGE   BIT(1) INIT('0'B);
+
+ DECLARE  K           FIXED BINARY;
+ DECLARE  M           FIXED BINARY;
+
+ DECLARE  BOARD_2(10, 10)      FIXED BINARY;
+ DECLARE  POSIBLE_MOVES_2      FIXED BINARY;
+ DECLARE  DIRECTION_2(8, 30)   FIXED BINARY; /*NOT USED EXCEPT IN CALL*/
+
+ DECLARE  BOARD_2S(30, 10, 10) FIXED BINARY;
+1DECLARE
+     1  POS,
+        2  POSI   FIXED BINARY,
+        2  POSJ   FIXED BINARY;
+
+ DECLARE
+     1  MOVES_2(30),
+        2  MOVESI_2  FIXED BINARY,
+        2  MOVESJ_2  FIXED BINARY;
+
+ DECLARE
+     1  EDGES(24)  STATIC,
+        2  EDGEI  FIXED BINARY INIT(
+                  (6) 2,                3, 4, 5, 6, 7, 8,
+                  (6) 9,                8, 7, 6, 5, 4, 3),
+        2  EDGEJ  FIXED BINARY INIT(
+                  3, 4, 5, 6, 7, 8,     (6) 9,
+                  8, 7, 6, 5, 4, 3,     (6) 2);
+ DECLARE
+     1  OVER(24) STATIC,
+        2  OVERI  FIXED BINARY INIT(
+               2,1,2,2,1,2,5,1,3,8,1,6,9,1,9,9,1,9,6,1,8,3,1,5),
+        2  OVERJ  FIXED BINARY INIT(
+               5,1,3,8,1,6,9,1,9,9,1,9,6,1,8,3,1,5,2,1,2,2,1,2);
+ DECLARE
+     1  MID(24)  STATIC,
+        2  MIDI  FIXED BINARY INIT(
+                 2,1,2,2,1,2,4,1,4,7,1,7,9,1,9,9,1,9,7,1,7,4,1,4),
+        2  MIDJ  FIXED BINARY INIT(
+                 4,1,4,7,1,7,9,1,9,9,1,9,7,1,7,4,1,4,2,1,2,2,1,2);
+1CK_EDGE:
+ DO I = 1 TO 24;
+     IF MOVESI(J) = EDGEI(I) & MOVESJ(J) = EDGEJ(I)
+         THEN DO;
+              CMOVE_EDGE = I;
+              C_ON_EDGE = YES;
+              LEAVE CK_EDGE;
+              END;
+     END CK_EDGE;
+
+ DO I = 1 TO POSIBLE_MOVES_1;
+
+     /* COPY OVER TEMPORARY BOARD */
+     BOARD_2 = BOARD_1;
+
+     /* TRY OUT THIS POSSIBLE PLAYER COMEBACK MOVE */
+     CALL BOARD_CHANGE(MOVES_1, I, BOARD_2, PLAYER_COLOR, DIRECTION_1,
+         DIR_COUNT_1);
+
+     /* SAVE ALL COMEBACK BOARDS FOR LATER LOOP */
+     BOARD_2S(I, *, *) = BOARD_2;
+
+     /* IS PLAYER GOING TO GET A CHANCE TO GET EDGE POSITION BACK? */
+     IF CMOVE_EDGE ^= 0 & BOARD_2(MOVESI(J), MOVESJ(J)) = PLAYER_COLOR
+         THEN DO;
+              NUM_FLIP(J) = NUM_FLIP(J) - 40;
+              C_ON_EDGE = NO;
+              END;
+
+     /* WOULD THIS MOVE LET HIM WIN? */
+     IF COUNT(BOARD_2, COMP_COLOR) <= 0
+         THEN NUM_FLIP(J) = NUM_FLIP(J) - 200;
+
+     CALL FIND_MOVES(BOARD_2, PLAYER_COLOR, MOVES_2,
+         DIRECTION_2, DIR_COUNT_2, POSIBLE_MOVES_2, DUMMY);
+
+     EDGE_MOVE:  /* ARE THERE ANY MOVES LEFT ON AN EDGE? */
+     DO K = 1 TO POSIBLE_MOVES_2;
+         IF MOVESI_2(K) = 2 ] MOVESI_2(K) = 9
+          ] MOVESJ_2(K) = 2 ] MOVESJ_2(K) = 9
+              THEN LEAVE EDGE_MOVE;
+          END EDGE_MOVE;
+     IF K = POSIBLE_MOVES_2 + 1
+         THEN NUM_FLIP(J) = NUM_FLIP(J) - 190;
+     END;
+1IF C_ON_EDGE
+     THEN DO;
+          IF BOARD(OVERI(CMOVE_EDGE), OVERJ(CMOVE_EDGE)) = COMP_COLOR
+           & BOARD(MIDI(CMOVE_EDGE), MIDJ(CMOVE_EDGE)) = 0
+              THEN NUM_FLIP(J) = NUM_FLIP(J) - 65;
+              ELSE NUM_FLIP(J) = NUM_FLIP(J) + 25;
+          DO K = 1 TO 24;
+              /* IS THIS EDGE POSITION COMP'S? */
+              IF BOARD(EDGEI(K), EDGEJ(K)) = COMP_COLOR
+                  THEN DO M = 1 TO POSIBLE_MOVES_1;
+                           /* SUBSTRACT FOR EACH CHANCE PLAYER HAS
+                           TO GET AN EDGE POSITION FROM COMP */
+                           IF BOARD_2S(M, EDGEI(K), EDGEJ(K)) =
+                             PLAYER_COLOR
+                               THEN NUM_FLIP(J) = NUM_FLIP(J) - 8;
+                           END;
+              END;
+          END;
+
+ DO K = 1 TO 4;
+     /* IF ORIGINAL BOARD CORNER IS EMPTY */
+     IF BOARD(CORNI(K), CORNJ(K)) = 0
+         THEN DO M = 1 TO POSIBLE_MOVES_1;
+                  /* IF COMP MOVE GIVES PLAYER A CHANCE AT CORNER */
+                  IF BOARD_2S(M, CORNI(K), CORNJ(K)) = PLAYER_COLOR
+                      THEN DO;
+                           NUM_FLIP(J) = NUM_FLIP(J) - 55;
+                           /* IF COMP'S MOVE WASN'T EVEN NEAR THE
+                              CORNER IT'S EVEN WORSE */
+                           IF (COUNT_COMP_EDGE > 1) &
+                              (MOVESI(J) ^= CORNI(K) ]
+                               MOVESJ(J) ^= CORNJ(K))
+                               THEN NUM_FLIP(J) = NUM_FLIP(J) - 20;
+                           END;
+                   END;
+     END;
+
+ END PROJECTED_MOVE;
+
+ END BEST_MOVE;
+1HANDCAP:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE WILL GIVE A CONTENDER A HANDICAP OF OCCUPYING      */
+ /* CORNERS.                                                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  COUNT  FIXED BINARY;
+
+
+ #CORNERS = 0;
+ CALL GETANSW('DO YOU WISH TO BE GIVEN A HANDICAP?');
+
+ IF ANSW = 'YES'
+     THEN DO;
+          DO UNTIL(#CORNERS >= 1 & #CORNERS <= 4);
+              PUT FILE(SYSPRINT) SKIP
+                  EDIT('HOW MANY CORNERS? (1-4)') (A);
+              GET FILE(SYSIN) LIST(#CORNERS);
+              END;
+          DO COUNT = 1 TO #CORNERS;
+              BOARD(CORNI(COUNT), CORNJ(COUNT)) = PLAYER_COLOR;
+              END;
+          END;
+     ELSE DO;
+          CALL GETANSW('DO YOU WISH TO GIVE ME A HANDICAP?');
+          IF ANSW ^= 'YES'
+              THEN RETURN;
+          DO UNTIL(#CORNERS >= 1 & #CORNERS <= 4);
+              PUT FILE(SYSPRINT) SKIP
+                  EDIT('HOW MANY CORNERS? (1-4)') (A);
+              GET FILE(SYSIN) LIST(#CORNERS);
+              END;
+          DO COUNT = 1 TO #CORNERS;
+              BOARD(CORNI(COUNT), CORNJ(COUNT)) = COMP_COLOR;
+              END;
+          END;
+
+ END HANDCAP;
+
+ END OTHEL;
+

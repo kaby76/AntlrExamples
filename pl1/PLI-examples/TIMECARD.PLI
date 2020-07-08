@@ -1,0 +1,327 @@
+*PROCESS NM;
+ TMECARD:  PROCEDURE OPTIONS(MAIN) REORDER;
+
+ DECLARE  PGMID   CHAR(35) VARYING STATIC EXTERNAL
+    INIT('TMECARD V1.0  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(4K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM KEEPS TRACK OF HOURS WORKED AND COMPUTES TIME IN     */
+ /* DECIMAL FRACTION TO THE NEAREST HUNDRETH.  IT EXECUTES UNDER SPF  */
+ /* WITH A SCREEN NAMED TIMECARD.                                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE
+     1  REC(8),
+        2  FILLER     CHAR(8),
+        2  OVERTIME   CHAR(1),
+        2  MORNING    CHAR(4),
+        2  LUNCH_STR  CHAR(4),
+        2  LUNCH_END  CHAR(4),
+        2  EVENING    CHAR(4);
+
+ DECLARE  ISPLINK     ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  VDEFINE     CHAR(8) INIT('VDEFINE') STATIC;
+ DECLARE  DISPLAY     CHAR(8) INIT('DISPLAY') STATIC;
+ DECLARE  CHAR        CHAR(4) INIT('CHAR') STATIC;
+ DECLARE  TIMECARD    CHAR(8) INIT('TIMECARD') STATIC;
+
+ DECLARE  YES        BIT(1)  STATIC INIT('1'B);
+ DECLARE  I          FIXED BINARY;
+ DECLARE  R          FIXED BINARY;
+ DECLARE  DAYS(7)    CHAR(3) STATIC
+          INIT('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN');
+
+ DECLARE  TCARD      FILE SEQUENTIAL UPDATE RECORD;
+ DECLARE  (ADDR, FIXED, INDEX, LENGTH, PLIRETV, SUBSTR)  BUILTIN;
+1DECLARE  L_OPT       FIXED BINARY(31) INIT(LENGTH(OPT));
+ DECLARE  L_DAY       FIXED BINARY(31) INIT(LENGTH(DAY));
+ DECLARE  L_MORN      FIXED BINARY(31) INIT(LENGTH(MORN));
+ DECLARE  L_LSTR      FIXED BINARY(31) INIT(LENGTH(LSTR));
+ DECLARE  L_LEND      FIXED BINARY(31) INIT(LENGTH(LEND));
+ DECLARE  L_EVEN      FIXED BINARY(31) INIT(LENGTH(EVEN));
+ DECLARE  L_COMP      FIXED BINARY(31) INIT(LENGTH(COMP));
+ DECLARE  L_WEEK      FIXED BINARY(31) INIT(LENGTH(WEEK));
+ DECLARE  L_OVER      FIXED BINARY(31) INIT(LENGTH(OVER));
+ DECLARE  L_MON       FIXED BINARY(31) INIT(LENGTH(MON));
+ DECLARE  L_TUE       FIXED BINARY(31) INIT(LENGTH(TUE));
+ DECLARE  L_WED       FIXED BINARY(31) INIT(LENGTH(WED));
+ DECLARE  L_THU       FIXED BINARY(31) INIT(LENGTH(THU));
+ DECLARE  L_FRI       FIXED BINARY(31) INIT(LENGTH(FRI));
+ DECLARE  L_SAT       FIXED BINARY(31) INIT(LENGTH(SAT));
+ DECLARE  L_SUN       FIXED BINARY(31) INIT(LENGTH(SUN));
+
+ DECLARE  N_OPT       CHAR(6) INIT('(OPT)') STATIC;
+ DECLARE  N_DAY       CHAR(6) INIT('(DAY)') STATIC;
+ DECLARE  N_MORN      CHAR(6) INIT('(MORN)') STATIC;
+ DECLARE  N_LSTR      CHAR(6) INIT('(LSTR)') STATIC;
+ DECLARE  N_LEND      CHAR(6) INIT('(LEND)') STATIC;
+ DECLARE  N_EVEN      CHAR(6) INIT('(EVEN)') STATIC;
+ DECLARE  N_COMP      CHAR(6) INIT('(COMP)') STATIC;
+ DECLARE  N_WEEK      CHAR(6) INIT('(WEEK)') STATIC;
+ DECLARE  N_OVER      CHAR(6) INIT('(OVER)') STATIC;
+ DECLARE  N_MON       CHAR(6) INIT('(MON)') STATIC;
+ DECLARE  N_TUE       CHAR(6) INIT('(TUE)') STATIC;
+ DECLARE  N_WED       CHAR(6) INIT('(WED)') STATIC;
+ DECLARE  N_THU       CHAR(6) INIT('(THU)') STATIC;
+ DECLARE  N_FRI       CHAR(6) INIT('(FRI)') STATIC;
+ DECLARE  N_SAT       CHAR(6) INIT('(SAT)') STATIC;
+ DECLARE  N_SUN       CHAR(6) INIT('(SUN)') STATIC;
+
+ DECLARE  OPT         CHAR(4) INIT(' ') STATIC;
+ DECLARE  DAY         CHAR(3) INIT(' ') STATIC;
+ DECLARE  MORN        CHAR(6) INIT(' ') STATIC;
+ DECLARE  LSTR        CHAR(6) INIT(' ') STATIC;
+ DECLARE  LEND        CHAR(6) INIT(' ') STATIC;
+ DECLARE  EVEN        CHAR(6) INIT(' ') STATIC;
+ DECLARE  COMP        CHAR(5) INIT(' ') STATIC;
+ DECLARE  WEEK        CHAR(5) INIT(' ') STATIC;
+ DECLARE  OVER        CHAR(5) INIT(' ') STATIC;
+ DECLARE  MON         CHAR(5) INIT(' ') STATIC;
+ DECLARE  TUE         CHAR(5) INIT(' ') STATIC;
+ DECLARE  WED         CHAR(5) INIT(' ') STATIC;
+ DECLARE  THU         CHAR(5) INIT(' ') STATIC;
+ DECLARE  FRI         CHAR(5) INIT(' ') STATIC;
+ DECLARE  SAT         CHAR(5) INIT(' ') STATIC;
+ DECLARE  SUN         CHAR(5) INIT(' ') STATIC;
+1DO I = 1 TO 7;
+     READ FILE(TCARD) INTO(REC(I));
+     END;
+ CLOSE FILE(TCARD);
+
+
+ CALL ISPLINK(VDEFINE, N_OPT, OPT, CHAR, L_OPT);
+ CALL ISPLINK(VDEFINE, N_DAY, DAY, CHAR, L_DAY);
+ CALL ISPLINK(VDEFINE, N_MORN, MORN, CHAR, L_MORN);
+ CALL ISPLINK(VDEFINE, N_LSTR, LSTR, CHAR, L_LSTR);
+ CALL ISPLINK(VDEFINE, N_LEND, LEND, CHAR, L_LEND);
+ CALL ISPLINK(VDEFINE, N_EVEN, EVEN, CHAR, L_EVEN);
+ CALL ISPLINK(VDEFINE, N_COMP, COMP, CHAR, L_COMP);
+ CALL ISPLINK(VDEFINE, N_WEEK, WEEK, CHAR, L_WEEK);
+ CALL ISPLINK(VDEFINE, N_OVER, OVER, CHAR, L_OVER);
+ CALL ISPLINK(VDEFINE, N_MON, MON, CHAR, L_MON);
+ CALL ISPLINK(VDEFINE, N_TUE, TUE, CHAR, L_TUE);
+ CALL ISPLINK(VDEFINE, N_WED, WED, CHAR, L_WED);
+ CALL ISPLINK(VDEFINE, N_THU, THU, CHAR, L_THU);
+ CALL ISPLINK(VDEFINE, N_FRI, FRI, CHAR, L_FRI);
+ CALL ISPLINK(VDEFINE, N_SAT, SAT, CHAR, L_SAT);
+ CALL ISPLINK(VDEFINE, N_SUN, SUN, CHAR, L_SUN);
+
+
+ OPT, DAY, MORN, LSTR, LEND, EVEN, COMP, WEEK, OVER = ' ';
+ MON, TUE, WED, THU, FRI, SAT, SUN = ' ';
+
+ CALL ISPLINK(DISPLAY, TIMECARD);
+
+ DO WHILE(PLIRETV = 0);
+
+     DO R = 1 TO 7;
+         IF DAY = DAYS(R)
+             THEN LEAVE;
+         END;
+1    SELECT(OPT);
+
+         WHEN('D') DO; /* DISPLAY DAY */
+              MORN = SUBSTR(MORNING(R), 1, 2) || ':'
+                  || SUBSTR(MORNING(R), 3, 2);
+              LSTR = SUBSTR(LUNCH_STR(R), 1, 2) || ':'
+                  || SUBSTR(LUNCH_STR(R), 3, 2);
+              LEND = SUBSTR(LUNCH_END(R), 1, 2) || ':'
+                  || SUBSTR(LUNCH_END(R), 3, 2);
+              EVEN = SUBSTR(EVENING(R), 1, 2) || ':'
+                  || SUBSTR(EVENING(R), 3, 2);
+              OPT, COMP, WEEK, OVER = ' ';
+              MON, TUE, WED, THU, FRI, SAT, SUN = ' ';
+              END;
+
+         WHEN('S') DO; /* SAVE DAY */
+              OVERTIME(R) = ' ';
+              MORNING(R) = SUBSTR(MORN, 1, 2) || SUBSTR(MORN, 4, 2);
+              LUNCH_STR(R) = SUBSTR(LSTR, 1, 2) || SUBSTR(LSTR, 4, 2);
+              LUNCH_END(R) = SUBSTR(LEND, 1, 2) || SUBSTR(LEND, 4, 2);
+              EVENING(R) = SUBSTR(EVEN, 1, 2) || SUBSTR(EVEN, 4, 2);
+              OPT, DAY, MORN, LSTR, LEND, EVEN, COMP, WEEK, OVER = ' ';
+              MON, TUE, WED, THU, FRI, SAT, SUN = ' ';
+              END;
+
+         WHEN('O') DO; /* SAVE OVERTIME DAY */
+              OVERTIME(R) = 'O';
+              MORNING(R) = SUBSTR(MORN, 1, 2) || SUBSTR(MORN, 4, 2);
+              LUNCH_STR(R) = SUBSTR(LSTR, 1, 2) || SUBSTR(LSTR, 4, 2);
+              LUNCH_END(R) = SUBSTR(LEND, 1, 2) || SUBSTR(LEND, 4, 2);
+              EVENING(R) = SUBSTR(EVEN, 1, 2) || SUBSTR(EVEN, 4, 2);
+              OPT, DAY, MORN, LSTR, LEND, EVEN, COMP, WEEK, OVER = ' ';
+              MON, TUE, WED, THU, FRI, SAT, SUN = ' ';
+              END;
+
+         WHEN('C') CALL COMPUTE;  /* COMPUTE DAY OR WEEK */
+1        WHEN('R') DO; /* RESET DAY OR WEEK */
+              IF R = 8
+                  THEN DO I = 1 TO 7;
+                           OVERTIME(I) = ' ';
+                           MORNING(I) = ' ';
+                           LUNCH_STR(I) = ' ';
+                           LUNCH_END(I) = ' ';
+                           EVENING(I) = ' ';
+                           END;
+                  ELSE DO;
+                       OVERTIME(R) = ' ';
+                       MORNING(R) = ' ';
+                       LUNCH_STR(R) = ' ';
+                       LUNCH_END(R) = ' ';
+                       EVENING(R) = ' ';
+                       END;
+              OPT, DAY, MORN, LSTR, LEND, EVEN, COMP, WEEK, OVER = ' ';
+              MON, TUE, WED, THU, FRI, SAT, SUN = ' ';
+              END;
+
+         OTHERWISE;
+         END;
+
+     CALL ISPLINK(DISPLAY, TIMECARD);
+     END;
+
+ DO I = 1 TO 7;
+     READ FILE(TCARD) INTO(REC(8));
+     REWRITE FILE(TCARD) FROM(REC(I));
+     END;
+1COMPUTE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO TMECARD.  COMPUTES HOURS FOR A DAY  */
+ /* OR A WEEK.                                                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  WEEK_DAY(7)  FIXED DECIMAL(5,1);
+ DECLARE  TOT_WK       FIXED DECIMAL(5,1) INIT(0);
+ DECLARE  TOT_OT       FIXED DECIMAL(5,1) INIT(0);
+ DECLARE  OUTPIC       PIC '-Z9V.9';
+
+ IF R = 8
+     THEN DO;
+          DO I = 1 TO 7;
+              WEEK_DAY(I) = CONVERT(EVENING(I)) - CONVERT(MORNING(I)) -
+                  (CONVERT(LUNCH_END(I)) - CONVERT(LUNCH_STR(I)));
+              END;
+          OUTPIC = WEEK_DAY(1);
+          MON = OUTPIC;
+          OUTPIC = WEEK_DAY(2);
+          TUE = OUTPIC;
+          OUTPIC = WEEK_DAY(3);
+          WED = OUTPIC;
+          OUTPIC = WEEK_DAY(4);
+          THU = OUTPIC;
+          OUTPIC = WEEK_DAY(5);
+          FRI = OUTPIC;
+          OUTPIC = WEEK_DAY(6);
+          SAT = OUTPIC;
+          OUTPIC = WEEK_DAY(7);
+          SUN = OUTPIC;
+          DO I = 1 TO 7;
+              IF OVERTIME(I) = 'O'
+                  THEN TOT_OT = TOT_OT + WEEK_DAY(I);
+                  ELSE TOT_WK = TOT_WK + WEEK_DAY(I);
+              END;
+          OUTPIC = TOT_OT;
+          OVER = OUTPIC;
+          OUTPIC = TOT_WK - 40;
+          COMP = OUTPIC;
+          IF TOT_WK > 40
+              THEN OUTPIC = 40;
+              ELSE OUTPIC = TOT_WK;
+          WEEK = OUTPIC;
+          END;
+     ELSE DO;
+          OUTPIC = CONVERT(EVENING(R)) - CONVERT(MORNING(R)) -
+              (CONVERT(LUNCH_END(R)) - CONVERT(LUNCH_STR(R)));
+          MON, TUE, WED, THU, FRI, SAT, SUN = ' ';
+          COMP, WEEK, OVER = ' ';
+          SELECT(DAY);
+              WHEN(DAYS(1)) MON = OUTPIC;
+              WHEN(DAYS(2)) TUE = OUTPIC;
+              WHEN(DAYS(3)) WED = OUTPIC;
+              WHEN(DAYS(4)) THU = OUTPIC;
+              WHEN(DAYS(5)) FRI = OUTPIC;
+              WHEN(DAYS(6)) SAT = OUTPIC;
+              WHEN(DAYS(7)) SUN = OUTPIC;
+              END;
+          END;
+
+ OPT, MORN, LSTR, LEND, EVEN = ' ';
+1CONVERT:  PROCEDURE(TIME) RETURNS(FIXED DECIMAL(5,1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO COMPUTE.  CONVERTS TIME FROM        */
+ /* CHARACTER TO FIXED DECIMAL(5,1).                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  TIME  CHAR(4);
+ DECLARE
+     1  T_TIME  BASED(ADDR(TIME)),
+        2  HOURS  CHAR(2),
+        2  MINS   CHAR(2);
+ DECLARE  WEEK_TIME  FIXED DECIMAL(5,1);
+
+ IF TIME = ' '
+     THEN TIME = '0000';
+
+ WEEK_TIME = FIXED(HOURS, 5, 1) + FIXED(MINS, 5, 1)/60;
+ RETURN(WEEK_TIME);
+
+ END CONVERT;
+
+ END COMPUTE;
+
+ END TMECARD;
+%--------------------------------  TIMECARD  ---------------------------
+%SELECT OPTION ===>_OPT +
+%
+%       D+- DISPLAY DAY                 % C+- COMPUTE DAY OR WEEK
+%       S+- SAVE DAY                    % R+- RESET DAY OR WEEK
+%       O+- SAVE OVERTIME DAY
+%
+%
+%       DAY OF THE WEEK %===>_DAY+
+%
+%       SAVE/DISPLAY INFORMATION: +(TIME IN MILLIARY HH:MM)
++            MORNING    %===>_MORN +
++            LUNCH START%===>_LSTR +
++            LUNCH END  %===>_LEND +
++            EVENING    %===>_EVEN +
++
+%       COMPUTE INFORMATION: +(TIME IN HOURS AND DECIMAL FRACTION)
++            MON &MON     TUE &TUE     WED &WED     THU &THU
++            FRI &FRI     SAT &SAT     SUN &SUN
++            FOR WEEK   %---> &WEEK
++            COMP TIME  %---> &COMP
++            OVERTIME   %---> &OVER
+)INIT
+)PROC
+   &DAY  = TRANS(&DAY M,MON W,WED F,FRI
+                      MO,MON TU,TUE WE,WED TH,THU FR,FRI SA,SAT SU,SUN
+             MON,MON TUE,TUE WED,WED THU,THU FRI,FRI SAT,SAT SUN,SUN)
+   VER (&DAY,LIST,MON,TUE,WED,THU,FRI,SAT,SUN)
+   VER (&OPT,NONBLANK)
+   VER (&OPT,LIST,D,S,O,C,R)
+   IF (&OPT = D,S,O)
+       VER (&DAY,NONBLANK)
+   IF (&OPT = S,O)
+       VER (&MORN,NONBLANK)
+       VER (&MORN,PICT,'99:99')
+       VER (&LSTR,NONBLANK)
+       VER (&LSTR,PICT,'99:99')
+       VER (&LEND,NONBLANK)
+       VER (&LEND,PICT,'99:99')
+       VER (&EVEN,NONBLANK)
+       VER (&EVEN,PICT,'99:99')
+)END
+

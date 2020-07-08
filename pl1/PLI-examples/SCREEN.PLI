@@ -1,0 +1,492 @@
+1%SCRFIELD:  PROCEDURE(FIELDS) RETURNS(CHAR);
+ /*  SCRFIELD  V1.0  BY CLYDE THOMAS ZUBER  */
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS MACRO REPLACES AND SUPERCEDES SCRDCL.  IT IS DESIGNED TO BE  */
+ /* COMPATIBLE WITH SCRADDR V2.0.                                     */
+ /* THE PURPOSE OF THIS MACRO IS TO ASSIGN THE BIT DEFINITIONS FOR    */
+ /* DECLARATIONS OF TPUT OUTPUT AREAS.  SINCE IT ALLOWS FOR FIELDS    */
+ /* OF DIFFERING LENGTHS IT CAN BE USED WITH BUFFER AREAS THAT ARE    */
+ /* DECLARED STATICALLY AS THE BIT STRING IS SUPPLIED AT COMPILE      */
+ /* TIME.                                                             */
+ /* EXAMPLE:  INIT(SCRFIELD(SBA ]] SCRADDR(3, 10) ]] SF));            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  (I, J, K, DOUBLE, POS) FIXED;
+ DECLARE  (OP, FIELDS, NEWSTR, OP2, STR, STR2, RETSTR)  CHAR;
+ DECLARE  (INDEX, LENGTH, SUBSTR)  BUILTIN;
+
+ I=0;J=0;K=0;DOUBLE=0;POS=0;
+ OP='';NEWSTR='';OP2='';STR='';STR2='';RETSTR='';
+1DO I = 1 TO 30;
+     IF FIELDS = ''
+         THEN GOTO FINISH;
+
+     POS = INDEX(FIELDS, ']]');
+
+     IF POS = 0
+         THEN DO;
+              OP = FIELDS;
+              FIELDS = '';
+              END;
+         ELSE DO;
+              OP = SUBSTR(FIELDS, 1, POS-1);
+              FIELDS = SUBSTR(FIELDS, POS+2);
+              END;
+
+     DOOP2:
+     IF DOUBLE = 1
+         THEN DO;
+              OP = OP2;
+              OP2 = '';
+              STR2 = STR;
+              DOUBLE = 0;
+              END;
+
+     POS = INDEX(OP, ']');
+     IF POS ^= 0
+         THEN DO;
+              DOUBLE = 1;
+              OP2 = SUBSTR(OP, POS+1);
+              OP = SUBSTR(OP, 1, POS-1);
+              END;
+
+     TRIM:
+     POS = INDEX(OP, ' ');
+     IF POS = 1
+         THEN DO;
+              OP = SUBSTR(OP, 2);
+              GOTO TRIM;
+              END;
+     ELSE IF POS ^= 0
+         THEN DO;
+              OP = SUBSTR(OP, 1, POS-1) ]] SUBSTR(OP, POS+1);
+              GOTO TRIM;
+              END;
+1    IF OP = 'ALARM'
+         THEN STR = '11000100';
+     ELSE IF OP = 'RESTORE_KEYBOARD'
+         THEN STR = '11000010';
+     ELSE IF OP = 'RESET_MTD'
+         THEN STR = '11000001';
+     ELSE IF OP = 'RESET_KEYBOARD_MTD'
+         THEN STR = '11000011';
+     ELSE IF OP = 'WCC_DEFAULT'
+         THEN STR = '01000000';
+     ELSE IF OP = 'SF'
+         THEN STR = '00011101';
+     ELSE IF OP = 'SBA'
+         THEN STR = '00010001';
+     ELSE IF OP = 'IC'
+         THEN STR = '00010011';
+     ELSE IF OP = 'PT'
+         THEN STR = '00000101';
+     ELSE IF OP = 'RA'
+         THEN STR = '00111100';
+     ELSE IF OP = 'EUA'
+         THEN STR = '00010010';
+     ELSE IF OP = 'PROT'
+         THEN STR = '01100000';
+     ELSE IF OP = 'NUMERIC'
+         THEN STR = '01010000';
+     ELSE IF OP = 'MDT'
+         THEN STR = '01000001';
+     ELSE IF OP = 'SKP'
+         THEN STR = '01110000';
+     ELSE IF OP = 'HI_LIGHT'
+         THEN STR = '01001000';
+     ELSE IF OP = 'NON_DISPLAY'
+         THEN STR = '01001100';
+     ELSE IF OP = 'SELECTABLE'
+         THEN STR = '01000100';
+     ELSE IF OP = 'DEF_ATTR'
+         THEN STR = '00000000';
+     ELSE STR = OP;
+1    IF STR2 ^= ''
+         THEN DO;
+              NEWSTR = '';
+              K = LENGTH(STR);
+              IF K > LENGTH(STR2)
+                  THEN K = LENGTH(STR2);
+              DO J = 1 TO K;
+                  IF SUBSTR(STR, J, 1) = '1' ] SUBSTR(STR2, J, 1) = '1'
+                      THEN NEWSTR = NEWSTR ]] '1';
+                      ELSE NEWSTR = NEWSTR ]] '0';
+                  END;
+              STR = NEWSTR;
+              STR2 = '';
+              END;
+
+
+     IF DOUBLE = 1
+         THEN GOTO DOOP2;
+
+     RETSTR = RETSTR ]] STR;
+     END;
+
+ FINISH:
+ RETURN('''' ]] RETSTR ]] '''B');
+ %END SCRFIELD;
+ %ACTIVATE SCRFIELD;
+1%SCRADDR:  PROCEDURE(ROW, COL) RETURNS(CHAR);
+ /*  SCRADDR  V2.0  BY CLYDE THOMAS ZUBER  */
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS MACRO COMPUTES THE SCREEN ADDRESS ON A TERMINAL SCREEN WITH  */
+ /* EITHER 40, 80 OR 132 CHARACTER COLUMNS.  THERE ARE 64 DIFFERENT   */
+ /* POSSIBLE HEX VALUES WHICH CAN BE USED IN AN ADDRESS OF A ROW OR   */
+ /* COLUMN.  THE MATH COMPUTES AN SUBSCRIPT WHICH IS USED TO          */
+ /* MAP THE 64 DIFFERENT POSSIBLE ADDRESSES.                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  (ROW, COL) FIXED;
+ DECLARE  (SUB1, SUB2, POS, NO_COLS)  FIXED;
+ DECLARE  (HEX_ADDR1, HEX_ADDR2)  CHAR;
+
+ /* THIS VALUE MAY BE CHANGED TO 40, 80 OR 132 */
+ NO_COLS = 80;
+
+ POS = ((ROW - 1) * NO_COLS) + (COL - 1);
+ SUB1 = POS / 64;
+ SUB2 = POS - ((POS / 64) * 64);
+1IF SUB1 = 0
+     THEN HEX_ADDR1 = '01000000';
+ ELSE IF SUB1 = 1
+     THEN HEX_ADDR1 = '11000001';
+ ELSE IF SUB1 = 2
+     THEN HEX_ADDR1 = '11000010';
+ ELSE IF SUB1 = 3
+     THEN HEX_ADDR1 = '11000011';
+ ELSE IF SUB1 = 4
+     THEN HEX_ADDR1 = '11000100';
+ ELSE IF SUB1 = 5
+     THEN HEX_ADDR1 = '11000101';
+ ELSE IF SUB1 = 6
+     THEN HEX_ADDR1 = '11000110';
+ ELSE IF SUB1 = 7
+     THEN HEX_ADDR1 = '11000111';
+ ELSE IF SUB1 = 8
+     THEN HEX_ADDR1 = '11001000';
+ ELSE IF SUB1 = 9
+     THEN HEX_ADDR1 = '11001001';
+ ELSE IF SUB1 = 10
+     THEN HEX_ADDR1 = '01001010';
+ ELSE IF SUB1 = 11
+     THEN HEX_ADDR1 = '01001011';
+ ELSE IF SUB1 = 12
+     THEN HEX_ADDR1 = '01001100';
+ ELSE IF SUB1 = 13
+     THEN HEX_ADDR1 = '01001101';
+ ELSE IF SUB1 = 14
+     THEN HEX_ADDR1 = '01001110';
+ ELSE IF SUB1 = 15
+     THEN HEX_ADDR1 = '01001111';
+ ELSE IF SUB1 = 16
+     THEN HEX_ADDR1 = '01010000';
+ ELSE IF SUB1 = 17
+     THEN HEX_ADDR1 = '11010001';
+ ELSE IF SUB1 = 18
+     THEN HEX_ADDR1 = '11010010';
+ ELSE IF SUB1 = 19
+     THEN HEX_ADDR1 = '11010011';
+ ELSE IF SUB1 = 20
+     THEN HEX_ADDR1 = '11010100';
+1ELSE IF SUB1 = 21
+     THEN HEX_ADDR1 = '11010101';
+ ELSE IF SUB1 = 22
+     THEN HEX_ADDR1 = '11010110';
+ ELSE IF SUB1 = 23
+     THEN HEX_ADDR1 = '11010111';
+ ELSE IF SUB1 = 24
+     THEN HEX_ADDR1 = '11011000';
+ ELSE IF SUB1 = 25
+     THEN HEX_ADDR1 = '11011001';
+ ELSE IF SUB1 = 26
+     THEN HEX_ADDR1 = '01011010';
+ ELSE IF SUB1 = 27
+     THEN HEX_ADDR1 = '01011011';
+ ELSE IF SUB1 = 28
+     THEN HEX_ADDR1 = '01011100';
+ ELSE IF SUB1 = 29
+     THEN HEX_ADDR1 = '01011101';
+ ELSE IF SUB1 = 30
+     THEN HEX_ADDR1 = '01011110';
+ ELSE IF SUB1 = 31
+     THEN HEX_ADDR1 = '01011111';
+ ELSE IF SUB1 = 32
+     THEN HEX_ADDR1 = '01100000';
+ ELSE IF SUB1 = 33
+     THEN HEX_ADDR1 = '01100001';
+ ELSE IF SUB1 = 34
+     THEN HEX_ADDR1 = '11100010';
+ ELSE IF SUB1 = 35
+     THEN HEX_ADDR1 = '11100011';
+ ELSE IF SUB1 = 36
+     THEN HEX_ADDR1 = '11100100';
+ ELSE IF SUB1 = 37
+     THEN HEX_ADDR1 = '11100101';
+ ELSE IF SUB1 = 38
+     THEN HEX_ADDR1 = '11100110';
+ ELSE IF SUB1 = 39
+     THEN HEX_ADDR1 = '11100111';
+ ELSE IF SUB1 = 40
+     THEN HEX_ADDR1 = '11101000';
+1ELSE IF SUB1 = 41
+     THEN HEX_ADDR1 = '11101001';
+ ELSE IF SUB1 = 42
+     THEN HEX_ADDR1 = '01101010';
+ ELSE IF SUB1 = 43
+     THEN HEX_ADDR1 = '01101011';
+ ELSE IF SUB1 = 44
+     THEN HEX_ADDR1 = '01101100';
+ ELSE IF SUB1 = 45
+     THEN HEX_ADDR1 = '01101101';
+ ELSE IF SUB1 = 46
+     THEN HEX_ADDR1 = '01101110';
+ ELSE IF SUB1 = 47
+     THEN HEX_ADDR1 = '01101111';
+ ELSE IF SUB1 = 48
+     THEN HEX_ADDR1 = '11110000';
+ ELSE IF SUB1 = 49
+     THEN HEX_ADDR1 = '11110001';
+ ELSE IF SUB1 = 50
+     THEN HEX_ADDR1 = '11110010';
+ ELSE IF SUB1 = 51
+     THEN HEX_ADDR1 = '11110011';
+ ELSE IF SUB1 = 52
+     THEN HEX_ADDR1 = '11110100';
+ ELSE IF SUB1 = 53
+     THEN HEX_ADDR1 = '11110101';
+ ELSE IF SUB1 = 54
+     THEN HEX_ADDR1 = '11110110';
+ ELSE IF SUB1 = 55
+     THEN HEX_ADDR1 = '11110111';
+ ELSE IF SUB1 = 56
+     THEN HEX_ADDR1 = '11111000';
+ ELSE IF SUB1 = 57
+     THEN HEX_ADDR1 = '11111001';
+ ELSE IF SUB1 = 58
+     THEN HEX_ADDR1 = '01111010';
+ ELSE IF SUB1 = 59
+     THEN HEX_ADDR1 = '01111011';
+ ELSE IF SUB1 = 60
+     THEN HEX_ADDR1 = '01111100';
+ ELSE IF SUB1 = 61
+     THEN HEX_ADDR1 = '01111101';
+ ELSE IF SUB1 = 62
+     THEN HEX_ADDR1 = '01111110';
+ ELSE IF SUB1 = 63
+     THEN HEX_ADDR1 = '01111111';
+1IF SUB2 = 0
+     THEN HEX_ADDR2 = '01000000';
+ ELSE IF SUB2 = 1
+     THEN HEX_ADDR2 = '11000001';
+ ELSE IF SUB2 = 2
+     THEN HEX_ADDR2 = '11000010';
+ ELSE IF SUB2 = 3
+     THEN HEX_ADDR2 = '11000011';
+ ELSE IF SUB2 = 4
+     THEN HEX_ADDR2 = '11000100';
+ ELSE IF SUB2 = 5
+     THEN HEX_ADDR2 = '11000101';
+ ELSE IF SUB2 = 6
+     THEN HEX_ADDR2 = '11000110';
+ ELSE IF SUB2 = 7
+     THEN HEX_ADDR2 = '11000111';
+ ELSE IF SUB2 = 8
+     THEN HEX_ADDR2 = '11001000';
+ ELSE IF SUB2 = 9
+     THEN HEX_ADDR2 = '11001001';
+ ELSE IF SUB2 = 10
+     THEN HEX_ADDR2 = '01001010';
+ ELSE IF SUB2 = 11
+     THEN HEX_ADDR2 = '01001011';
+ ELSE IF SUB2 = 12
+     THEN HEX_ADDR2 = '01001100';
+ ELSE IF SUB2 = 13
+     THEN HEX_ADDR2 = '01001101';
+ ELSE IF SUB2 = 14
+     THEN HEX_ADDR2 = '01001110';
+ ELSE IF SUB2 = 15
+     THEN HEX_ADDR2 = '01001111';
+ ELSE IF SUB2 = 16
+     THEN HEX_ADDR2 = '01010000';
+ ELSE IF SUB2 = 17
+     THEN HEX_ADDR2 = '11010001';
+ ELSE IF SUB2 = 18
+     THEN HEX_ADDR2 = '11010010';
+ ELSE IF SUB2 = 19
+     THEN HEX_ADDR2 = '11010011';
+ ELSE IF SUB2 = 20
+     THEN HEX_ADDR2 = '11010100';
+1ELSE IF SUB2 = 21
+     THEN HEX_ADDR2 = '11010101';
+ ELSE IF SUB2 = 22
+     THEN HEX_ADDR2 = '11010110';
+ ELSE IF SUB2 = 23
+     THEN HEX_ADDR2 = '11010111';
+ ELSE IF SUB2 = 24
+     THEN HEX_ADDR2 = '11011000';
+ ELSE IF SUB2 = 25
+     THEN HEX_ADDR2 = '11011001';
+ ELSE IF SUB2 = 26
+     THEN HEX_ADDR2 = '01011010';
+ ELSE IF SUB2 = 27
+     THEN HEX_ADDR2 = '01011011';
+ ELSE IF SUB2 = 28
+     THEN HEX_ADDR2 = '01011100';
+ ELSE IF SUB2 = 29
+     THEN HEX_ADDR2 = '01011101';
+ ELSE IF SUB2 = 30
+     THEN HEX_ADDR2 = '01011110';
+ ELSE IF SUB2 = 31
+     THEN HEX_ADDR2 = '01011111';
+ ELSE IF SUB2 = 32
+     THEN HEX_ADDR2 = '01100000';
+ ELSE IF SUB2 = 33
+     THEN HEX_ADDR2 = '01100001';
+ ELSE IF SUB2 = 34
+     THEN HEX_ADDR2 = '11100010';
+ ELSE IF SUB2 = 35
+     THEN HEX_ADDR2 = '11100011';
+ ELSE IF SUB2 = 36
+     THEN HEX_ADDR2 = '11100100';
+ ELSE IF SUB2 = 37
+     THEN HEX_ADDR2 = '11100101';
+ ELSE IF SUB2 = 38
+     THEN HEX_ADDR2 = '11100110';
+ ELSE IF SUB2 = 39
+     THEN HEX_ADDR2 = '11100111';
+ ELSE IF SUB2 = 40
+     THEN HEX_ADDR2 = '11101000';
+1ELSE IF SUB2 = 41
+     THEN HEX_ADDR2 = '11101001';
+ ELSE IF SUB2 = 42
+     THEN HEX_ADDR2 = '01101010';
+ ELSE IF SUB2 = 43
+     THEN HEX_ADDR2 = '01101011';
+ ELSE IF SUB2 = 44
+     THEN HEX_ADDR2 = '01101100';
+ ELSE IF SUB2 = 45
+     THEN HEX_ADDR2 = '01101101';
+ ELSE IF SUB2 = 46
+     THEN HEX_ADDR2 = '01101110';
+ ELSE IF SUB2 = 47
+     THEN HEX_ADDR2 = '01101111';
+ ELSE IF SUB2 = 48
+     THEN HEX_ADDR2 = '11110000';
+ ELSE IF SUB2 = 49
+     THEN HEX_ADDR2 = '11110001';
+ ELSE IF SUB2 = 50
+     THEN HEX_ADDR2 = '11110010';
+ ELSE IF SUB2 = 51
+     THEN HEX_ADDR2 = '11110011';
+ ELSE IF SUB2 = 52
+     THEN HEX_ADDR2 = '11110100';
+ ELSE IF SUB2 = 53
+     THEN HEX_ADDR2 = '11110101';
+ ELSE IF SUB2 = 54
+     THEN HEX_ADDR2 = '11110110';
+ ELSE IF SUB2 = 55
+     THEN HEX_ADDR2 = '11110111';
+ ELSE IF SUB2 = 56
+     THEN HEX_ADDR2 = '11111000';
+ ELSE IF SUB2 = 57
+     THEN HEX_ADDR2 = '11111001';
+ ELSE IF SUB2 = 58
+     THEN HEX_ADDR2 = '01111010';
+ ELSE IF SUB2 = 59
+     THEN HEX_ADDR2 = '01111011';
+ ELSE IF SUB2 = 60
+     THEN HEX_ADDR2 = '01111100';
+ ELSE IF SUB2 = 61
+     THEN HEX_ADDR2 = '01111101';
+ ELSE IF SUB2 = 62
+     THEN HEX_ADDR2 = '01111110';
+ ELSE IF SUB2 = 63
+     THEN HEX_ADDR2 = '01111111';
+
+
+ RETURN(HEX_ADDR1 ]] HEX_ADDR2);
+ %END SCRADDR;
+ %ACTIVATE SCRADDR;
+1%/********************************************************************/
+ /*                                                                   */
+ /* ATTENTION IDENTIFIERS, AID.                                       */
+ /*                                                                   */
+ /* THESE IDENTIFIERS ARE USED TO IDENTIFY WHAT KEY WAS USED TO INPUT */
+ /* A SCREEN. THESE CAN BE USED BY THE PROGRAM TO GIVE THE OPERATOR   */
+ /* THE ABILITY TO MAKE OTHER REQUESTS THAN WHAT THE SCREEN ITSELF    */
+ /* ALLOWS.                                                           */
+ /*                                                                   */
+ /********************************************************************/;
+ %;
+ %DECLARE ENTER  CHAR;
+ %DECLARE CLEAR  CHAR;
+ %;
+ %DECLARE PA1   CHAR;
+ %DECLARE PA2   CHAR;
+ %DECLARE PA3   CHAR;
+ %;
+ %DECLARE PF1   CHAR;
+ %DECLARE PF2   CHAR;
+ %DECLARE PF3   CHAR;
+ %DECLARE PF4   CHAR;
+ %DECLARE PF5   CHAR;
+ %DECLARE PF6   CHAR;
+ %DECLARE PF7   CHAR;
+ %DECLARE PF8   CHAR;
+ %DECLARE PF9   CHAR;
+ %DECLARE PF10  CHAR;
+ %DECLARE PF11  CHAR;
+ %DECLARE PF12  CHAR;
+ %DECLARE PF13  CHAR;
+ %DECLARE PF14  CHAR;
+ %DECLARE PF15  CHAR;
+ %DECLARE PF16  CHAR;
+ %DECLARE PF17  CHAR;
+ %DECLARE PF18  CHAR;
+ %DECLARE PF19  CHAR;
+ %DECLARE PF20  CHAR;
+ %DECLARE PF21  CHAR;
+ %DECLARE PF22  CHAR;
+ %DECLARE PF23  CHAR;
+ %DECLARE PF24  CHAR;
+1%ENTER         = 'X(7D)';
+ %CLEAR         = 'X(6D)';
+ %;
+ %PA1           = 'X(6C)';
+ %PA2           = 'X(6E)';
+ %PA3           = 'X(6B)';
+ %;
+ %PF1           = 'X(F1)';
+ %PF2           = 'X(F2)';
+ %PF3           = 'X(F3)';
+ %PF4           = 'X(F4)';
+ %PF5           = 'X(F5)';
+ %PF6           = 'X(F6)';
+ %PF7           = 'X(F7)';
+ %PF8           = 'X(F8)';
+ %PF9           = 'X(F9)';
+ %PF10          = 'X(FA)';
+ %PF11          = 'X(7B)';
+ %PF12          = 'X(7C)';
+ %PF13          = 'X(C1)';
+ %PF14          = 'X(C2)';
+ %PF15          = 'X(C3)';
+ %PF16          = 'X(C4)';
+ %PF17          = 'X(C5)';
+ %PF18          = 'X(C6)';
+ %PF19          = 'X(C7)';
+ %PF20          = 'X(C8)';
+ %PF21          = 'X(C9)';
+ %PF22          = 'X(4A)';
+ %PF23          = 'X(4B)';
+ %PF24          = 'X(4C)';
+

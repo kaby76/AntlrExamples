@@ -1,0 +1,200 @@
+*PROCESS NM;
+ DIRCOMP:  PROCEDURE(PARAMETER) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(36) VARYING STATIC EXTERNAL
+     INIT('DIRCOMP  V1.6  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(5K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM PEFORMS A DIRECTORY COMPARE BETWEEN THE MEMBER NAMES */
+ /* OF TWO PARTITIONED DATASETS.  IT LISTS THE MEMBER NAMES OUT IN    */
+ /* ALPHABETICAL ORDER IN TWO COLUMNS.  THE PDS ALLOCATED TO DDNAME   */
+ /* OLD IS LISTED FIRST FOLLOWED BY THE PDS ALLOCATED TO DDNAME NEW.  */
+ /* IF EITHER DIRECTORY DOES NOT CONTAIN A NAME THE COLUMN IS LEFT    */
+ /* BLANK FOR THAT PDS.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  PARAMETER  CHAR(*) VARYING;
+
+ DECLARE  PDSPROC   ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+ DECLARE  NO    BIT(1) STATIC INIT('0'B);
+ DECLARE  YES   BIT(1) STATIC INIT('1'B);
+ DECLARE  POS   FIXED BINARY;
+ DECLARE  H     BIT(8) STATIC INIT('11111111'B);
+ DECLARE  HIGH  CHAR(1) BASED(ADDR(H));
+ DECLARE  (N, O)    FIXED BINARY INIT(1);
+ DECLARE  (NS, OS)  CHAR(1);
+ DECLARE  (LOW_RANGE, HIGH_RANGE)  CHAR(8) VARYING;
+ DECLARE  (ADDR, INDEX, PLIRETV, REPEAT, SUBSTR)  BUILTIN;
+ DECLARE  ERRMSG1  BASED(ERRPTR(1)) CHAR(32760) VARYING;
+ DECLARE  ERRMSG2  BASED(ERRPTR(2)) CHAR(32760) VARYING;
+1DECLARE
+   1  PARM(2),
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMNAME     CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6);
+
+ DECLARE
+   1  OLD  BASED(BLDLPTR(1)),
+      2  #ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT1 REFER(OLD.#ENTRIES)),
+         3  MEM  CHAR(8),
+         3  TTRC,
+            4  TTR             CHAR(3),
+            4  C_FIELD,
+               5  ALIAS           BIT(1),
+               5  NUM_TTRN        BIT(2),
+               5  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+
+ DECLARE
+   1  NEW  BASED(BLDLPTR(2)),
+      2  #ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT2 REFER(NEW.#ENTRIES)),
+         3  MEM  CHAR(8),
+         3  TTRC,
+            4  TTR             CHAR(3),
+            4  C_FIELD,
+               5  ALIAS           BIT(1),
+               5  NUM_TTRN        BIT(2),
+               5  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+1/* PARSE ANY RANGE PARAMETERS SPECIFIED BY USER */
+
+ POS = INDEX(PARAMETER, ',');
+ IF POS = 0
+     THEN LOW_RANGE = PARAMETER;
+     ELSE DO;
+          LOW_RANGE = SUBSTR(PARAMETER, 1, POS-1);
+          HIGH_RANGE = SUBSTR(PARAMETER, POS+1);
+          END;
+
+ /* INITIALIZE FILES */
+ OPEN_FOR_INPUT = YES;
+ DDNAME(1) = 'OLD';
+ DDNAME(2) = 'NEW';
+ CALL PDSFUNC('OPEN', 1);
+ CALL PDSFUNC('OPEN', 2);
+
+ PUT SKIP EDIT('OLD DSN=', DSNAME(1), 'VOL=SER=', VOLUME(1)) (A);
+ PUT SKIP EDIT('NEW DSN=', DSNAME(2), 'VOL=SER=', VOLUME(2)) (A);
+
+ IF LOW_RANGE ^= '' ] HIGH_RANGE ^= ''
+     THEN DO;
+          PUT SKIP(2) EDIT('LOW RANGE =', LOW_RANGE) (A);
+          PUT SKIP(1) EDIT('HIGH RANGE=', HIGH_RANGE) (A);
+          END;
+
+ HIGH_RANGE = HIGH_RANGE ]] REPEAT(HIGH, 7);
+
+ PUT SKIP(2) EDIT(' OLD MEM    NEW MEM') (A);
+
+ CALL PDSFUNC('BLDL', 1);
+ CALL PDSFUNC('BLDL', 2);
+1DO WHILE(O <= OLD.#ENTRIES  &  N <= NEW.#ENTRIES);
+
+     IF OLD.MEM(O) = NEW.MEM(N)
+         THEN DO;
+              IF OLD.ALIAS(O)
+                  THEN OS = '*';
+                  ELSE OS = ' ';
+              IF NEW.ALIAS(N)
+                  THEN NS = '*';
+                  ELSE NS = ' ';
+              IF OLD.MEM(O) >= LOW_RANGE  &  OLD.MEM(O) <= HIGH_RANGE
+                  THEN PUT SKIP EDIT(OS, OLD.MEM(O), NS, NEW.MEM(N))
+                           (A, A, COL(12), A, A);
+              O = O + 1;
+              N = N + 1;
+              END;
+         ELSE IF OLD.MEM(O) < NEW.MEM(N)
+                  THEN DO;
+                       IF OLD.ALIAS(O)
+                           THEN OS = '*';
+                           ELSE OS = ' ';
+                       IF OLD.MEM(O) >= LOW_RANGE  &
+                          OLD.MEM(O) <= HIGH_RANGE
+                           THEN PUT SKIP EDIT(OS, OLD.MEM(O)) (A);
+                       O = O + 1;
+                       END;
+                  ELSE DO;
+                       IF NEW.ALIAS(N)
+                           THEN NS = '*';
+                           ELSE NS = ' ';
+                       IF NEW.MEM(O) >= LOW_RANGE  &
+                          NEW.MEM(O) <= HIGH_RANGE
+                           THEN PUT SKIP EDIT(NS, NEW.MEM(N))
+                                    (COL(12), A, A);
+                       N = N + 1;
+                       END;
+     END;
+1DO WHILE(O <= OLD.#ENTRIES);
+     IF OLD.ALIAS(O)
+         THEN OS = '*';
+         ELSE OS = ' ';
+     IF OLD.MEM(O) >= LOW_RANGE  &  OLD.MEM(O) <= HIGH_RANGE
+         THEN PUT SKIP EDIT(OS, OLD.MEM(O)) (A);
+     O = O + 1;
+     END;
+
+ DO WHILE(N <= NEW.#ENTRIES);
+     IF NEW.ALIAS(N)
+         THEN NS = '*';
+         ELSE NS = ' ';
+     IF NEW.MEM(O) >= LOW_RANGE  &  NEW.MEM(O) <= HIGH_RANGE
+         THEN PUT SKIP EDIT(NS, NEW.MEM(N)) (COL(12), A, A);
+     N = N + 1;
+     END;
+
+ CALL PDSFUNC('CLOSE', 1);
+ CALL PDSFUNC('CLOSE', 2);
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1PDSFUNC:  PROCEDURE(FUNCTION, PARM#);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE FIRST PARAMETER IS THE FUNCTION TO */
+ /* BE PERFORMED BY PDSPROC AND THE SECOND DETERMINES WHICH PDS IS    */
+ /* BEING REFERED TO.  DDNAME OLD IS NUMBER 1, DDNAME NEW IS NUMBER 2.*/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FUNCTION  CHAR(10);
+ DECLARE  PARM#  FIXED BINARY;
+
+ CALL PDSPROC(FUNCTION, PARM(PARM#));
+ IF PLIRETV ^= 0
+     THEN DO;
+          IF PARM# = 1
+              THEN PUT SKIP EDIT(ERRMSG1) (A);
+              ELSE PUT SKIP EDIT(ERRMSG2) (A);
+          PUT SKIP EDIT('RETURN CODE =', PLIRETV) (A, F(3));
+          SIGNAL ERROR;
+          END;
+
+ END PDSFUNC;
+ END DIRCOMP;
+

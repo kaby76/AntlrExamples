@@ -1,0 +1,867 @@
+*PROCESS M;
+ SMPREJ:  PROCEDURE(PARAMETER) OPTIONS(MAIN, REENTRANT) REORDER;
+
+ DECLARE  PGMID   CHAR(34) VARYING STATIC EXTERNAL
+    INIT('SMPREJ V2.3  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(9) VARYING INIT('ISA(256K)') STATIC EXTERNAL;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PURPOSE:   THE FUNCTION OF THIS PROGRAM IS TO READ THROUGH AN     */
+ /*            SMP PTS AND CREATE REJECT CONTROL STATEMENTS WHICH     */
+ /*            ARE GROUPED ACCORDING TO THEIR FMID.  DEPENDENT        */
+ /*            FUNCTIONS OCCUR UNDER THEIR OWNING FUNCTION AND ALSO   */
+ /*            AS THEMSELVES.  THE CONTROL STATEMENTS MAY THEN BE     */
+ /*            EDITED BY HAND AND PASSED TO SMP TO CLEAN UP THE PTS.  */
+ /*                                                                   */
+ /*            STARTING WITH VERSION 2.0 OF SMPREJ SYSMODS MAY BE     */
+ /*            COMPARED WITH THE PTS SYSTEM ENTRY AND EITHER          */
+ /*            INCLUDED OR EXCLUDED BASED ON THE MATCHING CRITERIA.   */
+ /*            DEFAULT PROCESSING INCLUDES SYSMODS WITH MORE THAN ONE */
+ /*            ++VER ONLY UNDER ONE FUNCTION IF ANY ONE OF THE        */
+ /*            FUNCTIONS IS FOUND IN THE PTS SYSTEM ENTRY.  THIS IS   */
+ /*            DONE TO PREVENT SYSMODS FROM BEING REJECTED UNDER AN   */
+ /*            FMID NOT IN THE SYSTEM ENTRY WHEN IT SHOULD BE KEPT    */
+ /*            FOR ANOTHER ACTIVE FMID.                               */
+ /*                                                                   */
+ /* METHOD:    THE PTS IS READ FINDING SYSMOD IDENTIFIERS AND THEIR   */
+ /*            OWNING FUNCTION.  FUNCTIONS ARE ENTERED INTO A TABLE   */
+ /*            WITH THE SYSMOD IDENTIFIERS IN LINK LIST FORMAT        */
+ /*            CHAINED OFF OF THE TABLE.  AFTER THE ENTIRE PTS IS     */
+ /*            PROCESSED AND THE DATA STRUCTURE IS COMPLETE THE TABLE */
+ /*            IS SORTED.  EACH POSITION IN THE SORTED TABLE IS THEN  */
+ /*            USED TO CREATE A REJECT CONTROL STATEMTENT, THE OWNING */
+ /*            FUNCTION BEING THE FIRST ELEMENT IN THE STATEMENT.     */
+ /*            SINCE THE PDS DIRECTORY IS SORTED ALL OF THE SYSMOD    */
+ /*            IDENTIFIERS IN THE STRUCTURE ARE ALSO IN SORTED ORDER. */
+ /*            THE CONTROL STATEMENTS ARE THEN AVAILABLE FOR EDITING  */
+ /*            AND LATER PROCESSING BY SMP.                           */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* REQUIRED DDNAMES:                                                 */
+ /* PTSSMP   - SHOULD ALLOCATE THE SMP PTS DATASET                    */
+ /* SYSPRINT - PROGRAM MESSAGES (IF ANY) WILL BE OUTPUT TO THIS FILE  */
+ /*            (USUALLY ALLOCATE TO SYSOUT)                           */
+ /* FMIDS    - INPUT FILE FOR A LIST OF FMIDS TO BE USED INSTEAD OF   */
+ /*            THE PTS SYSTEM ENTRY (LIKE WHEN USING SMP/E)           */
+ /* CNTLSMP  - REJECT CONTROL STATEMENT OUTPUT                        */
+ /*                                                                   */
+ /* VALID PARAMETERS:                                                 */
+ /* NOSYSTEM      - OUTPUT ENTIRE PTS, DO NOT DO COMPARISON WITH      */
+ /*                 PTS SYSTEM ENTRY (OR FMID LIST).                  */
+ /* ONLYFOUNDS    - OUTPUT ONLY MEMBERS WHOSE FMIDS ARE FOUND IN THE  */
+ /*                 PTS SYSTEM ENTRY (OR FMID LIST).                  */
+ /* NOTFOUNDS     - OUTPUT ONLY MEMBERS WHOSE FMIDS ARE NOT FOUND IN  */
+ /*                 THE PTS SYSTEM ENTRY (OR FMID LIST).              */
+ /* SYSREL='VALUE'- THE SYSTEM RELEASE TO CHECK FOR ON THE ++VER      */
+ /*                 STATEMENT.  THE PROGRAM DEFAULT IS Z038.          */
+ /*                 NOTE THAT ON PARM QUOTES MUST BE DOUBLED.         */
+ /*                                                                   */
+ /*********************************************************************/
+ %INCLUDE HEX
+
+ /* HEX/CHAR DECLARATIONS */
+ DECLARE  EMPTY_ENTRY        CHAR(8) BASED(ADDR(EMPTY_ENTRY_INIT));
+ DECLARE  DELETED_ENTRY      CHAR(8) BASED(ADDR(DELETED_ENTRY_INIT));
+ DECLARE  EMPTY_ENTRY_INIT   BIT(64) STATIC INIT(X(0000000000000040));
+ DECLARE  DELETED_ENTRY_INIT BIT(64) STATIC INIT(X(FF00000000000000));
+ %DEACTIVATE X;
+
+ /* SMPREJ PROGRAM SYSTEM PARAMETER */
+ DECLARE  PARAMETER     CHAR(100) VARYING;
+1/* EXTERNAL ROUTINES */
+ DECLARE  HEAPSRT  ENTRY((*)CHAR(*), FIXED BINARY);
+ DECLARE  IVERIFY  ENTRY RETURNS(FIXED BINARY(31));
+ DECLARE  MAXLEN   ENTRY(CHAR(*) VARYING) RETURNS(FIXED BINARY(31));
+ DECLARE  PDSPROC  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (ADDR, HBOUND, INDEX, LENGTH, NULL, ONSOURCE, PLIRETV,
+           SUBSTR, VERIFY)  BUILTIN;
+
+ /* FILE DECLARATIONS */
+ /* PTSSMP FILE CONTROLED BY PDSPROC EXTERNAL ROUTINE
+ DECLARE  PTSSMP    FILE RECORD INPUT */
+ DECLARE  FMIDS     FILE STREAM INPUT;
+ DECLARE  SYSPRINT  FILE STREAM OUTPUT PRINT;
+ DECLARE  CNTLSMP   FILE RECORD OUTPUT ENV(FB RECSIZE(80));
+
+ /* POINTER DECLARATIONS */
+ DECLARE  CURRPTR  PTR;  /* USED FOR LINK LIST TRAVERSAL */
+ DECLARE  N        PTR;  /* AUTOMATICALLY SET BY ALLOCATE NODE */
+ DECLARE  PREVPTR  PTR;  /* USED FOR LINK LIST TRAVERSAL */
+
+ /* ARITHMETIC DECLARATIONS */
+ DECLARE  NNN      FIXED BINARY;  /* USED FOR FAKE GET LIST */
+ DECLARE  POS      FIXED BINARY;  /* WORK IDENTIFIER */
+ DECLARE  F        FIXED BINARY;  /* CURRENT INDEX IN START */
+ DECLARE  I        FIXED BINARY;  /* WORK IDENTIFIER */
+ DECLARE  S        FIXED BINARY;  /* HIGH USED POSITION IN START */
+ DECLARE  ENTRY#   FIXED BINARY;  /* CURRENT DIRECTORY ENTRY */
+ DECLARE  OF       FIXED BINARY;  /* HIGH USED POSITION - OWNING_FUNC.*/
+ DECLARE  #SYS     FIXED BINARY;  /* HIGH USED POSITION IN SYS */
+
+ /* CHARACTER STRING DECLARATIONS */
+ DECLARE  SYSREL               CHAR(8)     VARYING INIT('Z038');
+ DECLARE  SYSRECS              CHAR(32760) VARYING INIT('');
+ DECLARE  PARM_SEL             CHAR(24);
+ DECLARE  INPT                 CHAR(8) INIT(' ');
+ DECLARE  CURRENT_SYSMOD       CHAR(8);
+ DECLARE  REC                  CHAR(72);
+
+ /* BIT STRING DECLARATIONS */
+ DECLARE  YES           BIT(1) STATIC INIT('1'B);  /* CONSTANT */
+ DECLARE  NO            BIT(1) STATIC INIT('0'B);  /* CONSTANT */
+ DECLARE  MORE_FMIDS    BIT(1)        INIT('1'B);  /* FLAG */
+ DECLARE  SAME_STMT     BIT(1)        INIT('1'B);  /* FLAG */
+ DECLARE  SMP_STMT      BIT(1)        INIT('0'B);  /* FLAG */
+ DECLARE  TAKE_REC      BIT(1)        INIT('0'B);  /* FLAG */
+ DECLARE  NOSYSTEM      BIT(1)        INIT('0'B);  /* FLAG */
+ DECLARE  ONLYFOUNDS    BIT(1)        INIT('0'B);  /* FLAG */
+ DECLARE  NOTFOUNDS     BIT(1)        INIT('0'B);  /* FLAG */
+1/* AGGREGATE DECLARATIONS */
+
+ /* PTS SYSTEM ENTRY TABLE */
+ DECLARE  SYS(3640)            CHAR(8) INIT((3640) (8) ' ');
+
+ /* TABLE TO SUPPORT MULTIPLE ++VER STATEMENTS */
+ DECLARE  OWNING_FUNCTION(10)  CHAR(8) INIT((10)   (8) ' ');
+
+ /* BASE TABLE FOR THE DATA STRUCTURE */
+ DECLARE
+     1  START(500),
+        2  FMID  CHAR(8) INIT((500) (8)' '),
+        2  NODEPTR   PTR INIT((500) NULL);
+ /* REDEFINED VERSION OF TABLE FOR SORT PROCEDURE */
+ DECLARE  START_CHAR(500)  CHAR(12) BASED(ADDR(START(1)));
+
+ /* LINKED LIST NODE STRUCTURE */
+ DECLARE
+     1  NODE  BASED(N),
+        2  SYSMOD   CHAR(8),
+        2  NEXTPTR  PTR INIT(NULL);
+
+ /* CNTLSMP OUTPUT RECORD FORMATS */
+ DECLARE
+     1  CNTL1,
+        2  FILLER1     CHAR(10) INIT(' REJECT S('),
+        2  SEL1(1:7)   CHAR(8)  INIT((7)(8)' '),
+        2  PUNC1       CHAR(2)  INIT(' '),
+        2  FILLER2     CHAR(12) INIT(' ');
+
+ DECLARE
+     1  CNTL2,
+        2  FILLER1     CHAR(10) INIT(' '),
+        2  SEL2(8:14)  CHAR(8)  INIT((7)(8)' '),
+        2  PUNC2       CHAR(2)  INIT(' '),
+        2  FILLER2     CHAR(12) INIT(' ');
+1/* PDSPROC IDENTIFIERS */
+
+ DECLARE  ERRMSG   BASED(ERRPTR) CHAR(32760) VARYING;
+
+ DECLARE
+   1  PARM,
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMNAME     CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6),
+      2  RECORD      CHAR(32760) VARYING;
+
+ DECLARE
+   1  DIRECTORY  BASED(BLDLPTR),
+      2  NUMBER_ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT REFER(NUMBER_ENTRIES)),
+         3  MEMBER_NAME  CHAR(8),
+         3  TTR          CHAR(3),
+         3  C_FIELD,
+            4  ALIAS           BIT(1),
+            4  NUM_TTRN        BIT(2),
+            4  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+1/* PARSE ANY PARAMETERS SPECIFIED BY USER */
+
+ DO WHILE(PARAMETER ª= '');
+
+     POS = INDEX(PARAMETER, ',');
+     IF POS = 0
+         THEN DO;
+              PARM_SEL = PARAMETER;
+              PARAMETER = '';
+              END;
+         ELSE DO;
+              PARM_SEL = SUBSTR(PARAMETER, 1, POS-1);
+              PARAMETER = SUBSTR(PARAMETER, POS+1);
+              END;
+
+     SELECT(SUBSTR(PARM_SEL, 1, 7));
+         WHEN('NOSYSTE') NOSYSTEM = YES;
+         WHEN('ONLYFOU') ONLYFOUNDS = YES;
+         WHEN('NOTFOUN') NOTFOUNDS = YES;
+         WHEN('SYSREL=') GET STRING(SUBSTR(PARM_SEL, 8)) LIST(SYSREL);
+         OTHERWISE PUT SKIP(2) EDIT('*** ERROR: ', PARM_SEL,
+             ' IS AN INVALID PARM.') (A);
+         END;
+     END;
+
+
+ /* INITIALIZATION PROCESSING */
+
+ ON ENDFILE(FMIDS) MORE_FMIDS = NO;
+ S, #SYS = 0;
+ OPEN_FOR_INPUT = YES;
+ DDNAME = 'PTSSMP';
+ CALL PDSFUNC('OPEN');
+ CALL PDSFUNC('BLDL');
+1/* PROCESS PTS SYSTEM ENTRY */
+ IF ªNOSYSTEM
+     THEN CALL SYSTEM_FMIDS(SYS, #SYS);
+
+ /* PRINT OPTIONS SELECTED BY PARAMETER */
+ SELECT;
+     WHEN(NOSYSTEM) PUT SKIP(2) EDIT('<<< NOSYSTEM OPTION - ',
+         'ENTIRE PTS FOR ', SYSREL, ' WILL BE REPRESENTED.') (A);
+     WHEN(ONLYFOUNDS) DO;
+         PUT SKIP(2) EDIT('<<< ONLYFOUNDS OPTION - ',
+             'ONLY SYSMODS FOR ', SYSREL, ' WILL BE REPRESENTED.') (A);
+         PUT SKIP(1) EDIT('    A SYSMOD WILL OCCUR UNDER EACH OF ITS ',
+             'FMIDS WHICH IS FOUND IN THE PTS SYSTEM ENTRY.') (A);
+         NOTFOUNDS = NO;
+         END;
+     WHEN(NOTFOUNDS) DO;
+         PUT SKIP(2) EDIT('<<< NOTFOUNDS OPTION - ',
+             'ONLY SYSMODS FOR ', SYSREL, ' WILL BE REPRESENTED.') (A);
+         PUT SKIP(1) EDIT('    A SYSMOD WILL NOT OCCUR IF ANY ',
+             'OF ITS FMIDS IS FOUND IN THE PTS SYSTEM ENTRY.') (A);
+         END;
+     OTHERWISE DO;
+         PUT SKIP(2) EDIT('<<< DEFAULT OPTION - ',
+             'ONLY SYSMODS FOR ', SYSREL, ' WILL BE REPRESENTED.') (A);
+         PUT SKIP(1) EDIT('    IN ADDITION, SYSMODS WITH MULTIPLE ',
+             '++VER STATEMENTS WILL OCCUR ONLY ') (A);
+         PUT SKIP(1) EDIT('    UNDER ONE FMID WHICH IS FOUND IN THE ',
+             'PTS SYSTEM ENTRY,') (A);
+         PUT SKIP(1) EDIT('    IF ANY OF THE FMIDS ARE FOUND IN THE ',
+             'PTS SYSTEM ENTRY.') (A);
+         END;
+     END;
+
+ SKIPPER:  /* SKIP MEMBERS WITH WIERD NAMES */
+ DO ENTRY# = 1 BY 1 WHILE(MEMBER_NAME(ENTRY#) < ' ');
+     END SKIPPER;
+
+ PTS:  /* PROCESS TEXT OF REGULAR SYSMOD ENTRIES */
+ DO ENTRY# = ENTRY# TO NUMBER_ENTRIES;
+
+     /* GET NEXT MEMBER AND DO INITIAL READ */
+     FINDTTR = TTR(ENTRY#);
+     CALL PDSFUNC('FINDTTR');
+     CALL READ_PTSSMP;
+1    READ_MEMBER:  /* READ THROUGH TO THE END OF A MEMBER */
+     DO WHILE(ªEND_OF_FILE);
+
+         IF SUBSTR(REC, 1, 2) = '++'
+             THEN DO;
+                  POS = VERIFY(SUBSTR(REC, 3), ' ') + 2;
+                  PLUS_PLUS:  /* DETERMINE TYPE OF ++ CARD */
+                  SELECT(SUBSTR(REC, POS, 3));
+                      WHEN('FUN') DO;
+                          CALL GET_SYSMOD;
+                          CALL FUNCTION(CURRENT_SYSMOD);
+                          END;
+                      WHEN('PTF') CALL GET_SYSMOD;
+                      WHEN('APA') CALL GET_SYSMOD;
+                      WHEN('USE') CALL GET_SYSMOD;
+                      WHEN('HOL');
+                      WHEN('JCL');
+                      WHEN('VER') CALL VER_STMT;
+                      WHEN('IF ');
+                      WHEN('MOD');
+                      WHEN('ZAP');
+                      WHEN('MAC');
+                      WHEN('UPD');
+                      WHEN('SRC');
+                      OTHERWISE DO;
+                          PUT SKIP(2) EDIT('<<< UNEXPECTED ++')(A);
+                          PUT SKIP EDIT(REC) (A);
+                          END;
+                      END PLUS_PLUS;
+
+                  END;
+
+         CALL READ_PTSSMP;
+         END READ_MEMBER;
+
+     END PTS;
+
+ CALL PDSFUNC('CLOSE');
+
+ CALL HEAPSRT(START_CHAR, S);
+1STARTS:  /* GO THROUGH THE BASE TABLE AND BUILD CONTROL STATEMENTS */
+ DO F = 1 TO S;
+
+     /* START A NEW CONTROL CARD */
+     I = 1;
+     SEL1(I) = FMID(F);
+     CURRPTR = NODEPTR(F);
+
+     STARTER_LIST:  /* EACH POSITION IN THE TABLE HAS A LINKED LIST */
+     DO WHILE(CURRPTR ª= NULL);
+         I = I + 1;
+         IF I <= 7
+             THEN DO;  /* FINISH FIRST CONTROL CARD */
+                  SEL1(I) = CURRPTR -> SYSMOD;
+                  CURRPTR = CURRPTR -> NEXTPTR;
+                  END;
+             ELSE DO;  /* BUILD CONTINUATION CONTROL CARDS */
+                  /* WRITE OUT COMPLETED FIRST CONTROL CARD */
+                  IF I = 8
+                      THEN DO;
+                           PUNC1 = ' ';
+                           WRITE FILE(CNTLSMP) FROM(CNTL1);
+                           END;
+                  /* WRITE OUT COMPLETED CONTINUATION CONTROL CARD */
+                  IF I = 15
+                      THEN DO;
+                           PUNC2 = ' ';
+                           WRITE FILE(CNTLSMP) FROM(CNTL2);
+                           I = 8;
+                           END;
+                  SEL2(I) = CURRPTR -> SYSMOD;
+                  CURRPTR = CURRPTR -> NEXTPTR;
+                  END;
+         END STARTER_LIST;
+1    /* BLANK OUT REMAINING POSITIONS IN CONTROL CARD AND TERMINATE */
+     IF I > 7
+         THEN DO;
+              DO I = I+1 TO 14;
+                  SEL2(I) = ' ';
+                  END;
+              PUNC2 = ').';
+              WRITE FILE(CNTLSMP) FROM(CNTL2);
+              END;
+         ELSE DO;
+              DO I = I+1 TO 7;
+                  SEL1(I) = ' ';
+                  END;
+              PUNC1 = ').';
+              WRITE FILE(CNTLSMP) FROM(CNTL1);
+              END;
+     END STARTS;
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1GET_SYSMOD:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE FINDS THE SYSMOD IDENTIFIER AND PLACES ITS VALUE   */
+ /* IN CURRENT_SYSMOD FOR LATER USE.  IT ALSO DOES SOME               */
+ /* INITIALIZATION PROCESSING AND CONTROLS THE CALLING OF             */
+ /*  ADD_OWNING_FUNCTIONS (FOR THE PRIOR SYSMOD).                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ /* ADD LAST SYSMOD TO STRUCTURE IF IT WAS VALID */
+ IF OWNING_FUNCTION(1) ª= ' '
+     THEN CALL ADD_OWNING_FUNCTIONS;
+
+ POS = INDEX(REC, '(') + 1;
+ POS = VERIFY(SUBSTR(REC, POS), ' ,') + POS - 1;
+
+ CURRENT_SYSMOD = SUBSTR(REC, POS, 7);
+
+ OF = 0;
+ OWNING_FUNCTION = ' ';
+
+ END GET_SYSMOD;
+1FUNCTION:  PROCEDURE(FMID_NAME);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THE PURPOSE OF THIS PROCEDURE IS TO BUILD THE FUNCTION TABLE      */
+ /* WHICH IS THE BASE OF THE DATA STRUCTURE.  IF THE FUNCTION HAS     */
+ /* ALREADY BEEN ENTERED OR THE PROGRAM OPTION IS SELECTIVE DO NOT    */
+ /* ENTER IT.                                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  FMID_NAME  CHAR(*);
+ DECLARE  I  FIXED BINARY;
+
+
+ DO I = 1 TO HBOUND(FMID, 1)  WHILE(FMID(I) ª= ' ');
+     IF FMID_NAME = FMID(I)
+         THEN RETURN;
+     END;
+
+ IF ONLYFOUNDS & ªIN_PTSSYS(FMID_NAME, SYS, #SYS)
+     THEN RETURN;
+
+ IF NOTFOUNDS & IN_PTSSYS(FMID_NAME, SYS, #SYS)
+     THEN RETURN;
+
+ S = S + 1;
+ IF S > HBOUND(FMID, 1)
+     THEN DO;
+          PUT SKIP(2) EDIT('*** ERROR, FMID TABLE OVERFLOW') (A);
+          SIGNAL ERROR;
+          END;
+
+ FMID(S) = FMID_NAME;
+
+
+ END FUNCTION;
+1VER_STMT:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* WHEN A ++VER STATEMENT IS ENCOUNTERED THE SYSREL IS CHECKED AND   */
+ /* IF IT MATCHES THE OWNING FUNCTION IS EXTRACTED.                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  I  FIXED BINARY;
+
+
+ /* VERIFY THAT THIS ++VER APPLIES TO THE SYSTEM RELEASE */
+ POS = INDEX(REC, '(') + 1;
+ POS = VERIFY(SUBSTR(REC, POS), ' ,') + POS - 1;
+ IF SUBSTR(REC, POS, 4) ª= SYSREL
+     THEN RETURN;
+
+ SCAN_VER:  /* THE FMID KEYWORD ON THE ++VER STATEMENT */
+ DO UNTIL(POS ª= 0 | END_OF_FILE);
+
+     I = INDEX(REC, 'FMID');
+     IF I ª= 0
+         THEN DO;
+              I = INDEX(SUBSTR(REC, I), '(') + I;
+              I = VERIFY(SUBSTR(REC, I), ' ,') + I - 1;
+              OF = OF + 1;
+              IF OF > HBOUND(OWNING_FUNCTION, 1)
+                  THEN PUT SKIP(2) EDIT('*** ERROR, OWNING_FUNCTION ',
+                           'TABLE OVERFLOW ON ', CURRENT_SYSMOD) (A);
+                  ELSE OWNING_FUNCTION(OF) = SUBSTR(REC, I, 7);
+              END;
+
+     POS = INDEX(REC, '.');
+     IF POS = 0
+         THEN CALL READ_PTSSMP;
+     END SCAN_VER;
+
+ END VER_STMT;
+1ADD_OWNING_FUNCTIONS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CONTROLS THE ENTERING OF SYSMODS INTO THE DATA     */
+ /* STRUCTURE ACCORDING TO THE PROGRAM OPTION.  IN ADDITION IT PRINTS */
+ /* INFORMATIVE MESSAGES ABOUT SYSMODS AFFECTED BY THE PROGRAM        */
+ /* OPTION.                                                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  I               FIXED BINARY;
+ DECLARE  LAST_FOUND      FIXED BINARY INIT(0);
+ DECLARE  LAST_NOT_FOUND  FIXED BINARY INIT(0);
+
+
+ /* FIND LAST FMID FOUND IN PTS SYSTEM ENTRY */
+ DO I = 1 TO OF;
+     IF IN_PTSSYS(OWNING_FUNCTION(I), SYS, #SYS)
+         THEN LAST_FOUND = I;
+         ELSE LAST_NOT_FOUND = I;
+     END;
+
+ OPTION_SELECT:  /* DO THE PROCESSING REQUIRED FOR EACH OPTION */
+ SELECT;
+     WHEN(NOSYSTEM) DO I = 1 TO OF;
+         CALL ADD_NODE(OWNING_FUNCTION(I));
+         END;
+
+     WHEN(NOTFOUNDS) IF LAST_FOUND = 0
+         THEN DO I = 1 TO OF;
+              CALL ADD_NODE(OWNING_FUNCTION(I));
+              END;
+         ELSE PUT SKIP(2) EDIT('<<< ', CURRENT_SYSMOD, 'WAS ',
+                  'FOUND IN PTS SYSTEM ENTRY FOR SOME FMID(S):  ',
+                  (OWNING_FUNCTION(I) DO I = 1 TO OF)) (A);
+1    WHEN(ONLYFOUNDS) IF LAST_FOUND = 0
+         THEN PUT SKIP(2) EDIT('<<< ', CURRENT_SYSMOD, 'WAS NOT ',
+                  'FOUND IN PTS SYSTEM ENTRY FOR ANY FMID(S):  ',
+                  (OWNING_FUNCTION(I) DO I = 1 TO OF)) (A);
+         ELSE IF LAST_NOT_FOUND = 0
+                  THEN DO I = 1 TO OF;
+                           CALL ADD_NODE(OWNING_FUNCTION(I));
+                           END;
+                  ELSE DO;
+                       PUT SKIP(2) EDIT('<<< ', CURRENT_SYSMOD,
+                           'WAS FOUND IN PTS SYSTEM ENTRY EXCEPT ',
+                           'FOR THESE FMID(S):  ') (A);
+                       DO I = 1 TO OF;
+                           IF IN_PTSSYS(OWNING_FUNCTION(I), SYS, #SYS)
+                               THEN CALL ADD_NODE(OWNING_FUNCTION(I));
+                               ELSE PUT EDIT(OWNING_FUNCTION(I)) (A);
+                           END;
+                       END;
+
+     OTHERWISE IF LAST_FOUND = 0
+         THEN DO I = 1 TO OF;
+                  CALL ADD_NODE(OWNING_FUNCTION(I));
+                  END;
+         ELSE IF OF = 1
+                  THEN CALL ADD_NODE(OWNING_FUNCTION(OF));
+                  ELSE DO;
+                       PUT SKIP(2) EDIT('<<< ', CURRENT_SYSMOD,
+                           'WILL NOT OCCUR UNDER THE FOLLOWING ',
+                           'FMID(S):  ') (A);
+                       DO I = 1 TO OF;
+                           IF I = LAST_FOUND
+                               THEN CALL ADD_NODE(OWNING_FUNCTION(I));
+                               ELSE PUT EDIT(OWNING_FUNCTION(I)) (A);
+                           END;
+                       PUT SKIP(1) EDIT('<<< ', CURRENT_SYSMOD,
+                           'WILL OCCUR ONLY UNDER ',
+                           OWNING_FUNCTION(LAST_FOUND)) (A);
+                       END;
+
+     END OPTION_SELECT;
+1ADD_NODE:  PROCEDURE(OWNING_FUNCTION);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* A SEARCH OF THE TABLE IS MADE FOR THE SYSMOD'S OWNING FUNCTION.   */
+ /* IF IT IS FOUND INSERT IS CALLED AND THE SYSMOD IS ADDED ONTO THE  */
+ /* LINKED LIST.  IF IT IS NOT FOUND THE FUNCTION IS ADDED TO THE     */
+ /* TABLE AND THEN THE SYSMOD IS ADDED AS THE THE FIRST NODE OF THE   */
+ /* LINKED LIST.                                                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  OWNING_FUNCTION  CHAR(*);
+ DECLARE  I                FIXED BINARY;
+
+
+ /* PREPARE NODE FOR INSERTION */
+ ALLOCATE NODE;
+ SYSMOD = CURRENT_SYSMOD;
+
+ SEARCH:  /* FIND OWNING FUNCTION IN THE BASE TABLE */
+ DO I = 1 TO S;
+     IF OWNING_FUNCTION = FMID(I)
+         THEN DO;
+              CALL INSERT(I);
+              RETURN;
+              END;
+     END SEARCH;
+
+ /* FUNCTION WAS NOT FOUND IN THE BASE TABLE SO ADD IT FIRST */
+ CALL FUNCTION(OWNING_FUNCTION);
+ CALL INSERT(S);
+1INSERT:  PROCEDURE(I);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO ADD_NODE.  THE LINK LIST POINTED TO */
+ /* WITH I IS TRAVERSED AND THE NEW NODE ADDED AT THE END OF THE      */
+ /* LIST.                                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  I  FIXED BINARY;
+
+
+ PREVPTR = NULL;
+ CURRPTR = NODEPTR(I);
+
+ DO WHILE(CURRPTR ª= NULL);
+     PREVPTR = CURRPTR;
+     CURRPTR = PREVPTR -> NEXTPTR;
+     END;
+
+ IF PREVPTR = NULL
+     THEN NODEPTR(I) = N;
+     ELSE PREVPTR -> NEXTPTR = N;
+
+ END INSERT;
+
+ END ADD_NODE;
+
+ END ADD_OWNING_FUNCTIONS;
+1READ_PTSSMP:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PROCEDURE FOR PTSSMP INPUT AND COMMON PROCESSING.  COMMON         */
+ /* PROCESSING INCLUDES STRIPING OUT COMMENTS AND NON-SMP (NON- ++)   */
+ /* DATA.                                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  BEGPOS  FIXED BINARY;
+ DECLARE  ENDPOS  FIXED BINARY;
+ DECLARE  REC2    CHAR(72) INIT(' ');
+
+
+ /* GET THE NEXT RECORD */
+ CALL PDSFUNC('READ');
+ IF END_OF_FILE
+     THEN RETURN;
+ REC = SUBSTR(RECORD, 1, 72);
+
+ /* STRIP OUT NON-SMP DATA */
+ IF SUBSTR(REC, 1, 2) ª= '++'  &  ªSMP_STMT
+     THEN DO;
+          REC = ' ';
+          RETURN;
+          END;
+1/* STRIP OUT COMMENTS FROM SMP CONTROL STATEMENTS */
+ BEGPOS = INDEX(REC, '/*');
+
+ COMMENT_FOUND:  /* PROCESS WHILE STATEMENT STILL CONTAINS COMMENTS */
+ DO WHILE(BEGPOS ª= 0 & ªEND_OF_FILE);
+
+     SAME_STMT = YES;
+     ENDPOS = INDEX(REC, '*/');
+
+     FIND_END:  /* LOOK FOR AN INDICATION OF THE END OF THE COMMENT */
+     DO WHILE(ENDPOS = 0 & ªEND_OF_FILE & SAME_STMT);
+         SUBSTR(REC, BEGPOS) = ' ';
+         IF REC ª= ' '
+             THEN DO;
+                  REC2 = REC;
+                  END;
+         BEGPOS = 1;
+         CALL PDSFUNC('READ');
+         REC = SUBSTR(RECORD, 1, 72);
+         ENDPOS = INDEX(REC, '*/');
+         IF SUBSTR(REC, 1, 2) = '++'
+             THEN SAME_STMT = NO;
+         END FIND_END;
+
+     /* REMOVE COMMENT MATERIAL */
+     IF ENDPOS ª= 0
+         THEN SUBSTR(REC, BEGPOS, ENDPOS-BEGPOS+2) = ' ';
+
+     /* RECONSTRUCT RECORD IF NECESSARY */
+     IF REC2 ª= ' ' & SAME_STMT
+         THEN REC = SUBSTR(REC2, 1, IVERIFY(REC2, ' ')) || ' ' ||
+                  SUBSTR(REC, VERIFY(REC, ' '));
+
+     /* CHECK FOR ANOTHER COMMENT */
+     BEGPOS = INDEX(REC, '/*');
+     END COMMENT_FOUND;
+
+ /* CHECK FOR END OF SMP CONTROL STATEMENT */
+ IF INDEX(REC, '.') = 0
+     THEN SMP_STMT = YES;
+     ELSE SMP_STMT = NO;
+
+ END READ_PTSSMP;
+1PDSFUNC:  PROCEDURE(FUNCTION);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE PARAMETER IS THE FUNCTION TO BE    */
+ /* PERFORMED BY PDSPROC.                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DCL FUNCTION CHAR(*);
+
+ CALL PDSPROC(FUNCTION, PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT SKIP EDIT(ERRMSG) (A);
+          PUT SKIP EDIT('RETURN CODE =', PLIRETV) (A, F(9));
+          SIGNAL ERROR;
+          END;
+ END PDSFUNC;
+1IN_PTSSYS:  PROCEDURE(KEY, TABLE, HIGH) RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THE FUNCTION OF THE PROCEDURE IS TO SEARCH THE TABLE FOR THE KEY  */
+ /* VALUE (BOTH PARAMETERS).  IF THE KEY IS FOUND IN THE TABLE RETURN */
+ /* A BINARY "TRUE" VALUE OTHERWISE "FALSE".  THE BINARY SEARCH       */
+ /* ALGORITHM IS USED SO THE TABLE MUST BE SORTED IN ASCENDING ORDER. */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  KEY           CHAR(*);
+ DECLARE  TABLE(*)      CHAR(*);
+ DECLARE  HIGH          FIXED BINARY;
+
+ DECLARE  POS           FIXED BINARY;
+ DECLARE  UPPER         FIXED BINARY;
+ DECLARE  LOWER         FIXED BINARY;
+
+
+ LOWER = 1;
+ UPPER = HIGH;
+
+ BINARY_SEARCH:
+ DO WHILE(UPPER >= LOWER);
+     POS = (LOWER + UPPER) / 2;
+     IF KEY = TABLE(POS)
+         THEN RETURN(YES);
+         ELSE IF KEY > TABLE(POS)
+                  THEN LOWER = POS + 1;
+                  ELSE UPPER = POS - 1;
+     END BINARY_SEARCH;
+
+ RETURN(NO);
+
+ END IN_PTSSYS;
+1SYSTEM_FMIDS: PROCEDURE(SYS, #SYS);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* CREATE A LIST OF SYSTEM FMIDS IN THE SYS TABLE.  THE FMIDS ARE    */
+ /* TAKEN FROM THE FMIDS INPUT FILE.  IF THE FMIDS FILE IS UNDEFINED  */
+ /* THEN THE PTS SYSTEM ENTRY IS READ (ONLY WORKS FOR SMP/4) AND THE  */
+ /* LIST IS CREATED FROM IT.                                          */
+ /* THE TABLE IS SORTED SO THE BINARY SEARCH ALGORITHM MAY BE USED    */
+ /* FOR TABLE SEARCH.                                                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  SYS(*)  CHAR(*);
+ DECLARE  #SYS    FIXED BINARY;
+
+ DECLARE  READ_FILE  BIT(1) INIT('0'B);
+
+
+ ON UNDEFINEDFILE(FMIDS) GOTO GETFMIDS;
+
+ OPEN FILE(FMIDS);
+ READ_FILE = YES;
+
+ GETFMIDS:
+ IF READ_FILE
+     THEN CALL READ_FMIDS;
+     ELSE CALL PTS_SYSTEM;
+
+ /* MAKE ALL INVALID ENTRIES ALIKE AND HIGH VALUED */
+ DO #SYS = 1 TO HBOUND(SYS, 1);
+     IF SYS(#SYS) = ' ' | SYS(#SYS) = EMPTY_ENTRY
+         THEN SYS(#SYS) = DELETED_ENTRY;
+     END;
+1/* SORT THE SYS TABLE */
+ CALL HEAPSRT(SYS, HBOUND(SYS, 1));
+
+ /* COUNT HOW MANY VALID ENTRIES */
+ DO #SYS = 1 TO HBOUND(SYS, 1) WHILE(SYS(#SYS) < DELETED_ENTRY);
+     END;
+
+ /* DID WE FILL THE TABLE? */
+ IF #SYS > HBOUND(SYS, 1)
+     THEN DO;
+          PUT SKIP(3) EDIT('*** ERROR IN PROCESSING PTS SYSTEM ENTRY, ',
+              'NOSYSTEM OPTION FORCED INTO EFFECT.') (A);
+          NOSYSTEM = YES;
+          ONLYFOUNDS = NO;
+          NOTFOUNDS = NO;
+          PUT SKIP(2) EDIT('*** PROGRAM INFORMATION FOR DEBUGGING.')(A);
+          PUT SKIP(2) DATA(SYS);
+          SYS = ' ';
+          RETURN;
+          END;
+     ELSE #SYS = #SYS - 1;
+1READ_FMIDS: PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO SYSTEM_FMIDS.                       */
+ /* THIS PROCEDURE READS THE FMIDS FILE AND BUILDS THE SYS TABLE      */
+ /* CONTAINING ALL THE FMIDS WHICH OCCUR IN THE SYSTEM AS SPECIFIED.  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ON CONVERSION BEGIN;
+     INPT = ONSOURCE;
+     ONSOURCE = (16) '0';
+     END;
+
+ /* GET FMID LIST FROM INPUT FILE */
+ GET FILE(FMIDS) LIST(NNN);
+ DO WHILE(MORE_FMIDS);
+     IF NNN = 0
+         THEN DO;
+              #SYS = #SYS + 1;
+              SYS(#SYS) = INPT;
+              END;
+     GET FILE(FMIDS) LIST(NNN);
+     END;
+
+ END READ_FMIDS;
+1PTS_SYSTEM: PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO SYSTEM_FMIDS.                       */
+ /* THIS PROCEDURE READS THE PTS SYSTEM ENTRY AND BUILDS THE SYS      */
+ /* TABLE CONTAINING ALL THE FMIDS WHICH OCCUR IN THE SYSTEM ENTRY.   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ /* GET PTS SYSTEM ENTRY - FIRST MEMBER (.SYSTEM) */
+ FINDTTR = TTR(1);
+ CALL PDSFUNC('FINDTTR');
+
+ /* ACCUMULATE RECORDS THAT CONTAIN FMIDS */
+ CALL PDSFUNC('READ');
+ DO WHILE(ªEND_OF_FILE);
+     IF SUBSTR(RECORD, 1, LENGTH(SYSREL)) = SYSREL
+         THEN TAKE_REC = YES;
+     IF TAKE_REC
+         THEN SYSRECS = SYSRECS || RECORD;
+     CALL PDSFUNC('READ');
+     END;
+1/* WAS THE ACCUMULATION SUCCESSFUL? */
+ IF ªTAKE_REC | LENGTH(SYSRECS) = MAXLEN(SYSRECS)
+     THEN DO;
+          PUT SKIP(3) EDIT('*** ERROR IN PROCESSING PTS SYSTEM ENTRY, ',
+              'NOSYSTEM OPTION FORCED INTO EFFECT.') (A);
+          NOSYSTEM = YES;
+          ONLYFOUNDS = NO;
+          NOTFOUNDS = NO;
+          PUT SKIP(2) EDIT('*** PROGRAM INFORMATION FOR DEBUGGING.')(A);
+          PUT SKIP(2) DATA(SYSRECS);
+          RETURN;
+          END;
+     ELSE DO;
+          SYSRECS = SYSRECS || (32760) ' ';
+          GET STRING(SYSRECS) EDIT(SYS) (A(7), X(2));
+          END;
+
+ /* MAKE INVALID ENTRY HIGH VALUED */
+ SYS(1) = DELETED_ENTRY;
+
+ END PTS_SYSTEM;
+
+ END SYSTEM_FMIDS;
+
+
+ END SMPREJ;
+

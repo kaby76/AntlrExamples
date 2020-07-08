@@ -1,0 +1,66 @@
+./ ADD MEMBER=CTZUTIL
+   D,'PANEL(DIRCOMP)'
+./ ADD MEMBER=DIRCOMP
+%--------------------------  PDS DIRECTORY COMPARE  ----------------------------
+%COMMAND ===>_ZCMD                                                             +
+%
++"OLD" DATA SET:
++   DATA SET NAME %===>_OLDDSN                                     +
++   VOLUME SERIAL %===>_OVOL  +   (If not cataloged)
++
++"NEW" DATA SET:
++   DATA SET NAME %===>_NEWDSN                                     +
++   VOLUME SERIAL %===>_NVOL  +   (If not cataloged)
++
++
++
++Optional Range of Member Names to be Compared:
++   LOW RANGE  %===>_LRANGE  +
++   HIGH RANGE %===>_HRANGE  +
+)INIT
+ .CURSOR = OLDDSN
+ .HELP = DIRCOMPT
+ &ZCMD = ' '
+)PROC
+ VER (&OLDDSN,NB,DSNAME)
+ VER (&NEWDSN,NB,DSNAME)
+ VER (&LRANGE,NAME)
+ VER (&HRANGE,NAME)
+ VPUT (OLDDSN,NEWDSN,OVOL,NVOL) SHARED
+ &ZSEL = 'CMD(%DIRCOMP &OLDDSN &NEWDSN OVOL(''&OVOL'') NVOL(''&NVOL'') +
+ LRANGE(''&LRANGE'') HRANGE(''&HRANGE''))'
+)END
+./ ADD MEMBER=DIRCOMPC
+PROC 2 OLDDSN NEWDSN OVOL() NVOL() LRANGE() HRANGE() NEW
+ALLOC DA(*) F(SYSPRINT) REUSE
+IF &OVOL ^= +
+    THEN SET &OVOL = &STR(UNIT(SYSDA) VOL(&OVOL))
+IF &NVOL ^= +
+    THEN SET &NVOL = &STR(UNIT(SYSDA) VOL(&NVOL))
+ALLOC DA(&OLDDSN.) F(OLD) SHR &OVOL REUSE
+ALLOC DA(&NEWDSN.) F(NEW) SHR &NVOL REUSE
+IF &NEW = +
+    THEN CALL 'T802S21.OLD.LOAD(DIRCOMP)'
+    ELSE CALL 'T802S21.NEW.LOAD(DIRCOMP)' +
+             'NOSTAE,NOSPIE/&LRANGE,&HRANGE'
+./ ADD MEMBER=DIRCOMPT
+%TUTORIAL -----------------  PDS DIRECTORY COMPARE  ------------------ TUTORIAL
+%
+%
++    DIRCOMP is a program to compare the directory entries for two
++    partitioned datasets (DSORG=PO).
++
++    %"OLD" DATA SET+ and %"NEW" DATA SET+ refers to the situation in which
++    the data sets are two versions of the same PDS.  It is %not+meant to
++    imply that the two data sets must be two versions of the same data set;
++    they may be totally unrelated.  Please note also that the actual
++    members of the data set themselves are not compared, only the member
++    names are.
++
++    When specifying the optional range either the low range or the high
++    range parameter or both may be specified.  The range is inclusive and
++    thus may be specified as a substring of any representative member.  For
++    example specifying +LOW RANGE  %===> c+ will cause the member
++    comparison to start with those members which start with the letter "C".
+)END
+

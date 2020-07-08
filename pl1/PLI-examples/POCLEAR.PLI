@@ -1,0 +1,131 @@
+*PROCESS NM;
+ POCLEAR:  PROCEDURE OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('POCLEAR V1.3  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(5K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM CLEARS OUT A PDS ALLOCATED TO DDNAME SYSUT1/SYSUT2.  */
+ /* AFTER ALL THE MEMBERS HAVE BEEN DELETED IEBCOPY IS ATTACHED TO    */
+ /* COMPRESS THE PDS.  THE PDS CAN THEN BE REUSED JUST LIKE A NEWLY   */
+ /* ALLOCATED ONE.                                                    */
+ /*                                                                   */
+ /*   DDNAME    EXPLANATION                                           */
+ /*   ======    ===========                                           */
+ /*   SYSUT1    PDS TO BE CLEARED                                     */
+ /*   SYSUT2    PDS TO BE CLEARED                                     */
+ /*   SYSUT3    TEMP SPILL SPACE FOR IEBCOPY                          */
+ /*   SYSUT4    TEMP SPILL SPACE FOR IEBCOPY                          */
+ /*   SYSIN     DUMMY FILE FOR IEBCOPY                                */
+ /*   SYSPRINT  SYSOUT MESSAGES FOR IEBCOPY                           */
+ /*   SYSMSG    SYSOUT MESSAGES FOR POCLEAR                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE
+   1  PARM,
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMNAME     CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6);
+1DECLARE
+   1  DIRECTORY  BASED(BLDLPTR),
+      2  NUMBER_ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT REFER(NUMBER_ENTRIES)),
+         3  MEMBER_NAME  CHAR(8),
+         3  TTR          CHAR(3),
+         3  C_FIELD,
+            4  ALIAS           BIT(1),
+            4  NUM_TTRN        BIT(2),
+            4  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+
+ DECLARE  PDSPROC    ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  LINK       ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  TSOSET     ENTRY OPTIONS(ASM, INTER);
+ DECLARE  TSORST     ENTRY OPTIONS(ASM, INTER);
+ DECLARE  SYSMSG     FILE STREAM OUTPUT PRINT;
+ DECLARE  DELMEM_NAME(#MEM)  CHAR(8) CONTROLLED;
+ DECLARE  (#MEM, I)  FIXED BINARY;
+ DECLARE  DSN        CHAR(44) VARYING;
+ DECLARE  VOLSER     CHAR(6);
+ DECLARE  YES        BIT(1) STATIC INIT('1'B);
+ DECLARE  NO         BIT(1) STATIC INIT('0'B);
+ DECLARE  PARAMETER  CHAR(1) VARYING INIT('');
+ DECLARE  (ADDR, LENGTH, PLIRETV, UNSPEC)  BUILTIN;
+ DECLARE  ERRMSG     BASED(ERRPTR) CHAR(32767) VARYING;
+
+
+ OPEN_FOR_INPUT = YES;
+ DDNAME = 'SYSUT1';
+ CALL PDSFUNC('OPEN');
+ CALL PDSFUNC('BLDL');
+
+ DSN = DSNAME;
+ VOLSER = VOLUME;
+ #MEM = NUMBER_ENTRIES;
+ ALLOC DELMEM_NAME;
+ DELMEM_NAME = MEMBER_NAME;
+
+ CALL PDSFUNC('CLOSE');
+1OPEN_FOR_INPUT = NO;
+ CALL PDSFUNC('OPEN');
+ PUT FILE(SYSMSG) SKIP EDIT(DSN, VOLSER) (A);
+
+ DO I = #MEM TO 1 BY -1;
+     BLDLPTR = ADDR(DELMEM_NAME(I));
+     CALL PDSFUNC('STOWDEL');
+     END;
+
+ CALL PDSFUNC('CLOSE');
+ FREE DELMEM_NAME;
+
+ CALL TSOSET;
+ CALL LINK('IEBCOPY ', PARAMETER);
+ PUT FILE(SYSMSG) SKIP EDIT('COMPRESS RETURN CODE=', PLIRETV)
+     (A, F(10));
+ CALL TSORST;
+1PDSFUNC:  PROCEDURE(FUNCTION);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE PARAMETER IS THE FUNCTION TO BE    */
+ /* PERFORMED BY PDSPROC.                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FUNCTION  CHAR(10);
+
+ CALL PDSPROC(FUNCTION, PARM);
+
+ IF PLIRETV > 4
+     THEN DO;
+          PUT FILE(SYSMSG) SKIP EDIT(ERRMSG) (A);
+          PUT FILE(SYSMSG) SKIP EDIT('RETURN CODE =', PLIRETV)
+              (A, F(4));
+          SIGNAL ERROR;
+          END;
+
+ END PDSFUNC;
+
+ END POCLEAR;
+

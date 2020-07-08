@@ -1,0 +1,66 @@
+*PROCESS NM;
+ PDSEXIT:  PROCEDURE(EXITOUT, REC, CURRMEM) REORDER;
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('PDSEXIT V2.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* PDSEXIT IS ANY USER EXIT WRITTEN FOR PDSPRINT.  THE MODULE IS     */
+ /* LINK EDITTED SEPARATE FROM PDSPRINT AND IS FETCHED WHEN THE       */
+ /* USEREXIT OPTION IS SELECTED.                                      */
+ /*                                                                   */
+ /* THE FIRST PARM EXITOUT IS AN OUTPUT FILE WHICH MAY BE USED FOR    */
+ /* ANY TYPE DCB CHARACTERISTICS AND MAY BE EITHER STREAM OR REC.     */
+ /*                                                                   */
+ /* THE SECOND PARM REC IS THE CURRENT REC IN THE CURRENT             */
+ /* MEMBER.                                                           */
+ /*                                                                   */
+ /* THE THIRD PARM CURRMEM IS THE NAME OF THE CURRENT MEMBER.         */
+ /*                                                                   */
+ /* THE PURPOSE OF THIS VERSION OF PDSEXIT IS TO PROVIDE AN EDIT FOR  */
+ /* SMP PTS SYSMOD MEMBERS.  THE OUTPUT FROM PDSPRINT IS THEN IN      */
+ /* COVERLETTER FORMAT.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  EXITOUT   FILE VARIABLE;
+ DECLARE  REC       CHAR(*) VARYING;
+ DECLARE  CURRMEM   CHAR(*);
+
+ DECLARE  SMPSTMT  BIT(1) STATIC INIT('0'B);
+ DECLARE  GETNEXT  BIT(1) STATIC INIT('0'B);
+
+ DECLARE  NO       BIT(1) STATIC INIT('0'B);
+ DECLARE  YES      BIT(1) STATIC INIT('1'B);
+ DECLARE  (INDEX, SUBSTR)  BUILTIN;
+1REC = SUBSTR(REC, 1, 72);
+
+ IF GETNEXT
+     THEN IF SUBSTR(REC, 1, 2) = '++'
+              THEN GETNEXT = NO;
+              ELSE IF INDEX(REC, '*/') = 0
+                       THEN RETURN;
+                       ELSE GETNEXT = NO;
+
+ /* STRIP OUT NON-SMP DATA */
+ IF SUBSTR(REC, 1, 2) ^= '++'  &  ^SMPSTMT
+     THEN DO;
+          REC = '';
+          RETURN;
+          END;
+
+ IF INDEX(REC, '/*') ^= 0
+     THEN IF INDEX(REC, '*/') = 0
+              THEN DO;
+                   SMPSTMT = YES;
+                   GETNEXT = YES;
+                   RETURN;
+                   END;
+
+ /* CHECK FOR END OF SMP CONTROL STATEMENT */
+ IF INDEX(REC, '.') = 0
+     THEN SMPSTMT = YES;
+     ELSE SMPSTMT = NO;
+
+ END PDSEXIT;
+

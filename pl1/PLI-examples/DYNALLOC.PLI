@@ -1,0 +1,1918 @@
+*PROCESS M;
+ DYNALOC:  PROCEDURE(PARAMETER) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(36) VARYING STATIC EXTERNAL
+     INIT('DYNALLOC V5.1  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(5K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM IS A ONE STEP TSO ALLOCATE PROGRAM.                  */
+ /* THE ACTUAL ALLOCATION IS DONE BY AN ASSEMBLER ROUTINE WHICH       */
+ /* MERELY LOADS A COUPLE OF REGISTERS AND ISSUES AN SVC 99.          */
+ /* FOR INPUT AND OUTPUT A FULL SCREEN TPUT AND TGET ARE USED.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+ /*    ++INCLUDE HEX                                                  */
+1%X:  PROCEDURE(HEXSTR) RETURNS(CHAR);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THE PURPOSE OF THIS MACRO IS TO ENABLE THE PROGRAMMER TO REFER TO */
+ /* HEX CONSTANTS IN A PL/I PROGRAM.  THE MACRO REFERENCE IS OF THE   */
+ /* FORM X(5F) FOR THE CORRESPONDING ASSEMBLER X'5F'.  WHAT IS        */
+ /* SUPPLIED TO THE COMPILER IS A BIT STRING '01011111'B.  WHEN USING */
+ /* HEX STRINGS FOR IDENTIFIERS WITH ATTRIBUTES OTHER THAN BIT, THE   */
+ /* MACRO WILL ALSO ALLOW THE PROGRAMMER TO PLACE THE IDENTIFIER IN A */
+ /* MACRO REFERENCE OF THE FORM X(IDENTIFIER).  WHAT IS SUPPLIED TO   */
+ /* THE COMPILER IN THIS INSTANCE IS UNSPEC(IDENTIFIER).  THIS        */
+ /* FEATURE IS SUPPLIED FOR LOGICAL CONSISTANCY, SO AS TO REFER TO    */
+ /* BOTH IDENTIFIER AND CONSTANTS AS HEX DATA RATHER THAN REQUIRING   */
+ /* THE PROGRAMMER TO REFER TO ANYTHING AS BIT STRINGS.  THE ONE      */
+ /* RESTRICTION ON USING IDENTIFIERS IN THE MACRO REFERENCE IS THAT   */
+ /* THE IDENTIFIER HAVE AT LEAST ONE CHARACTER IN ITS NAME THAT COULD */
+ /* NOT BE INTERPRETED AS BEING PART OF A HEX CONSTANT.  SO THAT, FOR */
+ /* EXAMPLE THE VARIABLE, ABC, WOULD BE WRONGLY INTERPRETED AS        */
+ /* '101010111100'B RATHER THAN UNSPEC(ABC).                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  HEXSTR  CHAR;
+ DECLARE  BITSTR  CHAR;
+ DECLARE  (LENGTH, SUBSTR) BUILTIN;
+ DECLARE  I  FIXED;
+
+ BITSTR = '';
+
+1DO I = 1 TO LENGTH(HEXSTR);
+     IF SUBSTR(HEXSTR, I, 1) = '0'
+         THEN BITSTR = BITSTR ]] '0000';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '1'
+         THEN BITSTR = BITSTR ]] '0001';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '2'
+         THEN BITSTR = BITSTR ]] '0010';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '3'
+         THEN BITSTR = BITSTR ]] '0011';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '4'
+         THEN BITSTR = BITSTR ]] '0100';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '5'
+         THEN BITSTR = BITSTR ]] '0101';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '6'
+         THEN BITSTR = BITSTR ]] '0110';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '7'
+         THEN BITSTR = BITSTR ]] '0111';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '8'
+         THEN BITSTR = BITSTR ]] '1000';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = '9'
+         THEN BITSTR = BITSTR ]] '1001';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = 'A'
+         THEN BITSTR = BITSTR ]] '1010';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = 'B'
+         THEN BITSTR = BITSTR ]] '1011';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = 'C'
+         THEN BITSTR = BITSTR ]] '1100';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = 'D'
+         THEN BITSTR = BITSTR ]] '1101';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = 'E'
+         THEN BITSTR = BITSTR ]] '1110';
+     ELSE IF SUBSTR(HEXSTR, I, 1) = 'F'
+         THEN BITSTR = BITSTR ]] '1111';
+     ELSE DO;
+          BITSTR = 'UNSPEC(' ]] HEXSTR ]] ')';
+          RETURN(BITSTR);
+          END;
+     END;
+
+ BITSTR = '''' ]] BITSTR ]] '''B';
+
+ RETURN(BITSTR);
+ %END X;
+ %ACTIVATE X;
+ /*    ++INCLUDE SCREEN                                               */
+1%SCRFIELD:  PROCEDURE(FIELDS) RETURNS(CHAR);
+ /*  SCRFIELD  V1.0  BY CLYDE THOMAS ZUBER  */
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS MACRO REPLACES AND SUPERCEDES SCRDCL.  IT IS DESIGNED TO BE  */
+ /* COMPATIBLE WITH SCRADDR V2.0.                                     */
+ /* THE PURPOSE OF THIS MACRO IS TO ASSIGN THE BIT DEFINITIONS FOR    */
+ /* DECLARATIONS OF TPUT OUTPUT AREAS.  SINCE IT ALLOWS FOR FIELDS    */
+ /* OF DIFFERING LENGTHS IT CAN BE USED WITH BUFFER AREAS THAT ARE    */
+ /* DECLARED STATICALLY AS THE BIT STRING IS SUPPLIED AT COMPILE      */
+ /* TIME.                                                             */
+ /* EXAMPLE:  INIT(SCRFIELD(SBA ]] SCRADDR(3, 10) ]] SF));            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  (I, J, K, DOUBLE, POS) FIXED;
+ DECLARE  (OP, FIELDS, NEWSTR, OP2, STR, STR2, RETSTR)  CHAR;
+ DECLARE  (INDEX, LENGTH, SUBSTR)  BUILTIN;
+
+ I=0;J=0;K=0;DOUBLE=0;POS=0;
+ OP='';NEWSTR='';OP2='';STR='';STR2='';RETSTR='';
+1DO I = 1 TO 30;
+     IF FIELDS = ''
+         THEN GOTO FINISH;
+
+     POS = INDEX(FIELDS, ']]');
+
+     IF POS = 0
+         THEN DO;
+              OP = FIELDS;
+              FIELDS = '';
+              END;
+         ELSE DO;
+              OP = SUBSTR(FIELDS, 1, POS-1);
+              FIELDS = SUBSTR(FIELDS, POS+2);
+              END;
+
+     DOOP2:
+     IF DOUBLE = 1
+         THEN DO;
+              OP = OP2;
+              OP2 = '';
+              STR2 = STR;
+              DOUBLE = 0;
+              END;
+
+     POS = INDEX(OP, ']');
+     IF POS ^= 0
+         THEN DO;
+              DOUBLE = 1;
+              OP2 = SUBSTR(OP, POS+1);
+              OP = SUBSTR(OP, 1, POS-1);
+              END;
+
+     TRIM:
+     POS = INDEX(OP, ' ');
+     IF POS = 1
+         THEN DO;
+              OP = SUBSTR(OP, 2);
+              GOTO TRIM;
+              END;
+     ELSE IF POS ^= 0
+         THEN DO;
+              OP = SUBSTR(OP, 1, POS-1) ]] SUBSTR(OP, POS+1);
+              GOTO TRIM;
+              END;
+1    IF OP = 'ALARM'
+         THEN STR = '11000100';
+     ELSE IF OP = 'RESTORE_KEYBOARD'
+         THEN STR = '11000010';
+     ELSE IF OP = 'RESET_MTD'
+         THEN STR = '11000001';
+     ELSE IF OP = 'RESET_KEYBOARD_MTD'
+         THEN STR = '11000011';
+     ELSE IF OP = 'WCC_DEFAULT'
+         THEN STR = '01000000';
+     ELSE IF OP = 'SF'
+         THEN STR = '00011101';
+     ELSE IF OP = 'SBA'
+         THEN STR = '00010001';
+     ELSE IF OP = 'IC'
+         THEN STR = '00010011';
+     ELSE IF OP = 'PT'
+         THEN STR = '00000101';
+     ELSE IF OP = 'RA'
+         THEN STR = '00111100';
+     ELSE IF OP = 'EUA'
+         THEN STR = '00010010';
+     ELSE IF OP = 'PROT'
+         THEN STR = '01100000';
+     ELSE IF OP = 'NUMERIC'
+         THEN STR = '01010000';
+     ELSE IF OP = 'MDT'
+         THEN STR = '01000001';
+     ELSE IF OP = 'SKP'
+         THEN STR = '01110000';
+     ELSE IF OP = 'HI_LIGHT'
+         THEN STR = '01001000';
+     ELSE IF OP = 'NON_DISPLAY'
+         THEN STR = '01001100';
+     ELSE IF OP = 'SELECTABLE'
+         THEN STR = '01000100';
+     ELSE IF OP = 'DEF_ATTR'
+         THEN STR = '00000000';
+     ELSE STR = OP;
+1    IF STR2 ^= ''
+         THEN DO;
+              NEWSTR = '';
+              K = LENGTH(STR);
+              IF K > LENGTH(STR2)
+                  THEN K = LENGTH(STR2);
+              DO J = 1 TO K;
+                  IF SUBSTR(STR, J, 1) = '1' ] SUBSTR(STR2, J, 1) = '1'
+                      THEN NEWSTR = NEWSTR ]] '1';
+                      ELSE NEWSTR = NEWSTR ]] '0';
+                  END;
+              STR = NEWSTR;
+              STR2 = '';
+              END;
+
+
+     IF DOUBLE = 1
+         THEN GOTO DOOP2;
+
+     RETSTR = RETSTR ]] STR;
+     END;
+
+ FINISH:
+ RETURN('''' ]] RETSTR ]] '''B');
+ %END SCRFIELD;
+ %ACTIVATE SCRFIELD;
+1%SCRADDR:  PROCEDURE(ROW, COL) RETURNS(CHAR);
+ /*  SCRADDR  V2.0  BY CLYDE THOMAS ZUBER  */
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS MACRO COMPUTES THE SCREEN ADDRESS ON A TERMINAL SCREEN WITH  */
+ /* EITHER 40, 80 OR 132 CHARACTER COLUMNS.  THERE ARE 64 DIFFERENT   */
+ /* POSSIBLE HEX VALUES WHICH CAN BE USED IN AN ADDRESS OF A ROW OR   */
+ /* COLUMN.  THE MATH COMPUTES AN SUBSCRIPT WHICH IS USED TO          */
+ /* MAP THE 64 DIFFERENT POSSIBLE ADDRESSES.                          */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  (ROW, COL) FIXED;
+ DECLARE  (SUB1, SUB2, POS, NO_COLS)  FIXED;
+ DECLARE  (HEX_ADDR1, HEX_ADDR2)  CHAR;
+
+ /* THIS VALUE MAY BE CHANGED TO 40, 80 OR 132 */
+ NO_COLS = 80;
+
+ POS = ((ROW - 1) * NO_COLS) + (COL - 1);
+ SUB1 = POS / 64;
+ SUB2 = POS - ((POS / 64) * 64);
+1IF SUB1 = 0
+     THEN HEX_ADDR1 = '01000000';
+ ELSE IF SUB1 = 1
+     THEN HEX_ADDR1 = '11000001';
+ ELSE IF SUB1 = 2
+     THEN HEX_ADDR1 = '11000010';
+ ELSE IF SUB1 = 3
+     THEN HEX_ADDR1 = '11000011';
+ ELSE IF SUB1 = 4
+     THEN HEX_ADDR1 = '11000100';
+ ELSE IF SUB1 = 5
+     THEN HEX_ADDR1 = '11000101';
+ ELSE IF SUB1 = 6
+     THEN HEX_ADDR1 = '11000110';
+ ELSE IF SUB1 = 7
+     THEN HEX_ADDR1 = '11000111';
+ ELSE IF SUB1 = 8
+     THEN HEX_ADDR1 = '11001000';
+ ELSE IF SUB1 = 9
+     THEN HEX_ADDR1 = '11001001';
+ ELSE IF SUB1 = 10
+     THEN HEX_ADDR1 = '01001010';
+ ELSE IF SUB1 = 11
+     THEN HEX_ADDR1 = '01001011';
+ ELSE IF SUB1 = 12
+     THEN HEX_ADDR1 = '01001100';
+ ELSE IF SUB1 = 13
+     THEN HEX_ADDR1 = '01001101';
+ ELSE IF SUB1 = 14
+     THEN HEX_ADDR1 = '01001110';
+ ELSE IF SUB1 = 15
+     THEN HEX_ADDR1 = '01001111';
+ ELSE IF SUB1 = 16
+     THEN HEX_ADDR1 = '01010000';
+ ELSE IF SUB1 = 17
+     THEN HEX_ADDR1 = '11010001';
+ ELSE IF SUB1 = 18
+     THEN HEX_ADDR1 = '11010010';
+ ELSE IF SUB1 = 19
+     THEN HEX_ADDR1 = '11010011';
+ ELSE IF SUB1 = 20
+     THEN HEX_ADDR1 = '11010100';
+1ELSE IF SUB1 = 21
+     THEN HEX_ADDR1 = '11010101';
+ ELSE IF SUB1 = 22
+     THEN HEX_ADDR1 = '11010110';
+ ELSE IF SUB1 = 23
+     THEN HEX_ADDR1 = '11010111';
+ ELSE IF SUB1 = 24
+     THEN HEX_ADDR1 = '11011000';
+ ELSE IF SUB1 = 25
+     THEN HEX_ADDR1 = '11011001';
+ ELSE IF SUB1 = 26
+     THEN HEX_ADDR1 = '01011010';
+ ELSE IF SUB1 = 27
+     THEN HEX_ADDR1 = '01011011';
+ ELSE IF SUB1 = 28
+     THEN HEX_ADDR1 = '01011100';
+ ELSE IF SUB1 = 29
+     THEN HEX_ADDR1 = '01011101';
+ ELSE IF SUB1 = 30
+     THEN HEX_ADDR1 = '01011110';
+ ELSE IF SUB1 = 31
+     THEN HEX_ADDR1 = '01011111';
+ ELSE IF SUB1 = 32
+     THEN HEX_ADDR1 = '01100000';
+ ELSE IF SUB1 = 33
+     THEN HEX_ADDR1 = '01100001';
+ ELSE IF SUB1 = 34
+     THEN HEX_ADDR1 = '11100010';
+ ELSE IF SUB1 = 35
+     THEN HEX_ADDR1 = '11100011';
+ ELSE IF SUB1 = 36
+     THEN HEX_ADDR1 = '11100100';
+ ELSE IF SUB1 = 37
+     THEN HEX_ADDR1 = '11100101';
+ ELSE IF SUB1 = 38
+     THEN HEX_ADDR1 = '11100110';
+ ELSE IF SUB1 = 39
+     THEN HEX_ADDR1 = '11100111';
+ ELSE IF SUB1 = 40
+     THEN HEX_ADDR1 = '11101000';
+1ELSE IF SUB1 = 41
+     THEN HEX_ADDR1 = '11101001';
+ ELSE IF SUB1 = 42
+     THEN HEX_ADDR1 = '01101010';
+ ELSE IF SUB1 = 43
+     THEN HEX_ADDR1 = '01101011';
+ ELSE IF SUB1 = 44
+     THEN HEX_ADDR1 = '01101100';
+ ELSE IF SUB1 = 45
+     THEN HEX_ADDR1 = '01101101';
+ ELSE IF SUB1 = 46
+     THEN HEX_ADDR1 = '01101110';
+ ELSE IF SUB1 = 47
+     THEN HEX_ADDR1 = '01101111';
+ ELSE IF SUB1 = 48
+     THEN HEX_ADDR1 = '11110000';
+ ELSE IF SUB1 = 49
+     THEN HEX_ADDR1 = '11110001';
+ ELSE IF SUB1 = 50
+     THEN HEX_ADDR1 = '11110010';
+ ELSE IF SUB1 = 51
+     THEN HEX_ADDR1 = '11110011';
+ ELSE IF SUB1 = 52
+     THEN HEX_ADDR1 = '11110100';
+ ELSE IF SUB1 = 53
+     THEN HEX_ADDR1 = '11110101';
+ ELSE IF SUB1 = 54
+     THEN HEX_ADDR1 = '11110110';
+ ELSE IF SUB1 = 55
+     THEN HEX_ADDR1 = '11110111';
+ ELSE IF SUB1 = 56
+     THEN HEX_ADDR1 = '11111000';
+ ELSE IF SUB1 = 57
+     THEN HEX_ADDR1 = '11111001';
+ ELSE IF SUB1 = 58
+     THEN HEX_ADDR1 = '01111010';
+ ELSE IF SUB1 = 59
+     THEN HEX_ADDR1 = '01111011';
+ ELSE IF SUB1 = 60
+     THEN HEX_ADDR1 = '01111100';
+ ELSE IF SUB1 = 61
+     THEN HEX_ADDR1 = '01111101';
+ ELSE IF SUB1 = 62
+     THEN HEX_ADDR1 = '01111110';
+ ELSE IF SUB1 = 63
+     THEN HEX_ADDR1 = '01111111';
+1IF SUB2 = 0
+     THEN HEX_ADDR2 = '01000000';
+ ELSE IF SUB2 = 1
+     THEN HEX_ADDR2 = '11000001';
+ ELSE IF SUB2 = 2
+     THEN HEX_ADDR2 = '11000010';
+ ELSE IF SUB2 = 3
+     THEN HEX_ADDR2 = '11000011';
+ ELSE IF SUB2 = 4
+     THEN HEX_ADDR2 = '11000100';
+ ELSE IF SUB2 = 5
+     THEN HEX_ADDR2 = '11000101';
+ ELSE IF SUB2 = 6
+     THEN HEX_ADDR2 = '11000110';
+ ELSE IF SUB2 = 7
+     THEN HEX_ADDR2 = '11000111';
+ ELSE IF SUB2 = 8
+     THEN HEX_ADDR2 = '11001000';
+ ELSE IF SUB2 = 9
+     THEN HEX_ADDR2 = '11001001';
+ ELSE IF SUB2 = 10
+     THEN HEX_ADDR2 = '01001010';
+ ELSE IF SUB2 = 11
+     THEN HEX_ADDR2 = '01001011';
+ ELSE IF SUB2 = 12
+     THEN HEX_ADDR2 = '01001100';
+ ELSE IF SUB2 = 13
+     THEN HEX_ADDR2 = '01001101';
+ ELSE IF SUB2 = 14
+     THEN HEX_ADDR2 = '01001110';
+ ELSE IF SUB2 = 15
+     THEN HEX_ADDR2 = '01001111';
+ ELSE IF SUB2 = 16
+     THEN HEX_ADDR2 = '01010000';
+ ELSE IF SUB2 = 17
+     THEN HEX_ADDR2 = '11010001';
+ ELSE IF SUB2 = 18
+     THEN HEX_ADDR2 = '11010010';
+ ELSE IF SUB2 = 19
+     THEN HEX_ADDR2 = '11010011';
+ ELSE IF SUB2 = 20
+     THEN HEX_ADDR2 = '11010100';
+1ELSE IF SUB2 = 21
+     THEN HEX_ADDR2 = '11010101';
+ ELSE IF SUB2 = 22
+     THEN HEX_ADDR2 = '11010110';
+ ELSE IF SUB2 = 23
+     THEN HEX_ADDR2 = '11010111';
+ ELSE IF SUB2 = 24
+     THEN HEX_ADDR2 = '11011000';
+ ELSE IF SUB2 = 25
+     THEN HEX_ADDR2 = '11011001';
+ ELSE IF SUB2 = 26
+     THEN HEX_ADDR2 = '01011010';
+ ELSE IF SUB2 = 27
+     THEN HEX_ADDR2 = '01011011';
+ ELSE IF SUB2 = 28
+     THEN HEX_ADDR2 = '01011100';
+ ELSE IF SUB2 = 29
+     THEN HEX_ADDR2 = '01011101';
+ ELSE IF SUB2 = 30
+     THEN HEX_ADDR2 = '01011110';
+ ELSE IF SUB2 = 31
+     THEN HEX_ADDR2 = '01011111';
+ ELSE IF SUB2 = 32
+     THEN HEX_ADDR2 = '01100000';
+ ELSE IF SUB2 = 33
+     THEN HEX_ADDR2 = '01100001';
+ ELSE IF SUB2 = 34
+     THEN HEX_ADDR2 = '11100010';
+ ELSE IF SUB2 = 35
+     THEN HEX_ADDR2 = '11100011';
+ ELSE IF SUB2 = 36
+     THEN HEX_ADDR2 = '11100100';
+ ELSE IF SUB2 = 37
+     THEN HEX_ADDR2 = '11100101';
+ ELSE IF SUB2 = 38
+     THEN HEX_ADDR2 = '11100110';
+ ELSE IF SUB2 = 39
+     THEN HEX_ADDR2 = '11100111';
+ ELSE IF SUB2 = 40
+     THEN HEX_ADDR2 = '11101000';
+1ELSE IF SUB2 = 41
+     THEN HEX_ADDR2 = '11101001';
+ ELSE IF SUB2 = 42
+     THEN HEX_ADDR2 = '01101010';
+ ELSE IF SUB2 = 43
+     THEN HEX_ADDR2 = '01101011';
+ ELSE IF SUB2 = 44
+     THEN HEX_ADDR2 = '01101100';
+ ELSE IF SUB2 = 45
+     THEN HEX_ADDR2 = '01101101';
+ ELSE IF SUB2 = 46
+     THEN HEX_ADDR2 = '01101110';
+ ELSE IF SUB2 = 47
+     THEN HEX_ADDR2 = '01101111';
+ ELSE IF SUB2 = 48
+     THEN HEX_ADDR2 = '11110000';
+ ELSE IF SUB2 = 49
+     THEN HEX_ADDR2 = '11110001';
+ ELSE IF SUB2 = 50
+     THEN HEX_ADDR2 = '11110010';
+ ELSE IF SUB2 = 51
+     THEN HEX_ADDR2 = '11110011';
+ ELSE IF SUB2 = 52
+     THEN HEX_ADDR2 = '11110100';
+ ELSE IF SUB2 = 53
+     THEN HEX_ADDR2 = '11110101';
+ ELSE IF SUB2 = 54
+     THEN HEX_ADDR2 = '11110110';
+ ELSE IF SUB2 = 55
+     THEN HEX_ADDR2 = '11110111';
+ ELSE IF SUB2 = 56
+     THEN HEX_ADDR2 = '11111000';
+ ELSE IF SUB2 = 57
+     THEN HEX_ADDR2 = '11111001';
+ ELSE IF SUB2 = 58
+     THEN HEX_ADDR2 = '01111010';
+ ELSE IF SUB2 = 59
+     THEN HEX_ADDR2 = '01111011';
+ ELSE IF SUB2 = 60
+     THEN HEX_ADDR2 = '01111100';
+ ELSE IF SUB2 = 61
+     THEN HEX_ADDR2 = '01111101';
+ ELSE IF SUB2 = 62
+     THEN HEX_ADDR2 = '01111110';
+ ELSE IF SUB2 = 63
+     THEN HEX_ADDR2 = '01111111';
+
+
+ RETURN(HEX_ADDR1 ]] HEX_ADDR2);
+ %END SCRADDR;
+ %ACTIVATE SCRADDR;
+1%/********************************************************************/
+ /*                                                                   */
+ /* ATTENTION IDENTIFIERS, AID.                                       */
+ /*                                                                   */
+ /* THESE IDENTIFIERS ARE USED TO IDENTIFY WHAT KEY WAS USED TO INPUT */
+ /* A SCREEN. THESE CAN BE USED BY THE PROGRAM TO GIVE THE OPERATOR   */
+ /* THE ABILITY TO MAKE OTHER REQUESTS THAN WHAT THE SCREEN ITSELF    */
+ /* ALLOWS.                                                           */
+ /*                                                                   */
+ /********************************************************************/;
+ %;
+ %DECLARE ENTER  CHAR;
+ %DECLARE CLEAR  CHAR;
+ %;
+ %DECLARE PA1   CHAR;
+ %DECLARE PA2   CHAR;
+ %DECLARE PA3   CHAR;
+ %;
+ %DECLARE PF1   CHAR;
+ %DECLARE PF2   CHAR;
+ %DECLARE PF3   CHAR;
+ %DECLARE PF4   CHAR;
+ %DECLARE PF5   CHAR;
+ %DECLARE PF6   CHAR;
+ %DECLARE PF7   CHAR;
+ %DECLARE PF8   CHAR;
+ %DECLARE PF9   CHAR;
+ %DECLARE PF10  CHAR;
+ %DECLARE PF11  CHAR;
+ %DECLARE PF12  CHAR;
+ %DECLARE PF13  CHAR;
+ %DECLARE PF14  CHAR;
+ %DECLARE PF15  CHAR;
+ %DECLARE PF16  CHAR;
+ %DECLARE PF17  CHAR;
+ %DECLARE PF18  CHAR;
+ %DECLARE PF19  CHAR;
+ %DECLARE PF20  CHAR;
+ %DECLARE PF21  CHAR;
+ %DECLARE PF22  CHAR;
+ %DECLARE PF23  CHAR;
+ %DECLARE PF24  CHAR;
+1%ENTER         = 'X(7D)';
+ %CLEAR         = 'X(6D)';
+ %;
+ %PA1           = 'X(6C)';
+ %PA2           = 'X(6E)';
+ %PA3           = 'X(6B)';
+ %;
+ %PF1           = 'X(F1)';
+ %PF2           = 'X(F2)';
+ %PF3           = 'X(F3)';
+ %PF4           = 'X(F4)';
+ %PF5           = 'X(F5)';
+ %PF6           = 'X(F6)';
+ %PF7           = 'X(F7)';
+ %PF8           = 'X(F8)';
+ %PF9           = 'X(F9)';
+ %PF10          = 'X(FA)';
+ %PF11          = 'X(7B)';
+ %PF12          = 'X(7C)';
+ %PF13          = 'X(C1)';
+ %PF14          = 'X(C2)';
+ %PF15          = 'X(C3)';
+ %PF16          = 'X(C4)';
+ %PF17          = 'X(C5)';
+ %PF18          = 'X(C6)';
+ %PF19          = 'X(C7)';
+ %PF20          = 'X(C8)';
+ %PF21          = 'X(C9)';
+ %PF22          = 'X(4A)';
+ %PF23          = 'X(4B)';
+ %PF24          = 'X(4C)';
+1%;
+
+ DECLARE
+     1  ALLOC  ALIGNED,
+        2  SVC99              FIXED BINARY INIT(99),
+        2  R0                 FIXED BINARY(31) INIT(0),
+        2  R1                 PTR,
+        2  PTR_REQUEST_BLK    BIT(32),
+        2  REQUEST_BLK,
+           3  BLK_LENGTH      BIT(8)  INIT(X(14)),
+           3  VERB            BIT(8)  INIT(X(01)),
+           3  FLAGS_ERR_INFO  BIT(48) INIT('0'B),
+           3  PTR_TEXT_PTRS   PTR,
+           3  RESERVED_FLAGS  BIT(64) INIT('0'B);
+
+ DECLARE  TEXT_PTR(20)  BIT(32) ALIGNED;
+
+ DECLARE
+     1  TEXT_FIELD(20),
+        2  KEY   FIXED BINARY,
+        2  NUM   FIXED BINARY,
+        2  PARM  CHAR(44) VARYING;
+
+ DECLARE
+   1  NUMBER_PARM(20)  BASED(ADDR(TEXT_FIELD(1))),
+      2  FILLER1   CHAR(4),
+      2  LEN       FIXED BINARY,
+      2  NUM_PARM  FIXED BINARY,
+      2  FILLER2   CHAR(42);
+1DECLARE
+   1  BIT_PARM(20)   BASED(ADDR(TEXT_FIELD(1))),
+      2  FILLER1     CHAR(6),
+      2  ONE_BYTE    BIT(8),
+      2  FILLER2     CHAR(43);
+
+ DECLARE
+   1  BIT_PARM2(20)   BASED(ADDR(TEXT_FIELD(1))),
+      2  FILLER1      CHAR(6),
+      2  THREE_BYTES  BIT(24),
+      2  FILLER2      CHAR(41);
+
+ DECLARE  (ADDR, DELAY, INDEX, LENGTH, MOD, PLIRETV, SUBSTR,
+           UNSPEC, VERIFY) BUILTIN;
+ DECLARE  CATLG    BIT(1) INIT('1'B);
+ DECLARE  FULLWORD  FIXED BINARY(31);
+ DECLARE  (FSMODE, GETSCR, PUTSCR)  ENTRY OPTIONS(ASM, INTER);
+ DECLARE  (LINK, SVC)  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  TSOID  ENTRY OPTIONS(ASM, INTER);
+ DECLARE  DSNAME  CHAR(44) VARYING;
+ %DECLARE  DSN_ALLOC_VERB  CHAR;
+ %DSN_ALLOC_VERB  = 'X(01)';
+ DECLARE  DUMMY  BIT(1) INIT('0'B);
+ DECLARE  EDIT_AREA  PIC '(5)Z';
+ %DECLARE  UNALLOC_VERB  CHAR;
+ %UNALLOC_VERB  = 'X(02)';
+ DECLARE  GAVE_DIRECTORY  BIT(1) INIT('0'B);
+ DECLARE  GAVE_MEMBER     BIT(1) INIT('0'B);
+ DECLARE  (POS, SET#) FIXED BINARY;
+ %DECLARE  NO  CHAR;
+ %NO  = '''0''B';
+ %DECLARE  PERIOD  CHAR;
+ %PERIOD  = '''.''';
+ %DECLARE  PIC_DIGITS  CHAR;
+ %PIC_DIGITS  = ''' 1234567890''';
+ DECLARE  PREFIX  CHAR(7) VARYING;
+ DECLARE  PROCESS_AGAIN  BIT(1) INIT('1'B);
+ DECLARE  UNALLOCATE  BIT(1) INIT('0'B);
+ DECLARE  USERID  CHAR(7) VARYING;
+ %DECLARE  VALID_CHARS  CHAR;
+ %VALID_CHARS = ''' 1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ@#-&$+''';
+ %DECLARE  VALID_CHARS_WPERIOD  CHAR;
+ %VALID_CHARS_WPERIOD
+             = ''' .1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ@#-&$+''';
+ %DECLARE  YES  CHAR;
+ %YES  = '''1''B';
+ %DECLARE  OLD_UNCATLG  CHAR;
+ %OLD_UNCATLG = 'X(01)';
+ %DECLARE  MOD_CATLG  CHAR;
+ %MOD_CATLG = 'X(02)';
+ %DECLARE  NEW_DEL  CHAR;
+ %NEW_DEL = 'X(04)';
+ %DECLARE  SHR_KEEP_CONTIG  CHAR;
+ %SHR_KEEP_CONTIG = 'X(08)';
+ %DECLARE  ABE  CHAR;
+ %ABE = 'X(20)';
+ %DECLARE  SKIP_BLK  CHAR;
+ %SKIP_BLK = 'X(40)';
+ %DECLARE  ACC  CHAR;
+ %ACC = 'X(80)';
+
+ DECLARE  PARAMETER CHAR(100) VARYING;
+ %DECLARE  ALIGNED_LENGTH  CHAR;
+ %ALIGNED_LENGTH  = '146';
+ %DECLARE  ERR_LIT  CHAR;
+ %ERR_LIT  = '''*****  ERROR -''';
+1DECLARE
+  1  WRITE_AREA  UNALIGNED,
+     2  ESCAPE_COMMAND_WCC  BIT(24)  INIT(X(27F5C3)),
+     2  LINE1,
+        3  ORD_ATTR  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(1,10) ]]SF]] SKP ] HI_LIGHT)),
+        3  TITLE  CHAR(18) INIT('DYNAMIC ALLOCATION'),
+     2  LINE2,
+        3  ORD_ATTR  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(2,3) ]]SF]] SKP ] HI_LIGHT)),
+        3  ERR_IND  CHAR(14) INIT(' '),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(2,18) ]]SF]] SKP ] HI_LIGHT)),
+        3  MSG  CHAR(62) INIT(' '),
+     2  LINE3,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(3,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  PROJECT_LIT  CHAR(7) INIT('PROJECT'),
+        3  ORD_ATTR2  BIT(48)
+             INIT(SCRFIELD(SBA ]] SCRADDR(3,21) ]] SF ]] MDT ]] IC)),
+        3  PROJECT_OUT  CHAR(8) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(3,35) ]] SF ]] SKP)),
+        3  PROJECT_EXP  CHAR(29) INIT('* for terminal, *** for dummy'),
+     2  LINE4,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(4,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  LIBRARY_LIT  CHAR(7) INIT('LIBRARY'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(4,21)  ]] SF ]] MDT)),
+        3  LIBRARY_OUT  CHAR(8) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(4,35) ]] SF ]] SKP)),
+        3  LIBRARY_EXP  CHAR(27) INIT('type if no middle qualifier'),
+     2  LINE5,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(5,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  TYPE_LIT  CHAR(4) INIT('TYPE'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(5,21) ]] SF ]] MDT)),
+        3  TYPE_OUT  CHAR(8) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE6,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(6,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  MEMBER_LIT  CHAR(6) INIT('MEMBER'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(6,21) ]] SF ]] MDT)),
+        3  MEMBER_OUT  CHAR(8) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+1    2  LINE8,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(8,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  DDNAME_LIT  CHAR(6) INIT('DDNAME'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(8,21) ]] SF ]] MDT)),
+        3  DDNAME_OUT  CHAR(8) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE9,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(9,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  VOLUME_LIT  CHAR(6) INIT('VOLUME'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(9,21) ]] SF ]] MDT)),
+        3  VOLUME_OUT  CHAR(6) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE10,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(10,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  DISP_LIT  CHAR(4) INIT('DISP'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(10,21) ]] SF ]] MDT)),
+        3  DISP_OUT  CHAR(1) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(10,35) ]] SF ]] SKP)),
+        3  DISP_EXP  CHAR(26) INIT('N-new, S-shr, O-old, M-mod'),
+     2  LINE11,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(11,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  PERM_LIT  CHAR(9) INIT('PERMANENT'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(11,21) ]] SF ]] MDT)),
+        3  PERM_OUT  CHAR(1) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(11,35) ]] SF ]] SKP)),
+        3  PERM_EXP  CHAR(5) INIT('Y-yes'),
+     2  LINE13,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(13,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  RECFM_LIT  CHAR(5) INIT('RECFM'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(13,21) ]] SF ]] MDT)),
+        3  RECFM_OUT  CHAR(4) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE14,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(14,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  LRECL_LIT  CHAR(5) INIT('LRECL'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(14,21) ]]SF]] NUMERIC ] MDT)),
+        3  LRECL_OUT  CHAR(5) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+1    2  LINE15,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(15,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  BLKSIZE_LIT  CHAR(7) INIT('BLKSIZE'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(15,21) ]]SF]] NUMERIC ] MDT)),
+        3  BLKSIZE_OUT  CHAR(5) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE16,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(16,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  DSORG_LIT  CHAR(5) INIT('DSORG'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(16,21) ]] SF ]] MDT)),
+        3  DSORG_OUT  CHAR(3) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(16,35) ]] SF ]] SKP)),
+        3  DSORG_EXP  CHAR(25) INIT('PS, PO, DA, PSU, POU, DAU'),
+     2  LINE17,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(17,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  EROPT_LIT  CHAR(5) INIT('EROPT'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(17,21) ]] SF ]] MDT)),
+        3  EROPT_OUT  CHAR(3) INIT('ABE'),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(17,35) ]] SF ]] SKP)),
+        3  EROPT_EXP  CHAR(31) INIT('ABE-abend, SKP-skip, ACC-accept'),
+     2  LINE19,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(19,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  SPACE_LIT  CHAR(5) INIT('SPACE'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(19,21) ]] SF ]] MDT)),
+        3  SPACE_OUT  CHAR(1) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(19,35) ]] SF ]] SKP)),
+        3  SPACE_EXP  CHAR(32) INIT('T-tracks, C-cylinders, B-blocks'),
+     2  LINE20,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(20,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  CONTIG_LIT  CHAR(10) INIT('CONTIGUOUS'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(20,21) ]] SF ]] MDT)),
+        3  CONTIG_OUT  CHAR(1) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(20,35) ]] SF ]] SKP)),
+        3  CONTIG_EXP  CHAR(5) INIT('Y-yes'),
+1    2  LINE21,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(21,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  PRIM_LIT  CHAR(7) INIT('PRIMARY'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(21,21) ]]SF]] NUMERIC ] MDT)),
+        3  PRIM_OUT  CHAR(5) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE22,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(22,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  SEC_LIT  CHAR(9) INIT('SECONDARY'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(22,21) ]]SF]] NUMERIC ] MDT)),
+        3  SEC_OUT  CHAR(5) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE23,
+        3  ORD  BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(23,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  DIR_LIT  CHAR(9) INIT('DIRECTORY'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(23,21) ]]SF]] NUMERIC ] MDT)),
+        3  DIR_OUT  CHAR(5) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+     2  LINE24,
+        3  ORD   BIT(32) INIT(SCRFIELD(SBA ]] SCRADDR(24,10) ]] SF)),
+        3  ATTR  BIT(8)  INIT(SCRFIELD(SKP)),
+        3  RLSE_LIT  CHAR(7) INIT('RELEASE'),
+        3  ORD_ATTR2  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(24,21) ]] SF ]] MDT)),
+        3  RLSE_OUT  CHAR(1) INIT(' '),
+        3  END_ATTR  BIT(16) INIT(SCRFIELD(SF ]] SKP)),
+        3  ORD_ATTR3  BIT(40)
+             INIT(SCRFIELD(SBA ]] SCRADDR(24,35) ]] SF ]] SKP)),
+        3  RLSE_EXP  CHAR(5) INIT('Y-yes'),
+     2  WRITE_AREA_END BIT(8);
+1DECLARE
+     1  READ_AREA  UNALIGNED,
+        2  AID  BIT(8),
+        2  CURSOR_ROW_COL  BIT(16),
+        2  ROW3,
+           3  ORD_ATTR2  BIT(24),
+           3  PROJECT_AREA  CHAR(8),
+        2  ROW4,
+           3  ORD_ATTR2  BIT(24),
+           3  LIBRARY_AREA  CHAR(8),
+        2  ROW5,
+           3  ORD_ATTR2  BIT(24),
+           3  TYPE_AREA  CHAR(8),
+        2  ROW6,
+           3  ORD_ATTR2  BIT(24),
+           3  MEMBER_AREA  CHAR(8),
+        2  ROW8,
+           3  ORD_ATTR2  BIT(24),
+           3  DDNAME_AREA  CHAR(8),
+        2  ROW9,
+           3  ORD_ATTR2  BIT(24),
+           3  VOLUME_AREA  CHAR(6),
+        2  ROW10,
+           3  ORD_ATTR2  BIT(24),
+           3  DISP_AREA  CHAR(1),
+        2  ROW11,
+           3  ORD_ATTR2  BIT(24),
+           3  PERM_AREA  CHAR(1),
+        2  ROW13,
+           3  ORD_ATTR2  BIT(24),
+           3  RECFM_AREA  CHAR(4),
+        2  ROW14,
+           3  ORD_ATTR2  BIT(24),
+           3  LRECL_AREA  PIC '(5)9',
+        2  ROW15,
+           3  ORD_ATTR2  BIT(24),
+           3  BLKSIZE_AREA  PIC '(5)9',
+        2  ROW16,
+           3  ORD_ATTR2  BIT(24),
+           3  DSORG_AREA  CHAR(3),
+        2  ROW17,
+           3  ORD_ATTR2  BIT(24),
+           3  EROPT_AREA  CHAR(3),
+        2  ROW19,
+           3  ORD_ATTR2  BIT(24),
+           3  SPACE_AREA  CHAR(1),
+1       2  ROW20,
+           3  ORD_ATTR2  BIT(24),
+           3  CONTIG_AREA  CHAR(1),
+        2  ROW21,
+           3  ORD_ATTR2  BIT(24),
+           3  PRIM_AREA  PIC '(5)9',
+        2  ROW22,
+           3  ORD_ATTR2  BIT(24),
+           3  SEC_AREA  PIC '(5)9',
+        2  ROW23,
+           3  ORD_ATTR2  BIT(24),
+           3  DIR_AREA  PIC '(5)9',
+        2  ROW24,
+           3  ORD_ATTR2  BIT(24),
+           3  RLSE_AREA  CHAR(1),
+        2  READ_AREA_END BIT(8);
+
+
+ CALL TSOID(USERID, PREFIX);
+ SELECT(PARAMETER);
+     WHEN('CLEAR') DO;
+         PROJECT_OUT = ' ';
+         EROPT_OUT = ' ';
+         END;
+     WHEN('PREFIX') PROJECT_OUT = PREFIX;
+     WHEN('UNCATLG') DO;
+         PROJECT_OUT = ' ';
+         CATLG = NO;
+         END;
+     OTHERWISE PROJECT_OUT = USERID;
+     END;
+
+ R1 = ADDR(PTR_REQUEST_BLK);
+ PTR_REQUEST_BLK = UNSPEC(ADDR(REQUEST_BLK));
+ PTR_TEXT_PTRS = ADDR(TEXT_PTR);
+ SUBSTR(PTR_REQUEST_BLK, 1, 1) = '1'B;
+ CALL FSMODE('ON');
+
+ DO WHILE(PROCESS_AGAIN);
+     PROCESS_AGAIN = NO;
+     CALL PUT_GET_SCREEN;
+     END;
+
+ CALL FSMODE('OFF');
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW.                                      */
+ /*********************************************************************/
+1PUT_GET_SCREEN: PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CALLS THE ASSEMBLER ROUTINE WHICH WRITES THE       */
+ /* WRITE_AREA TO THE TERMINAL SCREEN.  IT THEN ISSUES A READ INTO    */
+ /* THE READ_AREA.  INTERNAL PROCEDURES SET UP THE ALLOCATE PARMS     */
+ /* ACCORDING TO WHAT WAS ENTERED.  IF AN ERROR IS DETECTED IN WHAT   */
+ /* IS ENTERED THEN PROCESS_AGAIN IS SET AND THIS PROCEDURE IS CALLED */
+ /* AGAIN BY THE PROCESS_LOOP.                                        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CALL PUTSCR(WRITE_AREA, WRITE_AREA_END);
+ CALL GETSCR(READ_AREA, READ_AREA_END, FULLWORD);
+
+ IF AID = PF3 ] AID = PF15 ] AID = PA1
+     THEN RETURN;
+
+ ERR_IND = ERR_LIT;
+
+ IF FULLWORD ^= ALIGNED_LENGTH
+     THEN DO;
+          MSG = 'DO NOT USE DEL OR ERASE EOF KEYS, USE SPACES.';
+          PROCESS_AGAIN = YES;
+          RETURN;
+          END;
+
+ IF VERIFY(LRECL_AREA, PIC_DIGITS) ^= 0  ]
+    VERIFY(BLKSIZE_AREA, PIC_DIGITS) ^= 0
+     THEN DO;
+          LRECL_AREA, BLKSIZE_AREA = 0;
+          LINE14.ATTR = LINE14.ATTR ] SCRFIELD(HI_LIGHT);
+          LINE15.ATTR = LINE14.ATTR;
+          MSG = 'LRECL AND BLKSIZE MUST BE NUMERIC.';
+          PROCESS_AGAIN = YES;
+          END;
+
+ IF VERIFY(PRIM_AREA, PIC_DIGITS) ^= 0  ]
+    VERIFY(SEC_AREA, PIC_DIGITS) ^= 0  ]
+    VERIFY(DIR_AREA, PIC_DIGITS) ^=0
+     THEN DO;
+          PRIM_AREA, SEC_AREA, DIR_AREA = 0;
+          LINE21.ATTR = LINE21.ATTR ] SCRFIELD(HI_LIGHT);
+          LINE22.ATTR = LINE21.ATTR;
+          LINE23.ATTR = LINE21.ATTR;
+          MSG = 'PRIMARY, SECONDARY, AND DIRECTORY MUST BE NUMERIC.';
+          PROCESS_AGAIN = YES;
+          END;
+1CALL RIGHT_JUSTIFY(LRECL_AREA);
+ CALL RIGHT_JUSTIFY(BLKSIZE_AREA);
+ CALL RIGHT_JUSTIFY(PRIM_AREA);
+ CALL RIGHT_JUSTIFY(SEC_AREA);
+ CALL RIGHT_JUSTIFY(DIR_AREA);
+
+ SELECT(AID);
+     WHEN(PA2) PROCESS_AGAIN = YES;
+     WHEN(PF1, PF13) DO;
+         MSG = 'NO HELP AVAILABLE.';
+         CALL MOVE_SCREEN;
+         PROCESS_AGAIN = YES;
+         END;
+     WHEN(CLEAR, PF2, PF14) DO;
+         MSG = 'CLEAR SCREEN REQUESTED.';
+         CALL ERASE_SCREEN;
+         PROCESS_AGAIN = YES;
+         END;
+     WHEN(PF4, PF16) DO;
+         CALL FREE_ALLOCATION;
+         CALL MOVE_SCREEN;
+         PROCESS_AGAIN = YES;
+         END;
+     OTHERWISE CALL MOVE_SCREEN;
+     END;
+
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ LINE3.ATTR, LINE4.ATTR, LINE5.ATTR, LINE6.ATTR, LINE8.ATTR, LINE9.ATTR,
+     LINE10.ATTR, LINE11.ATTR, LINE13.ATTR, LINE14.ATTR, LINE15.ATTR,
+     LINE16.ATTR, LINE17.ATTR, LINE19.ATTR, LINE20.ATTR, LINE21.ATTR,
+     LINE22.ATTR, LINE23.ATTR, LINE24.ATTR = SCRFIELD(SKP);
+
+ SET# = 0;
+1SELECT(PROJECT_AREA);
+     WHEN('*')
+         IF LIBRARY_AREA = ' '  & TYPE_AREA = ' '   & MEMBER_AREA = ' '
+            & VOLUME_AREA = ' ' & DISP_AREA = ' '   & RECFM_AREA = ' '
+            & LRECL_AREA = 0    & BLKSIZE_AREA = 0  & DSORG_AREA = ' '
+            & SPACE_AREA = ' '  & CONTIG_AREA = ' ' & PRIM_AREA = 0
+            & SEC_AREA = 0      & DIR_AREA = 0
+              THEN DO;
+                   CALL SET(40, 0);
+                   CALL DDNAME;
+                   END;
+              ELSE DO;
+                   LINE4.ATTR  = LINE4.ATTR ] SCRFIELD(HI_LIGHT);
+                   LINE5.ATTR, LINE6.ATTR, LINE9.ATTR, LINE10.ATTR,
+                       LINE11.ATTR, LINE13.ATTR, LINE14.ATTR,
+                       LINE15.ATTR, LINE16.ATTR, LINE17.ATTR,
+                       LINE19.ATTR, LINE20.ATTR, LINE21.ATTR,
+                       LINE22.ATTR, LINE23.ATTR, LINE24.ATTR
+                       = LINE4.ATTR;
+                   MSG = 'ONLY DDNAME SHOULD BE SPECIFIED WITH '
+                       ]] 'TERMINAL OPTION.';
+                   PROCESS_AGAIN = YES;
+                   END;
+     WHEN('***')
+         IF LIBRARY_AREA = ' '  & TYPE_AREA = ' '   & MEMBER_AREA = ' '
+            & VOLUME_AREA = ' ' & DISP_AREA = ' '   & DSORG_AREA = ' '
+            & SPACE_AREA = ' '  & CONTIG_AREA = ' ' & PRIM_AREA = 0
+            & SEC_AREA = 0      & DIR_AREA = 0      & RLSE_AREA = ' '
+              THEN DO;
+                   CALL SET(36, 0);
+                   DUMMY = YES;
+                   CALL EXISTS;
+                   END;
+              ELSE DO;
+                   LINE4.ATTR  = LINE4.ATTR ] SCRFIELD(HI_LIGHT);
+                   LINE5.ATTR, LINE6.ATTR, LINE9.ATTR, LINE10.ATTR,
+                       LINE16.ATTR, LINE19.ATTR, LINE20.ATTR,
+                       LINE21.ATTR, LINE22.ATTR, LINE23.ATTR,
+                       LINE24.ATTR = LINE4.ATTR;
+                   MSG = 'INVALID SELECTION USED WITH DUMMY(***).';
+                   PROCESS_AGAIN = YES;
+                   END;
+1    WHEN(' ')
+         IF LIBRARY_AREA = ' '  & TYPE_AREA = ' '  & MEMBER_AREA = ' '
+              THEN CALL CREATE;
+              ELSE DO;
+                   LINE3.ATTR  = LINE3.ATTR ] SCRFIELD(HI_LIGHT);
+                   LINE4.ATTR, LINE5.ATTR, LINE6.ATTR = LINE3.ATTR;
+                   MSG = 'INVALID DATA SET NAME.';
+                   PROCESS_AGAIN = YES;
+                   END;
+     OTHERWISE CALL DSN;
+     END;
+
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ SUBSTR(TEXT_PTR(SET#), 1, 1) = '1'B;
+ CALL SVC(SVC99, R0, R1);
+
+ IF PLIRETV = 0
+     THEN DO;
+          IF (DISP_AREA = 'N' ] DISP_AREA = ' ')
+           & DDNAME_AREA = ' '
+           & (PERM_AREA = ' ' ] PERM_AREA = 'N')
+              THEN DO;
+                   CALL FREE_ALLOCATION;
+                   IF PROCESS_AGAIN
+                       THEN RETURN;
+                   END;
+          MSG = 'ALLOCATION COMPLETED.';
+          ERR_IND = ' ';
+          IF AID = PF12 ] AID = PF24
+              THEN PROCESS_AGAIN = YES;
+              ELSE DO;
+                   CALL PUTSCR(WRITE_AREA, WRITE_AREA_END);
+                   DELAY(1200);
+                   END;
+          END;
+1    ELSE DO;
+          SELECT(PLIRETV);
+              WHEN(4) MSG = 'SYSTEM RESOURCE UNAVAILABILITY OR ' ]]
+                          'SYSTEM ROUTINE FAILURE.';
+              WHEN(8) MSG = 'INSTALATION VALIDATION ROUTINE DENIED ' ]]
+                          'ALLOCATION REQUEST.';
+              WHEN(12) MSG = 'ALLOCATION FAILED BECAUSE OF INVALID ' ]]
+                          'PARAMETER LIST.';
+              OTHERWISE SIGNAL ERROR;
+              END;
+          CALL S99FAIL(PLIRETV);
+          CALL PUTSCR(WRITE_AREA, WRITE_AREA_END);
+          CALL GETSCR(READ_AREA, READ_AREA_END, FULLWORD);
+          PROCESS_AGAIN = YES;
+          END;
+
+ /*********************************************************************/
+ /* LOGICAL END OF -PROCEDURE- FLOW.  (PUT_GET_SCREEN)                */
+ /*********************************************************************/
+1DSN:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS EXECUTED WHEN A DATA SET NAME IS TO BE CHECKED  */
+ /* AND ADDED AS A TEXT FIELD TO THE ALLOCATE STRUCTURE.              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DSNAME = REMOVE_BLANKS(PROJECT_AREA ]] PERIOD ]] LIBRARY_AREA ]] PERIOD
+         ]] TYPE_AREA);
+
+ IF VERIFY(DSNAME, VALID_CHARS_WPERIOD) ^= 0
+     THEN DO;
+          LINE3.ATTR = LINE3.ATTR ] SCRFIELD(HI_LIGHT);
+          LINE4.ATTR, LINE5.ATTR = LINE3.ATTR;
+          MSG = 'INVALID CHARACTER IN DATA SET NAME.';
+          PROCESS_AGAIN = YES;
+          END;
+
+ CALL SET(2, 1);
+ PARM(SET#) = DSNAME;
+
+ IF MEMBER_AREA ^= ' '
+     THEN DO;
+          GAVE_MEMBER = YES;
+          CALL SET(3, 1);
+          PARM(SET#) = REMOVE_BLANKS(MEMBER_AREA);
+          IF VERIFY(PARM(SET#),
+              VALID_CHARS) ^= 0
+              THEN DO;
+                   LINE6.ATTR = LINE6.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'INVALID CHARACTER IN MEMBER NAME.';
+                   PROCESS_AGAIN = YES;
+                   END;
+          END;
+
+ IF UNALLOCATE ] PROCESS_AGAIN
+     THEN RETURN;
+1SELECT(DISP_AREA);
+     WHEN(' ', 'N') DO;
+         CALL SET(4, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = NEW_DEL;
+         CALL SET(5, 1);
+         LEN(SET#) = 1;
+         IF CATLG
+             THEN ONE_BYTE(SET#) = MOD_CATLG;
+             ELSE ONE_BYTE(SET#) = OLD_UNCATLG;
+         CALL CREATE;
+         END;
+     WHEN('S') DO;
+         CALL SET(4, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = SHR_KEEP_CONTIG;
+         CALL SET(5, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = SHR_KEEP_CONTIG;
+         CALL EXISTS;
+         END;
+     WHEN('O') DO;
+         CALL SET(4, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = OLD_UNCATLG;
+         CALL SET(5, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = SHR_KEEP_CONTIG;
+         CALL EXISTS;
+         END;
+     WHEN('M') DO;
+         CALL SET(4, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = MOD_CATLG;
+         CALL SET(5, 1);
+         LEN(SET#) = 1;
+         IF SPACE_AREA = ' '
+             THEN DO;
+                  ONE_BYTE(SET#) = SHR_KEEP_CONTIG;
+                  CALL EXISTS;
+                  END;
+             ELSE DO;
+                  IF CATLG
+                      THEN ONE_BYTE(SET#) = MOD_CATLG;
+                      ELSE ONE_BYTE(SET#) = OLD_UNCATLG;
+                  CALL CREATE;
+                  END;
+         END;
+1    OTHERWISE DO;
+         LINE10.ATTR = LINE10.ATTR ] SCRFIELD(HI_LIGHT);
+         MSG = 'INVALID DISPOSITION SELECTED.';
+         PROCESS_AGAIN = YES;
+         END;
+     END;
+ END DSN;
+1EXISTS:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS EXCLUSIVE OF THE CREATE PROCEDURE.  IT          */
+ /* ALLOCATES EXISTING DATA SETS.                                     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF SPACE_AREA ^= ' ' ] CONTIG_AREA ^= ' ' ] PRIM_AREA ^= 0
+   ] SEC_AREA ^= 0 ] DIR_AREA ^= 0 ] RLSE_AREA ^= ' '
+     THEN DO;
+          LINE19.ATTR = LINE19.ATTR ] SCRFIELD(HI_LIGHT);
+          LINE20.ATTR, LINE21.ATTR, LINE22.ATTR, LINE23.ATTR,
+              LINE24.ATTR = LINE19.ATTR;
+          MSG = 'DISP SELECTED IS EXCLUSIVE OF THE HI-LIGHTED AREAS.';
+          PROCESS_AGAIN = YES;
+          RETURN;
+          END;
+
+ IF DUMMY
+     THEN DO;
+          IF DDNAME_AREA = ' '
+              THEN DO;
+                   LINE8.ATTR = LINE8.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'DDNAME MUST BE SPECIFIED WITH DUMMY(***).';
+                   PROCESS_AGAIN = YES;
+                   RETURN;
+                   END;
+          IF DSORG_AREA ^= ' '
+              THEN DO;
+                   LINE16.ATTR = LINE16.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'DSORG MAY NOT BE SPECIFIED WITH DUMMY(***).';
+                   PROCESS_AGAIN = YES;
+                   RETURN;
+                   END;
+          END;
+1CALL DDNAME;
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ IF ^DUMMY
+     THEN DO;
+          CALL VOLUME;
+          IF PROCESS_AGAIN
+              THEN RETURN;
+          END;
+
+ CALL DCB;
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ SELECT(PERM_AREA);
+     WHEN('Y') CALL SET(82, 0);
+     WHEN('N', ' ');
+     OTHERWISE DO;
+         LINE11.ATTR = LINE11.ATTR ] SCRFIELD(HI_LIGHT);
+         MSG = 'INVALID PERMANENT SELECTION.';
+         PROCESS_AGAIN = YES;
+         END;
+     END;
+ END EXISTS;
+1CREATE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS EXECLUSIVE OF THE EXISTS PROCEDURE.  IT IS USED */
+ /* TO PROCESS A DATA DEST WITH DISPOSITION NEW.                      */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ SELECT(SPACE_AREA);
+     WHEN('T')  CALL SET(7, 0);
+     WHEN('C')  CALL SET(8, 0);
+     WHEN('B')  DO;
+         CALL SET(9, 1);
+         LEN(SET#) = 3;
+         FULLWORD = BLKSIZE_AREA;
+         THREE_BYTES(SET#) = SUBSTR(UNSPEC(FULLWORD), 9, 24);
+         END;
+     OTHERWISE DO;
+         LINE19.ATTR = LINE19.ATTR ] SCRFIELD(HI_LIGHT);
+         MSG = 'INVALID SPACE SELECTION.';
+         PROCESS_AGAIN = YES;
+         RETURN;
+         END;
+     END;
+
+ IF PRIM_AREA ^= 0
+     THEN DO;
+          CALL SET(10, 1);
+          LEN(SET#) = 3;
+          FULLWORD = PRIM_AREA;
+          THREE_BYTES(SET#) = SUBSTR(UNSPEC(FULLWORD), 9, 24);
+          END;
+     ELSE DO;
+          LINE21.ATTR = LINE21.ATTR ] SCRFIELD(HI_LIGHT);
+          MSG = 'PRIMARY SPACE ALLOCATION REQUIRED.';
+          PROCESS_AGAIN = YES;
+          RETURN;
+          END;
+
+ IF SEC_AREA ^= 0
+     THEN DO;
+          CALL SET(11, 1);
+          LEN(SET#) = 3;
+          FULLWORD = SEC_AREA;
+          THREE_BYTES(SET#) = SUBSTR(UNSPEC(FULLWORD), 9, 24);
+          END;
+1IF DIR_AREA ^= 0
+     THEN DO;
+          GAVE_DIRECTORY = YES;
+          CALL SET(12, 1);
+          LEN(SET#) = 3;
+          FULLWORD = DIR_AREA;
+          THREE_BYTES(SET#) = SUBSTR(UNSPEC(FULLWORD), 9, 24);
+          END;
+
+ SELECT(RLSE_AREA);
+     WHEN('Y') CALL SET(13, 0);
+     WHEN('N', ' ');
+     OTHERWISE DO;
+         LINE24.ATTR = LINE24.ATTR ] SCRFIELD(HI_LIGHT);
+         MSG = 'INVALID RELEASE SELECTION.';
+         PROCESS_AGAIN = YES;
+         RETURN;
+         END;
+     END;
+
+ SELECT(CONTIG_AREA);
+     WHEN('Y') DO;
+         CALL SET(14, 1);
+         LEN(SET#) = 1;
+         ONE_BYTE(SET#) = SHR_KEEP_CONTIG;
+         END;
+     WHEN('N', ' ');
+     OTHERWISE DO;
+         LINE20.ATTR = LINE20.ATTR ] SCRFIELD(HI_LIGHT);
+         MSG = 'INVALID CONTIGUOUS SELECTION.';
+         PROCESS_AGAIN = YES;
+         RETURN;
+         END;
+     END;
+
+ CALL DDNAME;
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ CALL VOLUME;
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ CALL DCB;
+ IF PROCESS_AGAIN
+     THEN RETURN;
+1SELECT(PERM_AREA);
+     WHEN('Y') CALL SET(82, 0);
+     WHEN('N', ' ');
+     OTHERWISE DO;
+         LINE11.ATTR = LINE11.ATTR ] SCRFIELD(HI_LIGHT);
+         MSG = 'INVALID PERMANENT SELECTION.';
+         PROCESS_AGAIN = YES;
+         END;
+     END;
+ END CREATE;
+1DDNAME:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE BUILDS THE TEXT FIELD WHICH ASSOCIATES A DDNAME    */
+ /* WITH THE ALLOCATION.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ IF DDNAME_AREA ^= ' '
+     THEN DO;
+          IF VERIFY(DDNAME_AREA,
+              VALID_CHARS) ^= 0
+              THEN DO;
+                   LINE8.ATTR = LINE8.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'INVALID CHARACTER IN DDNAME.';
+                   PROCESS_AGAIN = YES;
+                   END;
+          CALL SET(1, 1);
+          PARM(SET#) = REMOVE_BLANKS(DDNAME_AREA);
+          END;
+     ELSE IF PROJECT_AREA = '*'
+              THEN DO;
+                   LINE8.ATTR = LINE8.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'DDNAME MUST BE GIVEN WITH TERMINAL ALLOCATE.';
+                   PROCESS_AGAIN = YES;
+                   END;
+ END DDNAME;
+1VOLUME:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CREATES A TEXT FIELD TO FORCE THE ALLOCATE TO A    */
+ /* PARTICULAR VOLUME ON THE SYSTEM.                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ CALL SET(21, 1);
+ PARM(SET#) = 'SYSALLDA';
+ IF VOLUME_AREA ^= ' '
+     THEN DO;
+          IF VERIFY(VOLUME_AREA,
+              VALID_CHARS) ^=0
+              THEN DO;
+                   LINE9.ATTR = LINE9.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'INVALID CHARACTER IN VOLUME.';
+                   PROCESS_AGAIN = YES;
+                   END;
+          CALL SET(16, 1);
+          PARM(SET#) = REMOVE_BLANKS(VOLUME_AREA);
+          END;
+
+ END VOLUME;
+1DCB:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE FIGURES OUT THE DCB ATTRIBUTES THAT ARE DESIRED.   */
+ /* IT THEN ADDS THEM AS TEXT FIELDS TO THE ALLOCATE STRUCTURE.       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  NUMRECFM   FIXED BINARY INIT(0);
+ DECLARE
+   1  BIT_RECFM  BASED(ADDR(NUMRECFM)),
+      2  FILLER  BIT(8),
+      2  RECFM   BIT(8);
+
+ IF RECFM_AREA ^= ' '
+     THEN SELECT_RECFM: DO;
+          CALL COMPUTE_RECFM;
+          IF PROCESS_AGAIN
+              THEN RETURN;
+          CALL SET(73, 1);
+          LEN(SET#) = 1;
+          ONE_BYTE(SET#) = RECFM;
+          END SELECT_RECFM;
+1SELECT;
+
+     /* RECFM OF F OR U TYPE */
+     WHEN(NUMRECFM > 127)
+         IF LRECL_AREA > BLKSIZE_AREA
+             THEN IF BLKSIZE_AREA ^= 0
+                      THEN DO;
+                           LINE14.ATTR = LINE14.ATTR ]
+                               SCRFIELD(HI_LIGHT);
+                           LINE15.ATTR = LINE14.ATTR;
+                           MSG = 'LRECL MAY NOT BE GREATER THAN '
+                               ]] 'BLKSIZE WITH SELECTED RECFM.';
+                           PROCESS_AGAIN = YES;
+                           END;
+                      ELSE;
+             ELSE IF (LRECL_AREA ^= 0) & (BLKSIZE_AREA ^= 0)
+                    THEN IF MOD(BLKSIZE_AREA, LRECL_AREA) ^= 0
+                           THEN DO;
+                                LINE14.ATTR = LINE14.ATTR ]
+                                    SCRFIELD(HI_LIGHT);
+                                LINE15.ATTR = LINE14.ATTR;
+                                MSG = 'BLKSIZE IS NOT EQUAL TO OR A '
+                                       ]] 'MULTIPLE OF LRECL.';
+                                PROCESS_AGAIN = YES;
+                                END;
+
+     /* RECFM OF V TYPE BUT NOT SPANNED */
+     WHEN(VERIFY(RECFM_AREA, 'V') ^= 0 & VERIFY(RECFM_AREA, 'S') = 0)
+         IF (LRECL_AREA > BLKSIZE_AREA - 4) & (BLKSIZE_AREA ^= 0)
+             THEN DO;
+                  LINE14.ATTR = LINE14.ATTR ] SCRFIELD(HI_LIGHT);
+                  LINE15.ATTR = LINE14.ATTR;
+                  MSG = 'LRECL MAY NOT BE GREATER THAN BLKSIZE - 4 '
+                        ]] 'WITH SELECTED RECFM.';
+                  PROCESS_AGAIN = YES;
+                  END;
+
+     /* RECFM OF VS TYPE OR NONE */
+     OTHERWISE;
+     END;
+
+ IF PROCESS_AGAIN
+     THEN RETURN;
+1IF LRECL_AREA ^= 0
+     THEN DO;
+          CALL SET(66, 1);
+          LEN(SET#) = 2;
+          NUM_PARM(SET#) = LRECL_AREA;
+          END;
+
+ IF BLKSIZE_AREA ^= 0
+     THEN DO;
+          CALL SET(48, 1);
+          LEN(SET#) = 2;
+          NUM_PARM(SET#) = BLKSIZE_AREA;
+          IF NUM_PARM(SET#) < 1 ] NUM_PARM(SET#) > 32760
+              THEN DO;
+                   LINE15.ATTR = LINE15.ATTR ] SCRFIELD(HI_LIGHT);
+                   MSG = 'BLKSIZE MUST NOT BE < 1 OR > 32760.';
+                   PROCESS_AGAIN = YES;
+                   RETURN;
+                   END;
+          END;
+
+ IF EROPT_AREA ^= ' '
+     THEN DO;
+          CALL SET(61, 1);
+          LEN(SET#) = 1;
+          SELECT(EROPT_AREA);
+              WHEN('ABE')  ONE_BYTE(SET#) = ABE;
+              WHEN('SKP')  ONE_BYTE(SET#) = SKIP_BLK;
+              WHEN('ACC')  ONE_BYTE(SET#) = ACC;
+              OTHERWISE DO;
+                  LINE17.ATTR = LINE17.ATTR ] SCRFIELD(HI_LIGHT);
+                  MSG = 'INVALID EROPT SELECTION.';
+                  PROCESS_AGAIN = YES;
+                  RETURN;
+                  END;
+              END;
+          END;
+1SELECT(DSORG_AREA);
+     WHEN(' ')
+         IF ^GAVE_DIRECTORY & GAVE_MEMBER &
+         (DISP_AREA = 'N' ] DISP_AREA = ' ')
+              THEN DO;
+                   LINE6.ATTR = LINE6.ATTR ] SCRFIELD(HI_LIGHT);
+                   LINE16.ATTR = LINE6.ATTR;
+                   MSG = 'MEMBER SPECIFICATION REQUIRES PARTITIONED'
+                       ]] ' DSORG.';
+                   PROCESS_AGAIN = YES;
+                   END;
+     WHEN('PS', 'DA', 'PSU', 'DAU')
+         IF GAVE_DIRECTORY
+             THEN DO;
+                  LINE16.ATTR = LINE16.ATTR ]
+                      SCRFIELD(HI_LIGHT);
+                  LINE23.ATTR = LINE16.ATTR;
+                  MSG = 'DIRECTORY DISAGREES WITH DSORG.';
+                  PROCESS_AGAIN = YES;
+                  END;
+     WHEN('PO', 'POU')
+         IF ^GAVE_DIRECTORY & (DISP_AREA = 'N' ] DISP_AREA = ' ')
+             THEN DO;
+                  LINE16.ATTR = LINE16.ATTR ]
+                      SCRFIELD(HI_LIGHT);
+                  LINE23.ATTR = LINE16.ATTR;
+                  MSG = 'NO DIRECTORY SPACE GIVEN.';
+                  PROCESS_AGAIN = YES;
+                  END;
+     OTHERWISE DO;
+          LINE16.ATTR = LINE16.ATTR ] SCRFIELD(HI_LIGHT);
+          MSG = 'INVALID DSORG SELECTION.';
+          PROCESS_AGAIN = YES;
+          END;
+     END;
+
+ IF DSORG_AREA ^= ' '
+     THEN DO;
+          CALL SET(60, 1);
+          LEN(SET#) = 2;
+          SELECT(DSORG_AREA);
+              WHEN('PS')  NUM_PARM(SET#) = 16384;
+              WHEN('PO')  NUM_PARM(SET#) = 512;
+              WHEN('DA')  NUM_PARM(SET#) = 8192;
+              WHEN('PSU') NUM_PARM(SET#) = 16640;
+              WHEN('POU') NUM_PARM(SET#) = 768;
+              WHEN('DAU') NUM_PARM(SET#) = 8448;
+              OTHERWISE;
+              END;
+          END;
+1COMPUTE_RECFM:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE COMPUTES THE RECFM VALUE FOR A PARTICULAR RECFM.   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ %DECLARE  F  CHAR;
+ %DECLARE  V  CHAR;
+ %DECLARE  U  CHAR;
+ %DECLARE  A  CHAR;
+ %DECLARE  B  CHAR;
+ %DECLARE  S  CHAR;
+ %DECLARE  M  CHAR;
+ %DECLARE  T  CHAR;
+ %;
+ %F='128'; %V='64'; %U='192'; %A='4'; %B='16'; %S='8'; %M='2'; %T='32';
+ %;
+ DO POS = 1 TO LENGTH(RECFM_AREA);
+     SELECT(SUBSTR(RECFM_AREA, POS, 1));
+         WHEN(' ');
+         WHEN('F') NUMRECFM = NUMRECFM + F;
+         WHEN('V') NUMRECFM = NUMRECFM + V;
+         WHEN('U') NUMRECFM = NUMRECFM + U;
+         WHEN('A') NUMRECFM = NUMRECFM + A;
+         WHEN('B') NUMRECFM = NUMRECFM + B;
+         WHEN('S') NUMRECFM = NUMRECFM + S;
+         WHEN('M') NUMRECFM = NUMRECFM + M;
+         WHEN('T') NUMRECFM = NUMRECFM + T;
+         OTHERWISE DO;
+             LINE13.ATTR = LINE13.ATTR ] SCRFIELD(HI_LIGHT);
+             MSG='INVALID RECFM, USE COMBINATION OF:  F,V,U,B,S,A,M,T.';
+             PROCESS_AGAIN = YES;
+             END;
+         END;
+     END;
+
+ END COMPUTE_RECFM;
+ END DCB;
+1SET:  PROCEDURE(KEY_VALUE, NUM_VALUE);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS USED TO SET THE KEY AND NUM FIELDS OF THE       */
+ /* STRUCTURE THAT SVC 99 USES TO DO THE DYNAMIC ALLOCATE.            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  KEY_VALUE FIXED BINARY;
+ DECLARE  NUM_VALUE FIXED BINARY;
+
+
+ SET# = SET# + 1;
+ TEXT_PTR(SET#) = UNSPEC(ADDR(TEXT_FIELD(SET#)));
+ KEY(SET#) = KEY_VALUE;
+ NUM(SET#) = NUM_VALUE;
+
+ END SET;
+1REMOVE_BLANKS:  PROCEDURE(INPUT) RETURNS(CHAR(45) VARYING);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE REMOVES BLANKS FROM A CHARACTER STRING WHICH IS    */
+ /* PASSED TO IT.  IT RETURNS A VARYING STRING WITH NO BLANKS         */
+ /* INTERNAL OR ON THE ENDS OF THE STRING.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE INPUT CHAR(*);
+ DECLARE FIELD CHAR(45) VARYING;
+
+
+ FIELD = INPUT;
+ POS = INDEX(FIELD, ' ');
+
+ DO WHILE(POS ^= 0);
+     SELECT;
+         WHEN(POS = 1) FIELD = SUBSTR(FIELD, 2);
+         WHEN(POS = LENGTH(FIELD)) FIELD = SUBSTR(FIELD, 1, POS-1);
+         OTHERWISE
+            FIELD = SUBSTR(FIELD, 1, POS-1) ]] SUBSTR(FIELD, POS+1);
+         END;
+     POS = INDEX(FIELD, ' ');
+     END;
+
+ IF INDEX(SUBSTR(FIELD, LENGTH(FIELD), 1),  PERIOD) ^= 0
+     THEN FIELD = SUBSTR(FIELD, 1, LENGTH(FIELD)-1);
+
+ RETURN(FIELD);
+
+ END REMOVE_BLANKS;
+1FREE_ALLOCATION:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE ISSUES A DEALLOCATION BY EITHER DATA SET NAME OR   */
+ /* FILE (DDNAME) NAME OR BOTH.  THIS IS DONE BY USER REQUEST WHEN    */
+ /* SCREEN IS ENTERED WITH PF4 OR AUTOMATICALLY AFTER A NEW DATA SET  */
+ /* ALLOCATION IF DDNAME AND PERM WERE NOT SELECTED.  THIS MAKES THE  */
+ /* DATA SET IMMEDIATELY AVAILABLE FOR BACKGROUND JOBS.               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ SET# = 0;
+ VERB = UNALLOC_VERB;
+
+ IF DDNAME_AREA = ' '
+     THEN DO;
+          UNALLOCATE = YES;
+          CALL DSN;
+          UNALLOCATE = NO;
+          END;
+     ELSE CALL DDNAME;
+
+ IF PROCESS_AGAIN
+     THEN RETURN;
+
+ CALL SET(7, 0);
+
+ SUBSTR(TEXT_PTR(SET#), 1, 1) = '1'B;
+
+ CALL SVC(SVC99, R0, R1);
+1IF PLIRETV = 0
+     THEN DO;
+          MSG = '*UNALLOCATION COMPLETED.';
+          ERR_IND = ' ';
+          END;
+     ELSE DO;
+          SELECT(PLIRETV);
+              WHEN(4) MSG = '*UNALLOC RESOURCE UNAVAILABILITY OR ' ]]
+                  'SYSTEM ROUTINE FAILURE.';
+              WHEN(8) MSG = '*INSTALATION VALIDATION ROUTINE DENIED ' ]]
+                  'UNALLOCATION REQUEST.';
+              WHEN(12) MSG = '*UNALLOCATION FAILED BECAUSE OF ' ]]
+                  'INVALID PARAMETER LIST.';
+              OTHERWISE SIGNAL ERROR;
+              END;
+          CALL S99FAIL(PLIRETV);
+          CALL PUTSCR(WRITE_AREA, WRITE_AREA_END);
+          CALL GETSCR(READ_AREA, READ_AREA_END, FULLWORD);
+          PROCESS_AGAIN = YES;
+          END;
+
+ VERB = DSN_ALLOC_VERB;
+ END FREE_ALLOCATION;
+
+ END PUT_GET_SCREEN;
+1RIGHT_JUSTIFY:  PROCEDURE(INPUT);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE RIGHT JUSTIFIES A FIVE DIGIT NUMERIC FIELD WHICH   */
+ /* IS PASSED AS PICTURE DATA AND PROCESSED AS CHARACTER.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  INPUT  PIC '(5)9';
+ DECLARE  FIELD  CHAR(5) BASED(ADDR(INPUT));
+
+
+ DO WHILE(SUBSTR(FIELD, 5, 1) = ' ');
+     FIELD = '0' ]] FIELD;
+     END;
+
+ END RIGHT_JUSTIFY;
+1ERASE_SCREEN: PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SETS THE WRITE_AREA TO THE VALUES WHICH WERE       */
+ /* ORIGINALLY GIVEN TO THE USER IN THE FIRST PLACE.                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ GAVE_DIRECTORY = NO;
+ GAVE_MEMBER = NO;
+
+ ERR_IND = ' ';
+
+ SELECT(PARAMETER);
+     WHEN('CLEAR') DO;
+         PROJECT_OUT = ' ';
+         EROPT_OUT = ' ';
+         END;
+     WHEN('PREFIX') PROJECT_OUT = PREFIX;
+     WHEN('UNCATLG') DO;
+         PROJECT_OUT = ' ';
+         CATLG = NO;
+         END;
+     OTHERWISE PROJECT_OUT = USERID;
+     END;
+
+
+ LIBRARY_OUT, TYPE_OUT, MEMBER_OUT, DDNAME_OUT, VOLUME_OUT, DISP_OUT,
+     PERM_OUT, RECFM_OUT, LRECL_OUT, BLKSIZE_OUT, DSORG_OUT, SPACE_OUT,
+     CONTIG_OUT, PRIM_OUT, SEC_OUT, DIR_OUT, RLSE_OUT = ' ';
+
+
+ LINE3.ATTR, LINE4.ATTR, LINE5.ATTR, LINE6.ATTR, LINE8.ATTR, LINE9.ATTR,
+     LINE10.ATTR, LINE11.ATTR, LINE13.ATTR, LINE14.ATTR, LINE15.ATTR,
+     LINE16.ATTR, LINE17.ATTR, LINE19.ATTR, LINE20.ATTR, LINE21.ATTR,
+     LINE22.ATTR, LINE23.ATTR, LINE24.ATTR = SCRFIELD(SKP);
+
+ END ERASE_SCREEN;
+1MOVE_SCREEN:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE SETS THE WRITE_AREA TO THE VALUES WHICH WERE       */
+ /* ENTERED AND READ BY THE GETSCR.                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ GAVE_DIRECTORY = NO;
+ GAVE_MEMBER = NO;
+
+ PROJECT_OUT = PROJECT_AREA;
+ LIBRARY_OUT = LIBRARY_AREA;
+ TYPE_OUT    = TYPE_AREA;
+ MEMBER_OUT  = MEMBER_AREA;
+ DDNAME_OUT  = DDNAME_AREA;
+ VOLUME_OUT  = VOLUME_AREA;
+ DISP_OUT    = DISP_AREA;
+ PERM_OUT    = PERM_AREA;
+ RECFM_OUT   = RECFM_AREA;
+ EDIT_AREA   = LRECL_AREA;
+ LRECL_OUT   = EDIT_AREA;
+ EDIT_AREA   = BLKSIZE_AREA;
+ BLKSIZE_OUT = EDIT_AREA;
+ DSORG_OUT   = DSORG_AREA;
+ EROPT_OUT   = EROPT_AREA;
+ SPACE_OUT   = SPACE_AREA;
+ CONTIG_OUT  = CONTIG_AREA;
+ EDIT_AREA   = PRIM_AREA;
+ PRIM_OUT    = EDIT_AREA;
+ EDIT_AREA   = SEC_AREA;
+ SEC_OUT     = EDIT_AREA;
+ EDIT_AREA   = DIR_AREA;
+ DIR_OUT     = EDIT_AREA;
+ RLSE_OUT    = RLSE_AREA;
+
+ END MOVE_SCREEN;
+1S99FAIL:  PROCEDURE(SVC99_RC);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS USED FOR OBTAINING A SYSTEM DEFINED ERROR       */
+ /* MESSAGE FOR ALLOCATION FAILURE.  THE PARAMETER LIST AND MESSAGE   */
+ /* BUFFER STRUCTURES ARE SET UP FOR THE MOST GENERAL CASE EVEN       */
+ /* THOUGH ALL OF THE FIELDS MAY NOT BE REQUIRED FOR A GIVEN USE.     */
+ /* IKJEFF18 PROVIDES THE MESSAGE WHICH MAY EITHER BE EXTRACTED OR    */
+ /* PUT DIRECTLY TO THE TERMINAL VIA WTP OR PUTLINE.  PUTLINE NEEDS   */
+ /* A CPPL, HOWEVER.                                                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SVC99_RC  FIXED BINARY(31);
+
+ DECLARE
+   1  SWITCH_ID  STATIC,
+      /* ON FOR WTP, OFF FOR PUTLINE */
+      2  WTP_PUTLINE      BIT(1)  INIT('1'B),
+      /* ON FOR EXTRACT MSG ONLY */
+      2  EXTRACT_ONLY     BIT(1)  INIT('0'B),
+      /* ON FOR EXTRACT AND PUTLINE */
+      2  EXTRACT_PUTLINE  BIT(1)  INIT('0'B),
+      2  FILLER           BIT(5)  INIT('0'B),
+      /* X01=DAIR, X32=SVC99, X33=FREE COMMAND */
+      2  ID               BIT(8)  INIT(X(32));
+
+ /* IKJEFF18 PARAMETER LIST
+    1)  ADDRESS OF THE FAILING SVC99 REQUEST BLOCK
+    2)  ADDRESS OF A FULLWORD CONTAINING SVC99 RETURN CODE
+    3)  ADDRESS OF IKJEFF02 IF KNOWN ELSE ADDRESS OF ZEROS
+    4)  ADDRESS OF SWITCHES AND ID
+    5)  ADDRESS OF THE CPPL, OPTIONAL
+    6)  ADDRESS OF BUFFER FOR EXTRACT, OPTIONAL */
+
+ FULLWORD = 0;
+ CALL FSMODE('OFF');
+ CALL LINK('IKJEFF18', REQUEST_BLK, SVC99_RC, FULLWORD, SWITCH_ID);
+ CALL FSMODE('ON');
+
+ END S99FAIL;
+
+ END DYNALOC;
+

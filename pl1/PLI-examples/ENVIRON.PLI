@@ -1,0 +1,93 @@
+*PROCESS NM;
+ ENVIRON:  PROCEDURE OPTIONS(MAIN) REORDER;
+
+ DECLARE  PGMID  CHAR(35) VARYING STATIC EXTERNAL
+     INIT('ENVIRON V4.0  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DISPLAY INFORMATION FROM SYSINFO IN A READABLE MANNER.            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+ DECLARE  SYSINFO   ENTRY OPTIONS(ASM, INTER);
+ DECLARE  I    FIXED BINARY;
+ DECLARE  YES  BIT(1) STATIC INIT('1'B);
+ DECLARE  NO   BIT(1) STATIC INIT('0'B);
+ DECLARE  (ADDR, CHAR, MOD, SUBSTR)  BUILTIN;
+1DECLARE
+   1  SYSTEM_INFO,
+      2  VIRT_MEMORY  FIXED BINARY(31),
+      2  REAL_MEMORY  FIXED BINARY(31),
+      2  EXTD_MEMORY  FIXED BINARY(31),
+      2  BEGIN_PRIV   FIXED BINARY(31),
+      2  BEGIN_CSA    FIXED BINARY(31),
+      2  AVAIL_MEMORY FIXED BINARY(31),
+      2  MVS_NAME     CHAR(8),
+      2  MVS_FMID     CHAR(8),
+      2  USER_INFO    CHAR(16),
+      2  MVS_RELEASE  CHAR(4),
+      2  SMF_SID      CHAR(4),
+      2  JES_NAME     CHAR(4),
+      2  JES3_ID      CHAR(8),
+      2  FLAG_BITS,
+         3  JES3         BIT(1),
+         3  JES_GLOBAL   BIT(1),
+         3  XA_SYSTEM    BIT(1),
+         3  FILLER       BIT(5),
+      2  CURRENT_DATE FIXED DECIMAL(5,3),
+      2  IPL_TIME     FIXED DECIMAL(5,2),
+      2  IPL_DATE     FIXED DECIMAL(5,3),
+      2  IPL_VOLSER   CHAR(6),
+      2  IPL_NUC      CHAR(1),
+      2  FILLER       CHAR(1),
+      2  #CPU_ONLINE  FIXED BINARY,
+      2  CPUS(16),  /* (N REFER(#CPU_ONLINE)) */
+         3  CPU_SERNUM   CHAR(6),
+         3  CPU_MODEL    CHAR(4);
+1CALL SYSINFO(SYSTEM_INFO);
+
+ AVAIL_MEMORY = AVAIL_MEMORY / 1024;
+ VIRT_MEMORY = VIRT_MEMORY / 1024 + 1;
+ REAL_MEMORY = REAL_MEMORY / 1024 + 1;
+ EXTD_MEMORY = EXTD_MEMORY / 1024;
+ BEGIN_PRIV = BEGIN_PRIV / 1024;
+ BEGIN_CSA   = BEGIN_CSA / 1024;
+
+ PUT SKIP EDIT('TODAY''S DATE    =    ', CURRENT_DATE)  (A, F(6,3));
+ PUT SKIP EDIT('VIRTUAL MEMORY  =', VIRT_MEMORY, 'K')   (A, F(9), A);
+ PUT SKIP EDIT('REAL MEMORY     =', REAL_MEMORY, 'K')   (A, F(9), A);
+ PUT SKIP EDIT('EXTENDED MEMORY =', EXTD_MEMORY, 'K')   (A, F(9), A);
+ PUT SKIP EDIT('BEGINNING CSA   =', BEGIN_CSA, 'K')     (A, F(9), A);
+ PUT SKIP EDIT('BEGINNING PRIV  =', BEGIN_PRIV, 'K')    (A, F(9), A);
+ PUT SKIP EDIT('LOW PRIV AREA   =', AVAIL_MEMORY, 'K')  (A, F(9), A);
+ PUT SKIP EDIT('IPL VOLSER      =    ', IPL_VOLSER) (A);
+ PUT SKIP EDIT('IPL NUCLEUS     =  IEANUC0', IPL_NUC) (A);
+ PUT SKIP EDIT('IPL TIME        =    ', IPL_TIME) (A, F(6,2));
+ PUT SKIP EDIT('IPL DATE        =    ', IPL_DATE) (A, F(6,3));
+ PUT SKIP EDIT('MVS SYSTEM NAME =   ', MVS_NAME) (A);
+ PUT SKIP EDIT('MVS FUNCTION ID =   ', MVS_FMID) (A);
+ PUT SKIP EDIT('MVS USER INFO   = ', USER_INFO) (A);
+ PUT SKIP EDIT('MVS RELEASE     =     ', SUBSTR(MVS_RELEASE,1,2),
+     '.', SUBSTR(MVS_RELEASE,3,2)) (A, F(2), A, A);
+ IF XA_SYSTEM
+      THEN PUT EDIT(' (XA)') (A);
+ PUT SKIP EDIT('JES CONFIG      =      ', JES_NAME) (A);
+ IF JES3
+     THEN DO;
+          IF JES_GLOBAL
+              THEN PUT EDIT(' (GLOBAL)') (A);
+              ELSE PUT EDIT(' (LOCAL)') (A);
+          PUT SKIP EDIT('JES3 MAIN NAME  =       ', JES3_ID) (A);
+          END;
+ PUT SKIP EDIT('SMF IDENTIFIER  =      ', SMF_SID) (A);
+ PUT SKIP EDIT('#CPU ONLINE     =      ', #CPU_ONLINE) (A, F(4));
+ DO I = 1 TO #CPU_ONLINE;
+     PUT SKIP EDIT(I, ':  CPU SERIAL =    ', CPU_SERNUM(I),
+         '   (MODEL = ', CPU_MODEL(I), ')') (F(2), A, A, A, A, A);
+     END;
+
+ END ENVIRON;
+

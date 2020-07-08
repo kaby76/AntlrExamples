@@ -1,0 +1,490 @@
+*PROCESS NM;
+ COBMSG:  PROCEDURE(MESSAGE_SELECTORS) REORDER;
+ DECLARE  PGMID  CHAR(47) VARYING STATIC EXTERNAL
+     INIT('COBMSG V3.1 (OF COBFORM)  BY CLYDE THOMAS ZUBER');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*THIS PROCEDURE PROCESSES MESSAGE TEXT FOR OUTPUT FOR THE COBFORM   */
+ /*COBOL FORMATTER PROGRAM.  IT IS DYNAMICALLY INVOKED ONLY WHEN      */
+ /*NEEDED.  LINK EDIT WITH AN ENTRY COBMSG STATEMENT.                 */
+ /*                                                                   */
+ /*INPUT:   MSG_SELECTORS                                             */
+ /*OUTPUT:  THE MESSAGE TEXT ON SYSPRINT                              */
+ /*METHOD:  HARD CODED MESSAGE TEXT IS DECLARED EXTERNALLY IN COBMSG  */
+ /*         AND PUTOUT HERE WHEN SELECTED.                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE
+    1  MESSAGE_SELECTORS,
+       2  CASE_SELECTOR      BIT(1),
+       2  FUNCTION_SELECTOR  BIT(1),
+       2  HELP_SELECTOR      BIT(1),
+       2  HELPS_SELECTOR     BIT(1),
+       2  INV_ANSW_SELECTOR  BIT(1),
+       2  JCL_SELECTOR       BIT(1),
+       2  LIST_CMD_SELECTOR  BIT(1),
+       2  PARMS_SELECTOR     BIT(1),
+       2  SYNTAX_SELECTOR    BIT(1),
+       2  TERM_SELECTOR      BIT(1),
+       2  TSO_SELECTOR       BIT(1);
+
+1DECLARE  SYSPRINT FILE OUTPUT STREAM PRINT;
+
+ DECLARE  NO  BIT(1) INIT('0'B) STATIC;
+ DECLARE  LINE_NO  FIXED BINARY;
+ DECLARE  (ADDR, DATE, HBOUND, STRING, TIME)  BUILTIN;
+ DECLARE  RUN_DATE  CHAR(6);
+
+ DECLARE
+   1  SPLIT_DATE  DEFINED RUN_DATE,
+      2  YEAR  CHAR(2),
+      2  MONTH  CHAR(2),
+      2  DAY  CHAR(2);
+
+ DECLARE  EDITED_RUN_DATE  PIC 'Z9/99/99';
+ DECLARE  ORDERED_RUN_DATE  CHAR(6);
+ DECLARE  RUN_TIME  CHAR(9);
+
+ DECLARE
+   1  SPLIT_TIME  DEFINED RUN_TIME,
+      2  HOURS  CHAR(2),
+      2  MINUTES  CHAR(2),
+      2  FILLER   CHAR(4);
+
+ DECLARE  COLON  CHAR(1) INIT(':') STATIC;
+ DECLARE  EDITED_RUN_TIME  CHAR(5);
+1DECLARE
+   1  MESSAGES  STATIC,
+      2  CASE(38)            CHAR(68)  INIT(
+ 'THE CASE CONSTRUCT OF NESTED IF STATEMENTS:                         ',
+ '                                                                    ',
+ '                                                                    ',
+ '   Because COBOL has no case statement it is often necessary to use ',
+ '   nested IFs to accomplish the same purpose.  Since the ELSE       ',
+ '   functions in a different manner and is only necessary to optimize',
+ '   performance a different method of indentation is provided for    ',
+ '   this instance.  Note in the following example that the same value',
+ '   is compared in all instances.                                    ',
+ '                                                                    ',
+ '       IF X = A                                                     ',
+ '           THEN PERFORM B2A1-MAX                                    ',
+ '       ELSE IF X = B                                                ',
+ '           THEN PERFORM B2B1-MIN                                    ',
+ '       ELSE IF X = C                                                ',
+ '           THEN PERFORM B2C1-AVG.                                   ',
+ '                                                                    ',
+ '   To obtain this type of indentation the user must place a "C"     ',
+ '   (standing for case) in column seven of the line which has the    ',
+ '   first IF in it.  This option is automatically reset when a period',
+ '   is encountered.  To temporarily suspend the case processing a    ',
+ '   letter "R" (standing for regular) in column seven of a line which',
+ '   has an IF in it will cause that one IF to indent normally.       ',
+ '   Following is an example of the result of this user control.      ',
+ '                                                                    ',
+ '     C   IF X = A                                                   ',
+ '             THEN PERFORM B2A1-MAX                                  ',
+ '         ELSE IF X = B                                              ',
+ '     R       THEN IF Y = B                                          ',
+ '                      THEN PERFORM B2B1-MIN                         ',
+ '                      ELSE NEXT SENTENCE                            ',
+ '         ELSE IF X = C                                              ',
+ '             THEN PERFORM B2C1-AVG.                                 ',
+ '                                                                    ',
+ '   Note, however, that the "C" and "R" would not be reproduced to   ',
+ '   the output file.  No manual removal of these codes is therefore  ',
+ '   necessary.                                                       ',
+ '                                                                    '
+ ),
+1     2  FUNCTION(33)  CHAR(68)  INIT(
+ 'DISCLAIMER:                                                         ',
+ '   No results of this utility are guaranteed.  Syntax of output     ',
+ '   will copy any punctuation or spelling defects of the input.      ',
+ '   As the output is distinct from the input no risk is involved     ',
+ '   but output should be inspected before deleting the input.        ',
+ '                                                                    ',
+ '                                                                    ',
+ 'FUNCTION:                                                           ',
+ '   This utility accepts as input a Cobol source program and outputs ',
+ '   the same program reformated.  Blank lines are inserted where     ',
+ '   appropriate and indentation is made, up to six levels.  The      ',
+ '   utility can be used to make old programs which were never        ',
+ '   properly formated more readable, or it can be used to bring into ',
+ '   Cobol format new programs which are typed in a free format       ',
+ '   manner.  Using an option columns 7-80 are available for this     ',
+ '   purpose.  Column 7 is used only for * and -, used in comments and',
+ '   literals.  Literals should be entered in a valid Cobol manner,   ',
+ '   using column 7 if continuation is necessary.                     ',
+ '                                                                    ',
+ 'PARTIAL PROGRAMS:                                                   ',
+ '   Partial programs may be reformatted provided one of the division ',
+ '   names (ie. IDENTIFICATION, DATA, ENVIRONMENT, or PROCEDURE) is   ',
+ '   placed in the beginning of the code to indicate to the formatter ',
+ '   how to process the partial program.                              ',
+ '                                                                    ',
+ 'WARNING:                                                            ',
+ '   The word ENVIRONMENT is a formatter keyword and should not be    ',
+ '   used in the REMARKS section of your program. If it is used the   ',
+ '   processing in this area of your program may be wrong.            ',
+ '   A single or double quote in the REMARKS section will be          ',
+ '   interpreted as the beginning of a literal unless the NO_REMARKS  ',
+ '   option is specified.                                             ',
+ '                                                                    '
+ ),
+1     2  HELP(30)  CHAR(68)  INIT(
+ 'GENERAL INFORMATION:                                                ',
+ '                                                                    ',
+ '   In order to obtain information about the use of this utility a   ',
+ 'number of help command words have been provided to provide the exact',
+ 'information desired.                                                ',
+ '                                                                    ',
+ '   Key Word    Explanation                                          ',
+ '   ========    ===========                                          ',
+ '   CASE_CONSTRUCT  Explains the special processing available for    ',
+ '               using IF statements to simulate the case construct.  ',
+ '               Also defines the case construct and explains how to  ',
+ '               use it in programming.                               ',
+ '                                                                    ',
+ '   COMMANDS    Simply lists all available commands.  These are all  ',
+ '               the commands explained by the SYNTAX and PARMS       ',
+ '               commands.                                            ',
+ '                                                                    ',
+ '   FUNCTION    Explains the purpose of the formatter and details the',
+ '               ways it may be used.  In addition it gives warnings  ',
+ '               as to limitations.                                   ',
+ '                                                                    ',
+ '   HELPS       Lists the entire help facility.                      ',
+ '                                                                    ',
+ '   PARMS       Lists and explains all formatter commands which may  ',
+ '               alter the processing of the Cobol program.  These are',
+ '               the available options.                               ',
+ '                                                                    ',
+ '   SYNTAX      Explains how to use this sysin control processor and ',
+ '               the keywords which specifically relate to it.        ',
+ '                                                                    '
+ ),
+1     2  IANS(2)  CHAR(68)  INIT(
+ 'Response given is not recognized or is inactive.                    ',
+ 'For more information type HELP.                                     '
+ ),
+1     2  JCL(15)  CHAR(68)  INIT(
+ 'SAMPLE JCL:                                                         ',
+ '                                                                    ',
+ '   //COBFORM  EXEC PGM=COBFORM                                      ',
+ '   //STEPLIB  DD   DSN=library which contains cobform module,       ',
+ '   //         DISP=SHR                                              ',
+ '   //IN       DD   DSN=cobol source program,DISP=SHR                ',
+ '   //OUT      DD   DSN=index.REFORM.COBOL,DISP=(,CATLG),            ',
+ '   //         SPACE=(TRK,(5,5),RLSE),UNIT=DISK,                     ',
+ '   //         DCB=(RECFM=FB,LRECL=80,BLKSIZE=6160)                  ',
+ '   //SYSPRINT DD   SYSOUT=*                                         ',
+ '   //SYSIN    DD   *                                                ',
+ '     place here cards with options if desired                       ',
+ '   /*                                                               ',
+ '   //                                                               ',
+ '                                                                    '
+ ),
+1     2  LISTER(35)  CHAR(35)  INIT(
+ '  Currently available commands:   ',
+ '                                  ',
+ '    ALT-INDENT                    ',
+ '    BEGIN                         ',
+ '    CANCEL                        ',
+ '    CASE-CONSTRUCT                ',
+ '    COMMANDS                      ',
+ '    COMPRESS-SOURCE               ',
+ '    COUNT                         ',
+ '    DATA-DIVISION-ONLY            ',
+ '    END                           ',
+ '    FUNCTION                      ',
+ '    HELP                          ',
+ '    HELPS                         ',
+ '    JCL                           ',
+ '    KEEP-COMMAS                   ',
+ '    KEEP-SPACERS                  ',
+ '    LIST-ONLY                     ',
+ '    LIST-OUTPUT                   ',
+ '    NO-COMMENTS                   ',
+ '    NO-REMARKS                    ',
+ '    NO-SUBSTITUTIONS              ',
+ '    OMIT-THENS                    ',
+ '    OUT2                          ',
+ '    PROCEDURE-DIVISION-ONLY       ',
+ '    PARMS                         ',
+ '    PGM-ID                        ',
+ '    PIC-COL                       ',
+ '    SEQ                           ',
+ '    STATE                         ',
+ '    STOP                          ',
+ '    SYNTAX                        ',
+ '    TSO                           ',
+ '    USING-COLUMN                  ',
+ '    WIDE-MARGINS                  '
+ ),
+1     2  PARMS(102)  CHAR(68)  INIT(
+ 'FORMAT FUNCTION COMMANDS:                                           ',
+ '                                                                    ',
+ '     ALT_INDENT   Provides an alternate form of indentation where   ',
+ '                  the THEN and ELSE keywords in IF statements are   ',
+ '                  not indented but remain on the same level as the  ',
+ '                  IF.  In addition the remainder of their line      ',
+ '                  remains blank.                                    ',
+ '                                                                    ',
+ '     COMPRESS_SOURCE  This is the reverse function of the formatter.',
+ '                  It causes the source to be output with one space  ',
+ '                  between each word with no regard to syntax or     ',
+ '                  margins in order to take as little space as       ',
+ '                  possible.  To regain the proper form use the      ',
+ '                  formatter without this option specified.          ',
+ '                                                                    ',
+ '     COUNT        Display input and output file record counts.      ',
+ '                                                                    ',
+ '     DATA_DIVISION_ONLY  When this is selected only the DATA        ',
+ '                  DIVISION is reformatted.  For processing to occur ',
+ '                  the division name must begin in column eight and  ',
+ '                  there must be only one space between DATA and     ',
+ '                  DIVISION.  In addition the remainder of the line  ',
+ '                  should be blank.  Note that this is the normal    ',
+ '                  position for these words.                         ',
+ '                                                                    ',
+ '     KEEP_COMMAS  Prevents the default option that deletes commas   ',
+ '                  while formatting.                                 ',
+ '                                                                    ',
+ '     KEEP_SPACERS  This command may be used to override the default ',
+ '                  processing of the Cobol format words EJECT, SKIP1,',
+ '                  SKIP2 and SKIP3.  Normally these words are deleted',
+ '                  and blank lines are inserted for the skips.  When ',
+ '                  this command is used these words in the program   ',
+ '                  are left alone and no additional EJECTS are added.',
+ '                                                                    ',
+ '     LIST_ONLY    Only sysprint listing is produced.  No output     ',
+ '                  files are produced.                               ',
+ '                                                                    ',
+ '     LIST_OUTPUT  Displays a listing of the output file on sysprint.',
+ '                  This option is recommended for execution only in  ',
+ '                  the batch environment.                            ',
+ '                                                                    ',
+1'     NO_COMMENTS  Causes comment lines to be skipped in reformatting',
+ '                  process.  Note however, that block comments are   ',
+ '                  always skipped.  So if you desire only a few      ',
+ '                  few comments to be skipped merely make sure they  ',
+ '                  have a * in column 72 which will flag them as     ',
+ '                  block comments.                                   ',
+ '                                                                    ',
+ '     NO_REMARKS   When this keyword is selected the REMARKS         ',
+ '                  paragraph of the IDENTIFICATION DIVISION is not   ',
+ '                  reformated.  It should be noted that when this    ',
+ '                  option is in effect the REMARKS paragraph columns ',
+ '                  8-72 is output as is and cols 73-80 are ignored   ',
+ '                  even if WIDE_MARGINS is in effect.                ',
+ '                                                                    ',
+ '     NO_SUBSTITUTIONS  This option prevents the formatter from      ',
+ '                  abreviating keywords encountered in the program.  ',
+ '                  This goes against the principle of eliminating the',
+ '                  unnecessary.                                      ',
+ '                                                                    ',
+ '     OMIT_THENS   Causes the Cobol THEN keyword to be omitted from  ',
+ '                  the output data set(s).                           ',
+ '                                                                    ',
+ '     OUT2         Causes the creation of a second output data set   ',
+ '                  allocated to ddname out2.  This is recommended    ',
+ '                  only for multiple class output.                   ',
+ '                                                                    ',
+ '     PGM_ID Char_String  Specify a program identifier.  Char_string ',
+ '                  should be substituted by your identifier, using up',
+ '                  to eight characters.  This value will appear in   ',
+ '                  columns 73 - 80 of the output file(s).            ',
+ '                                                                    ',
+ '     PIC_COL Number  Specify a column in which to begin all PIC     ',
+ '                  Cobol keywords.  If it is impossible to place it  ',
+ '                  beginning in the specified column the program     ',
+ '                  default of spacing twice is used.  Number may be  ',
+ '                  any value from 13 to 70.  If Number is not given  ',
+ '                  default value for this option is 37.              ',
+ '                                                                    ',
+ '     PROCEDURE_DIVISION_ONLY  Causes processing of the PROCEDURE    ',
+ '                  DIVISION while the rest of the program remains    ',
+ '                  untouched.  The word PROCEDURE should start on the',
+ '                  A margin (column 8) followed by one space and then',
+ '                  the word DIVISION.  The remainder of the line     ',
+ '                  should be blank.                                  ',
+ '                                                                    ',
+1'     SEQ  Number  Specify increment value for output card numbering.',
+ '                  Number may be any value from 1 to 100.  If Number ',
+ '                  is not specified the default value of 10 is used. ',
+ '                                                                    ',
+ '     USING_COLUMN This option specifies that identifiers following  ',
+ '                  the USING keyword in a Cobol program (ie. in a    ',
+ '                  CALL or ENTRY statement) are to be formatted into ',
+ '                  a single column.                                  ',
+ '                                                                    ',
+ '     WIDE_MARGINS Used to specify that the input text is in         ',
+ '                  columns 7 through 80.  This is convenient for     ',
+ '                  entering a new program.  It naturally assumes that',
+ '                  there is no program identifier or sequence        ',
+ '                  numbering in columns 73-80 of the input.          ',
+ '                                                                    '
+ ),
+1     2  SYNTAX(36)  CHAR(68)  INIT(
+ 'SYSIN CONTROL FILE:                                                 ',
+ '   Some features of this program are controlable through the sysin  ',
+ '   file.  All features have a default so that control is only       ',
+ '   necessary to specify non-default options.                        ',
+ '                                                                    ',
+ '                                                                    ',
+ 'SYSIN SYNTAX:                                                       ',
+ '   All commands which are more than one "word" are connected with   ',
+ '   either hypehns or underline characters as shown.  No quotes are  ',
+ '   needed.  Number operands are entered without quotes as indicated.',
+ '                                                                    ',
+ '                                                                    ',
+ 'CONTROL LOOP COMMANDS:                                              ',
+ '                                                                    ',
+ '     BEGIN        Causes options not to be displayed before         ',
+ '                  execution.  Execution begins without delay.       ',
+ '                                                                    ',
+ '     CANCEL       Allows one to skip processing of files and        ',
+ '                  immediately terminate execution.  This prevents   ',
+ '                  abend if you just realized you haven''t allocated ',
+ '                  the necessary files.                              ',
+ '                                                                    ',
+ '     END          Ends the control loop.                            ',
+ '                                                                    ',
+ '     JCL          Displays information on running the formatter     ',
+ '                  in the background.                                ',
+ '                                                                    ',
+ '     STATE        Displays the options in effect at the time of     ',
+ '                  the giving of this command.  Can be used to       ',
+ '                  verify default options.                           ',
+ '                                                                    ',
+ '     STOP         Ends the control loop.                            ',
+ '                                                                    ',
+ '     TSO          Displays information on running the formatter     ',
+ '                  in the foreground.                                ',
+ '                                                                    '
+ ),
+1     2  TERM(8)  CHAR(68)  INIT(
+ '                                                                    ',
+ '                     COBOL SOURCE FORMAT UTILITY                    ',
+ '                        By Clyde Thomas Zuber                       ',
+ '                             Version 3.1                            ',
+ '                                                                    ',
+ '          For more information enter HELP.  To procede with         ',
+ '          processing and terminate control loop enter END.          ',
+ '                                                                    '
+ ),
+1     2  TSO(12)  CHAR(68)  INIT(
+ 'IN TSO FOREGROUND:                                                  ',
+ '                                                                    ',
+ '   Issue the following commands corresponding to the jcl.           ',
+ '                                                                    ',
+ '   ALLOC DA(library which contains cobform module) SHR              ',
+ '   ALLOC F(SYSPRINT) DA(*)                                          ',
+ '   ALLOC F(SYSIN)    DA(*)                                          ',
+ '   ATTR COBFILE  RECFM(F,B) LRECL(80) BLKSIZE(6160)                 ',
+ '   ALLOC F(OUT) DA(REFORM.COBOL) SPA(5,5) TRA CAT REL US(COBFILE)   ',
+ '   ALLOC F(IN)  DA(cobol source program)                            ',
+ '   CALL  library as in first stmt above(COBFORM)                    ',
+ '                                                                    '
+ );
+1PUT FILE(SYSPRINT) PAGE;
+ SELECT;
+     WHEN (TERM_SELECTOR) DO; /*INITIAL WELCOME*/
+          RUN_DATE = DATE;
+          ORDERED_RUN_DATE = MONTH ]] DAY ]] YEAR;
+          EDITED_RUN_DATE = ORDERED_RUN_DATE;
+          RUN_TIME = TIME;
+          EDITED_RUN_TIME = HOURS ]] COLON ]] MINUTES;
+          PUTOUT_TERM:  /*DISPLAY ENTRY MESSAGE*/
+          DO LINE_NO = 1 TO HBOUND(TERM, 1);
+              PUT FILE(SYSPRINT) SKIP(1) EDIT(TERM(LINE_NO)) (A);
+              END PUTOUT_TERM;
+          PUT FILE(SYSPRINT) SKIP(1) EDIT(
+           '                    Date:  ', EDITED_RUN_DATE, '  Time:  ',
+              EDITED_RUN_TIME) (A);
+          END;
+
+     WHEN (INV_ANSW_SELECTOR) PUT_INV_ANSW:  /*LIST INV ANSW AREA*/
+          DO LINE_NO = 1 TO HBOUND(IANS, 1);
+              PUT FILE(SYSPRINT) SKIP(1) EDIT(IANS(LINE_NO)) (A);
+              END PUT_INV_ANSW;
+
+     WHEN (LIST_CMD_SELECTOR) PUT_COMMANDS:  /*LIST COMMANDS*/
+          DO LINE_NO = 1 TO HBOUND(LISTER, 1);
+              PUT FILE(SYSPRINT) SKIP(1) EDIT(LISTER(LINE_NO)) (A);
+              END PUT_COMMANDS;
+
+     WHEN (HELP_SELECTOR) PUT_HELP:  /*LIST THE HELP AREA*/
+          DO LINE_NO = 1 TO HBOUND(HELP, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(HELP(LINE_NO)) (A);
+              END PUT_HELP;
+
+     WHEN (FUNCTION_SELECTOR) PUT_FUNC:  /*LIST THE FUNCTION AREA*/
+          DO LINE_NO = 1 TO HBOUND(FUNCTION, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(FUNCTION(LINE_NO)) (A);
+              END PUT_FUNC;
+
+     WHEN (SYNTAX_SELECTOR) PUT_SYNTAX:  /*LIST THE SYNTAX AREA*/
+          DO LINE_NO = 1 TO HBOUND(SYNTAX, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(SYNTAX(LINE_NO)) (A);
+              END PUT_SYNTAX;
+
+     WHEN (PARMS_SELECTOR) PUT_PARM:  /*LIST THE PARMS AREA*/
+          DO LINE_NO = 1 TO HBOUND(PARMS, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(PARMS(LINE_NO)) (A);
+              END PUT_PARM;
+
+1    WHEN (TSO_SELECTOR) PUT_TSO:  /*LIST THE TSO AREA*/
+          DO LINE_NO = 1 TO HBOUND(TSO, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(TSO(LINE_NO)) (A);
+              END PUT_TSO;
+
+     WHEN (JCL_SELECTOR) PUT_JCL:  /*LIST THE JCL AREA*/
+          DO LINE_NO = 1 TO HBOUND(JCL, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(JCL(LINE_NO)) (A);
+              END PUT_JCL;
+
+     WHEN (CASE_SELECTOR) PUT_CASE:  /*LIST THE CASE INFORMATION*/
+          DO LINE_NO = 1 TO HBOUND(CASE, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(CASE(LINE_NO)) (A);
+              END PUT_CASE;
+
+     WHEN (HELPS_SELECTOR) PUT_HELPS: DO; /*LIST ALL HELPS*/
+          DO LINE_NO = 1 TO HBOUND(FUNCTION, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(FUNCTION(LINE_NO)) (A);
+              END;
+          DO LINE_NO = 1 TO HBOUND(SYNTAX, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(SYNTAX(LINE_NO)) (A);
+              END;
+          DO LINE_NO = 1 TO HBOUND(PARMS, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(PARMS(LINE_NO)) (A);
+              END;
+          DO LINE_NO = 1 TO HBOUND(CASE, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(CASE(LINE_NO)) (A);
+              END;
+          DO LINE_NO = 1 TO HBOUND(TSO, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(TSO(LINE_NO)) (A);
+              END;
+          DO LINE_NO = 1 TO HBOUND(JCL, 1);
+                       PUT FILE(SYSPRINT) SKIP(1)
+                           EDIT(JCL(LINE_NO)) (A);
+              END;
+          END PUT_HELPS;
+     END;
+ STRING(MESSAGE_SELECTORS) = NO;
+ END COBMSG;
+

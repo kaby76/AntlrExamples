@@ -1,0 +1,112 @@
+./ ADD MEMBER=BLKSIZET
+%TUTORIAL ---------------  OPTIMUM BLKSIZE CALCULATOR  -----------------TUTORIAL
+%OPTION ===>_OPT                                                               +
+%
+% PURPOSE:+ To provide the user with enough information so that he can
++           easily choose the best blksize for a given lrecl.
+%
+% METHOD:+  This program takes a logical record length with or without
++           keys and computes all possible block sizes.  It then
++           evaluates their space effectiveness on four direct access
++           device types.  It then sorts them in best first order for
++           the device types selected and puts out the information in an
++           ispf table.
++
+% TABLE HEADER DEFINITIONS:
+%   BKNG -+blocking factor, number of logical records in physical record.
+%   BLKSIZE -+physical record size (lrecl * BKNG).
+%   RATING -+relative utilization (USED-OVERHEAD) for chosen device types.
+%   UNIT/CON -+devices from previous panel and whether considered for rating.
+%   #BLKS/TRK -+number of physical records which will fit on device track.
+%   BYTES (the following refer to a track of a given device/UNIT):
+%     USED -+bytes used (#BLKS/TRK * BLKSIZE).
+%     WASTED -+usable bytes wasted on device track due to BLKSIZE.
+%     OVERHEAD -+bytes required by device type for #BLKS/TRK plus WASTED.
+)END
+./ ADD MEMBER=BLKSIZE0
+%------------------------  OPTIMUM BLKSIZE CALCULATOR  -------------------------
+%OPTION ===>_OPT                                                               +
+%
+%  Select unit types for consideration+(YES or NO):
++
++       3330  %===>_U30+
++       3340  %===>_U40+
++       3350  %===>_U50+
++       3380  %===>_U80+
++
++
++       LRECL %===>_LRECL+
++       KEYLEN%===>_KEYLN+
++
++
+%  NOTE: +Calculation is based on disk storage utilization.  Other factors
++  such as memory page size (4k/4096 bytes) and the number of buffers being
++  used by the access method (defaults to 5) should also be considered when
++  choosing the blksize.
+)INIT
+ .HELP = BLKSIZET
+ .CURSOR = LRECL
+ &LRECL = ' '
+ &KEYLN = 0
+ IF (&U30 = ' ')
+     &U30 = YES
+ IF (&U40 = ' ')
+     &U40 = NO
+ IF (&U50 = ' ')
+     &U50 = YES
+ IF (&U80 = ' ')
+     &U80 = YES
+)PROC
+  VER(&LRECL,NONBLANK)
+  VER(&LRECL,NUM)
+  VER(&LRECL,RANGE,3,32767)
+  VER(&KEYLN,NONBLANK)
+  VER(&KEYLN,NUM)
+  VER(&KEYLN,RANGE,0,255)
+  VER(&U30,NONBLANK)
+  VER(&U40,NONBLANK)
+  VER(&U50,NONBLANK)
+  VER(&U80,NONBLANK)
+  &U30 = TRANS(&U30  Y,YES N,NO YE,YES YES,YES NO,NO)
+  &U40 = TRANS(&U40  Y,YES N,NO YE,YES YES,YES NO,NO)
+  &U50 = TRANS(&U50  Y,YES N,NO YE,YES YES,YES NO,NO)
+  &U80 = TRANS(&U80  Y,YES N,NO YE,YES YES,YES NO,NO)
+  VER(&U30,LIST,YES,NO)
+  VER(&U40,LIST,YES,NO)
+  VER(&U50,LIST,YES,NO)
+  VER(&U80,LIST,YES,NO)
+  VPUT (U30,U40,U50,U80) PROFILE
+  VPUT (LRECL KEYLN) SHARED
+  &ZSEL = TRANS(&OPT  ' ',' '  '*','?')
+  IF (&ZSEL ^= '?')
+      &ZSEL = 'PGM(BLKSIZE)'
+)END
+./ ADD MEMBER=BLKSIZE1
+)ATTR
+ DEFAULT(%+])
+ $ TYPE(OUTPUT) INTENS(HIGH)
+ @ TYPE(OUTPUT) INTENS(LOW)
+)BODY
+%OPTIMUM BLKSIZE CALCULATOR   LRECL=$LRECL%KEYLEN=$KEYLN%-----------------------
+%OPTION ===>]OPT                                              %SCROLL ===>]ZSCR+
+%BKNG   BLKSIZE   RATING   UNIT/CON  #BLKS/TRK   BYTES USED    WASTED  OVERHEAD
+)MODEL
++______________________________________________________________________________
+@Z   +   $Z    +    @Z  + $UN3 @U30+      @Z  +      @Z    +   @Z    +   @Z    +
+                          $UN4 @U40+      @Z  +      @Z    +   @Z    +   @Z    +
+                          $UN5 @U50+      @Z  +      @Z    +   @Z    +   @Z    +
+                          $UN8 @U80+      @Z  +      @Z    +   @Z    +   @Z    +
+)INIT
+ .HELP = BLKSIZET
+ .ZVARS='(BLKI BLKSI RATI +
+          BT3 BU3 BW3 OH3 +
+          BT4 BU4 BW4 OH4 +
+          BT5 BU5 BW5 OH5 +
+          BT8 BU8 BW8 OH8)'
+ &ZSCR = 'PAGE'
+ &UN3 = '3330'
+ &UN4 = '3340'
+ &UN5 = '3350'
+ &UN8 = '3380'
+)END
+

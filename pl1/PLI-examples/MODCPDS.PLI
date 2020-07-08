@@ -1,0 +1,616 @@
+*PROCESS NM;
+ MODCPDS:  PROCEDURE(PDSPARM) OPTIONS(MAIN, REENTRANT) REORDER;
+ DECLARE  PGMID  CHAR(36) VARYING STATIC EXTERNAL
+     INIT('MODCPDS  V3.1  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(8K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM PROVIDES THE FACILITY TO USE MODCOPY ON PARTITIONED  */
+ /* DATA SETS.  THIS METHOD USED TO ACCOMPLISH THIS TASK IS NOT VERY  */
+ /* EFFICIENT AND UNLESS MODCOPY'S FACILITIES ARE REQUIRED A STANDARD */
+ /* COPY UTILITY IS RECOMMENDED.  THIS PROGRAM READS THE DIRECTORY    */
+ /* OF THE INPUT PDS AND THEN ALLOWS SELECTION AND OMITION OF MEMBERS.*/
+ /* EACH MEMBER TO BE COPIED IS DYNAMICALLY ALLOCATED TO THE IN,OUT   */
+ /* FILE NAMES AND A SEQUENTIAL COPY IS PERFORMED VIA LINK TO MODCOPY.*/
+ /* SYSIN MAY BE SPECIFIED DIFFERENTLY FOR EACH MEMBER WHEN THE FILE  */
+ /* IS ALLOCATED TO THE TERMINAL OR UNDER MOST CIRCUMSTANCES IT IS    */
+ /* PERFERABLE TO HAVE THE SAME CONTROL CARD(S) APPLY TO ALL MEMBERS. */
+ /* SELECT AND OMIT FILES ARE MUTUALLY EXCLUSIVE.  A PARAMETER        */
+ /* "CLRSCR" IS PROVIDED FOR USE WITH TSO WHICH WILL CLEAR A 3270     */
+ /* TYPE TERMINAL UNDER VTAM AT APPROPRIATE TIMES.                    */
+ /*                                                                   */
+ /* DDNAMES    EXPLANATION                                            */
+ /* =======    ===========                                            */
+ /* PDSIN      DIRECTED TO INPUT PO DATA SET                          */
+ /* PDSOUT     DIRECTED TO OUTPUT PO DATA SET                         */
+ /* SELECT     SEQUENTIAL MEMBER SELECTION LIST, FREE FORMAT          */
+ /* OMIT       SEQUENTIAL MEMBER OMITION LIST, FREE FORMAT            */
+ /* SYSPRINT   PROGRAM OUTPUT FOR MODCPDS AND MODCOPY                 */
+ /* SYSIN      CONTROL INPUT FOR MODCOPY                              */
+ /* (IN,OUT)   SHOULD NOT BE SPECIFIED, DYNAMICALLY ALLOCATED         */
+ /*                                                                   */
+ /*********************************************************************/
+1DECLARE  PDSPARM   CHAR(*) VARYING;
+ DECLARE  MODPARM   CHAR(2) VARYING INIT('');
+
+ DECLARE  FSMODE    ENTRY OPTIONS(ASM, INTER);
+ DECLARE  ISPLINK   ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  LINK      ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  PDSPROC   ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  QCKSORT   ENTRY((*)CHAR(*), FIXED BINARY, FIXED BINARY);
+
+ DECLARE  (ADDR, HBOUND, INDEX, ONSOURCE, PLIRETV, SUBSTR, UNSPEC)
+          BUILTIN;
+
+ DECLARE  SELECT    FILE INPUT  STREAM;
+ DECLARE  OMIT      FILE INPUT  STREAM;
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+
+ DECLARE  MODCOPY      CHAR(8) STATIC INIT('MODCOPY');
+ DECLARE  OUTDSN       CHAR(44);
+ DECLARE  OUTVOL       CHAR(6);
+ DECLARE  CHOSEN(*)    CHAR(8) CONTROLLED;
+
+ DECLARE  CLEAR        BIT(1) INIT('0'B);
+ DECLARE  OMITION      BIT(1) INIT('1'B);
+ DECLARE  SELECTION    BIT(1) INIT('1'B);
+ DECLARE  NO           BIT(1) STATIC INIT('0'B);
+ DECLARE  YES          BIT(1) STATIC INIT('1'B);
+
+ DECLARE  I            FIXED BINARY;
+ DECLARE  MAX          FIXED BINARY INIT(1);
+ DECLARE  NNN          FIXED BINARY;
+ DECLARE  POS          FIXED BINARY;
+1/*********************************************************************/
+ /*                                                                   */
+ /* PDSPROC IDENTIFIERS.                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  ERRMSG       BASED(ERRPTR) CHAR(32760) VARYING;
+
+ DECLARE
+   1  PARAMETER,
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMBER      CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6);
+
+ DECLARE
+   1  IN_DIR  BASED(BLDLPTR),
+      2  #ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT REFER(#ENTRIES)),
+         3  MEMNAME  CHAR(8),
+         3  TTRC,
+            4  TTR             CHAR(3),
+            4  C_FIELD,
+               5  ALIAS           BIT(1),
+               5  NUM_TTRN        BIT(2),
+               5  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+1/*********************************************************************/
+ /*                                                                   */
+ /* ALLOC/FREE PROCEDURE IDENTIFIERS.  INCLUDED IN MAIN PROCEDURE TO  */
+ /* AVOID MULTIPLE INIT OF VARIABLES.                                 */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  SVC      ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  ENDLIST  ENTRY OPTIONS(ASM, INTER);
+
+ DECLARE  FREE_TEXTPTR(2)   PTR INIT(ADDR(TF1), ADDR(TF7));
+ DECLARE  ALLOC_TEXTPTR(7)  PTR INIT(ADDR(TF1), ADDR(TF2), ADDR(TF3),
+          ADDR(TF4), ADDR(TF5), ADDR(TF16), ADDR(TF21));
+
+ DECLARE
+     1  FREE_REQUEST_BLK,
+        2  BLK_LENGTH      BIT(8)  INIT('00010100'B),
+        2  VERB            BIT(8)  INIT('00000010'B),
+        2  FLAGS_ERR_INFO  BIT(48) INIT('0'B),
+        2  PTR_TEXTPTRS    PTR     INIT(ADDR(FREE_TEXTPTR(1))),
+        2  RESERVED_FLAGS  BIT(64) INIT('0'B);
+
+ DECLARE
+     1  ALLOC_REQUEST_BLK,
+        2  BLK_LENGTH      BIT(8)  INIT('00010100'B),
+        2  VERB            BIT(8)  INIT('00000001'B),
+        2  FLAGS_ERR_INFO  BIT(48) INIT('0'B),
+        2  PTR_TEXTPTRS    PTR     INIT(ADDR(ALLOC_TEXTPTR(1))),
+        2  RESERVED_FLAGS  BIT(64) INIT('0'B);
+
+ DECLARE  PTR_FREE_REQUEST   PTR INIT(ADDR(FREE_REQUEST_BLK));
+ DECLARE  PTR_ALLOC_REQUEST  PTR INIT(ADDR(ALLOC_REQUEST_BLK));
+ DECLARE  R1_F   PTR INIT(ADDR(PTR_FREE_REQUEST));
+ DECLARE  R1_A   PTR INIT(ADDR(PTR_ALLOC_REQUEST));
+ DECLARE  #99    FIXED BINARY STATIC INIT(99);
+ DECLARE  R0     FIXED BINARY(31) INIT(0);
+1DECLARE  /* DDNAME */
+     1  TF1,
+        2  KEY   FIXED BINARY INIT(1),
+        2  NUM   FIXED BINARY INIT(1),
+        2  PARM  CHAR(8) VARYING;
+
+ DECLARE  /* DSNAME */
+     1  TF2,
+        2  KEY   FIXED BINARY INIT(2),
+        2  NUM   FIXED BINARY INIT(1),
+        2  PARM  CHAR(44) VARYING;
+
+ DECLARE  /* MEMBER */
+     1  TF3,
+        2  KEY   FIXED BINARY INIT(3),
+        2  NUM   FIXED BINARY INIT(1),
+        2  PARM  CHAR(8) VARYING;
+
+ DECLARE  /* STARTING DISP (SHR,...) */
+     1  TF4,
+        2  KEY   FIXED BINARY INIT(4),
+        2  NUM   FIXED BINARY INIT(1),
+        2  LEN   FIXED BINARY INIT(1),
+        2  PARM  BIT(8) INIT('00001000'B);
+
+ DECLARE  /* NORMAL TERMINATION (...,KEEP) */
+     1  TF5,
+        2  KEY   FIXED BINARY INIT(5),
+        2  NUM   FIXED BINARY INIT(1),
+        2  LEN   FIXED BINARY INIT(1),
+        2  PARM  BIT(8) INIT('00001000'B);
+1DECLARE  /* UNALLOC */
+     1  TF7,
+        2  KEY   FIXED BINARY INIT(7),
+        2  NUM   FIXED BINARY INIT(0);
+
+ DECLARE  /* VOLUME */
+     1  TF16,
+        2  KEY   FIXED BINARY INIT(16),
+        2  NUM   FIXED BINARY INIT(1),
+        2  PARM  CHAR(8) VARYING;
+
+ DECLARE  /* DEVT */
+     1  TF21,
+        2  KEY   FIXED BINARY INIT(21),
+        2  NUM   FIXED BINARY INIT(1),
+        2  PARM  CHAR(8) VARYING INIT('SYSALLDA');
+1/* INIT FOR ALLOC PROCEDURE */
+ CALL ENDLIST(PTR_FREE_REQUEST);
+ CALL ENDLIST(PTR_ALLOC_REQUEST);
+ CALL ENDLIST(FREE_TEXTPTR(2));
+ CALL ENDLIST(ALLOC_TEXTPTR(7));
+
+ /* OBTAIN INFO FOR OUTPUT DATASET */
+ OPEN_FOR_INPUT = YES;
+ DDNAME = 'PDSOUT';
+ CALL PDSFUNC('OPEN');
+ OUTDSN = DSNAME;
+ OUTVOL = VOLUME;
+ CALL PDSFUNC('CLOSE');
+
+ /* OBTAIN INFO FOR INPUT DATASET */
+ OPEN_FOR_INPUT = YES;
+ DDNAME = 'PDSIN';
+ CALL PDSFUNC('OPEN');
+ CALL PDSFUNC('BLDL');
+
+ /* CHECK PARM AND PREPARE TO REUSE */
+ IF INDEX(PDSPARM, 'CLRSCR') ^= 0
+     THEN CLEAR = YES;
+
+ /* PROCESS SELECT AND OMIT FILES */
+ ALLOCATE CHOSEN(#ENTRIES);
+ IF INDEX(PDSPARM, 'ISPF') = 0
+     THEN DO;
+          IF CLEAR
+              THEN CALL FSMODE('CLEAR');
+          PUT SKIP EDIT(PGMID)(A);
+          PUT SKIP(2) EDIT('IN  DSN=', DSNAME, 'VOL=SER=', VOLUME)(A);
+          PUT SKIP(1) EDIT('OUT DSN=', OUTDSN, 'VOL=SER=', OUTVOL)(A);
+          CALL CHOICE;
+          END;
+     ELSE CALL MEMISPF(MEMNAME);
+
+ IF SELECTION ] OMITION
+     THEN CALL QCKSORT(CHOSEN, 1, MAX);
+1/* COPY MEMBERS */
+ DO I = 1 TO #ENTRIES;
+     IF SELECTION ] OMITION
+         THEN IF PROVIDED(MEMNAME(I), (MAX), CHOSEN)
+                  THEN IF SELECTION
+                           THEN CALL COPY(MEMNAME(I));
+                           ELSE;
+                  ELSE IF SELECTION
+                           THEN;
+                           ELSE CALL COPY(MEMNAME(I));
+         ELSE CALL COPY(MEMNAME(I));
+     END;
+
+ CALL PDSFUNC('CLOSE');
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1PROVIDED:  PROCEDURE(MEMBER, HIGH, ARRAY) RETURNS(BIT(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* GENERALIZED SEARCH TABLE PROCEDURE.  USES BINARY SEARCH ALGORITHM.*/
+ /* NOTE THAT CALL BY VALUE SHOULD BE USED ON SECOND ARGUMENT.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  MEMBER   CHAR(*);
+ DECLARE  ARRAY(*) CHAR(*);
+ DECLARE  HIGH    FIXED BINARY;
+ DECLARE  LOW     FIXED BINARY INIT(1);
+
+ DO WHILE(HIGH >= LOW);
+     POS = (LOW + HIGH) / 2;
+     IF MEMBER = ARRAY(POS)
+         THEN RETURN(YES);
+         ELSE IF MEMBER > ARRAY(POS)
+                  THEN LOW = POS + 1;
+                  ELSE HIGH = POS - 1;
+     END;
+
+ RETURN(NO);
+
+ END PROVIDED;
+1COPY:  PROCEDURE(MEMNAME);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ACTUAL COPY LOGIC SEPERATED FROM FLOW TO ALLOW FOR SELECT/OMIT    */
+ /* LOGIC.                                                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  MEMNAME  CHAR(*);
+
+ CALL ALLOC('IN',  DSNAME, MEMNAME, VOLUME);
+ CALL ALLOC('OUT', OUTDSN, MEMNAME, OUTVOL);
+
+ IF CLEAR
+     THEN CALL FSMODE('CLEAR');
+ PUT SKIP(2) EDIT('MODCPDS MEMBER=', MEMNAME)(A);
+ PUT SKIP(2);
+
+ CALL LINK(MODCOPY, MODPARM);
+
+ CALL FREE('IN');
+ CALL FREE('OUT');
+
+ END COPY;
+1FREE:  PROCEDURE(DDNAME);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DYNAMIC FREE ON THE DDNAME PASSED AS ARGUMENT.                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  DDNAME   CHAR(*);
+
+ TF1.PARM = DDNAME;
+
+ CALL SVC(#99, R0, R1_F);
+
+ IF PLIRETV > 4
+     THEN DO;
+          PUT SKIP EDIT('FREE ERROR, RETURN CODE =', PLIRETV)(A, F(10));
+          PUT SKIP(1) EDIT('DDNAME=', DDNAME)(A);
+          SIGNAL ERROR;
+          END;
+
+ END FREE;
+1ALLOC:  PROCEDURE(DDNAME, DSNAME, MEMNAME, VOLUME);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* DYNAMIC ALLOCATION FOR A PDS MEMBER.                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  DDNAME   CHAR(*);
+ DECLARE  DSNAME   CHAR(*);
+ DECLARE  MEMNAME  CHAR(*);
+ DECLARE  VOLUME   CHAR(*);
+
+ TF1.PARM = DDNAME;
+
+ POS = INDEX(DSNAME]]' ', ' ') - 1;
+ TF2.PARM = SUBSTR(DSNAME, 1, POS);
+
+ POS = INDEX(MEMNAME]]' ', ' ') - 1;
+ TF3.PARM  = SUBSTR(MEMNAME, 1, POS);
+
+ POS = INDEX(VOLUME]]' ', ' ') - 1;
+ TF16.PARM  = SUBSTR(VOLUME, 1, POS);
+
+ CALL SVC(#99, R0, R1_A);
+
+ IF PLIRETV ^= 0
+     THEN DO;
+          PUT SKIP(3) EDIT('ALLOCATION ERROR, RETURN CODE =', PLIRETV)
+              (A, F(10));
+          PUT SKIP(1) EDIT(' MEMBER=', MEMNAME, ' DDNAME=', DDNAME,
+              ' DSNAME=', DSNAME, ' VOLUME=', VOLUME)(A);
+          SIGNAL ERROR;
+          END;
+
+ END ALLOC;
+1PDSFUNC:  PROCEDURE(FUNCTION);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE PARAMETER IS THE FUNCTION TO BE    */
+ /* PERFORMED BY PDSPROC.                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FUNCTION  CHAR(10);
+
+ CALL PDSPROC(FUNCTION, PARAMETER);
+
+ IF PLIRETV ^= 0
+     THEN DO;
+          PUT SKIP EDIT(ERRMSG) (A);
+          IF PLIRETV > 4
+              THEN DO;
+                   PUT SKIP EDIT('RETURN CODE =', PLIRETV) (A, F(3));
+                   SIGNAL ERROR;
+                   END;
+          END;
+
+ END PDSFUNC;
+1CHOICE:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* SELECT/OMIT FILE PROCESSING.  ALLOW MEMBER SELECT OR OMIT.        */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ON CONVERSION BEGIN; /* RECOVER AND OBTAIN INPUT */
+     CHOSEN(MAX) = ONSOURCE;
+     UNSPEC(CHOSEN(MAX)) = UNSPEC(CHOSEN(MAX)) ] (8)'01000000'B;
+     ONSOURCE = (16)'0';
+     END;
+
+ ON UNDEFINEDFILE(SELECT) BEGIN;
+     PUT SKIP(3) EDIT('NO SELECT FILE SPECIFIED')(A);
+     GOTO END_SELECTS;
+     END;
+
+ ON ENDFILE(SELECT) GOTO END_SELECTS;
+
+ OPEN FILE(SELECT);
+ PUT SKIP(3) EDIT('SELECT FILE PROCESSING - ENTER MEMBER NAMES')(A);
+ DO MAX = 1 TO #ENTRIES;
+     GET FILE(SELECT) LIST(NNN);
+     IF CHOSEN(MAX) = 'END'
+         THEN GOTO END_SELECTS;
+     IF ^PROVIDED(CHOSEN(MAX), (#ENTRIES), MEMNAME)
+         THEN DO;
+              PUT SKIP EDIT(CHOSEN(MAX), ' INVALID, REENTER')(A);
+              MAX = MAX - 1;
+              END;
+     END;
+
+ PUT SKIP(3) EDIT('*** SELECTED MORE MEMBERS THAN DATA SET HAS ***')(A);
+
+ END_SELECTS:
+1IF MAX = 1
+     THEN SELECTION = NO;
+
+ IF SELECTION
+     THEN DO;
+          PUT SKIP(3) EDIT('SELECT FILE WAS SPECIFIED')(A);
+          PUT SKIP(1) EDIT('OMIT FILE WILL NOT BE READ')(A);
+          OMITION = NO;
+          GOTO END_OMITS;
+          END;
+
+ ON ENDFILE(OMIT) GOTO END_OMITS;
+
+ ON UNDEFINEDFILE(OMIT) BEGIN;
+     PUT SKIP(1) EDIT('NO OMIT FILE SPECIFIED')(A);
+     PUT SKIP(2) EDIT('ALL MEMBERS WILL BE COPIED')(A);
+     OMITION = NO;
+     GOTO END_OMITS;
+     END;
+
+ OPEN FILE(OMIT);
+ PUT SKIP(3) EDIT('OMIT FILE PROCESSING - ENTER MEMBER NAMES')(A);
+ DO MAX = 1 TO #ENTRIES;
+     GET FILE(OMIT) LIST(NNN);
+     IF CHOSEN(MAX) = 'END'
+         THEN GOTO END_OMITS;
+     IF ^PROVIDED(CHOSEN(MAX), (#ENTRIES), MEMNAME)
+         THEN DO;
+              PUT SKIP EDIT(CHOSEN(MAX), ' INVALID, REENTER')(A);
+              MAX = MAX - 1;
+              END;
+     END;
+
+ PUT SKIP(3) EDIT('*** OMITTED MORE MEMBERS THAN DATA SET HAS ***')(A);
+
+ END_OMITS:
+
+ IF MAX = 1
+     THEN OMITION = NO;
+     ELSE MAX = MAX - 1;
+
+ END CHOICE;
+1MEMISPF:  PROCEDURE(MEMLIST);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* ISPF PANEL AND TABLE MEMBER SELECT OR OMIT.                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  MEMLIST(*) CHAR(*);
+
+ DECLARE  LSTRETV    FIXED BINARY(31);
+ DECLARE  MEMNAME    CHAR(8);
+ DECLARE  PCK        CHAR(1) INIT(' ');
+ DECLARE  TYP        CHAR(8);
+ DECLARE  ZCMD       CHAR(44);
+
+ /* ISPF CONSTANTS - KEYWORDS */
+ DECLARE  CHAR       CHAR(4)  STATIC INIT('CHAR');
+ DECLARE  CONTROL    CHAR(8)  STATIC INIT('CONTROL');
+ DECLARE  DISPLAY    CHAR(8)  STATIC INIT('DISPLAY');
+ DECLARE  LINE       CHAR(4)  STATIC INIT('LINE');
+ DECLARE  NOWRITE    CHAR(8)  STATIC INIT('NOWRITE');
+ DECLARE  SETMSG     CHAR(8)  STATIC INIT('SETMSG');
+ DECLARE  TBADD      CHAR(8)  STATIC INIT('TBADD');
+ DECLARE  TBEND      CHAR(8)  STATIC INIT('TBEND');
+ DECLARE  TBMOD      CHAR(8)  STATIC INIT('TBMOD');
+ DECLARE  TBTOP      CHAR(8)  STATIC INIT('TBTOP');
+ DECLARE  TBCREATE   CHAR(8)  STATIC INIT('TBCREATE');
+ DECLARE  TBDISPL    CHAR(8)  STATIC INIT('TBDISPL');
+ DECLARE  VDEFINE    CHAR(8)  STATIC INIT('VDEFINE');
+ DECLARE  VDELETE    CHAR(8)  STATIC INIT('VDELETE');
+ DECLARE  VREPLACE   CHAR(8)  STATIC INIT('VREPLACE');
+1/* ISPF CONSTANTS - PANEL, TABLE NAMES, ETC. */
+ DECLARE  MODCPDS    CHAR(8)  STATIC INIT('MODCPDS');
+ DECLARE  MODCPDS1   CHAR(8)  STATIC INIT('MODCPDS1');
+ DECLARE  MSG_ID1    CHAR(8)  STATIC INIT('MODP001');
+ DECLARE  MSG_ID2    CHAR(8)  STATIC INIT('MODP002');
+ DECLARE  MSG_ID3    CHAR(8)  STATIC INIT('MODP003');
+
+ /* ISPF CONSTANTS - VARIABLE NAMES */
+ DECLARE  N_INDSN    CHAR(8)  STATIC INIT('(INDSN)');
+ DECLARE  N_IVOL     CHAR(8)  STATIC INIT('(IVOL)');
+ DECLARE  N_MEMNAME  CHAR(12) STATIC INIT('(MEMNAME)');
+ DECLARE  N_OUTDSN   CHAR(8)  STATIC INIT('(OUTDSN)');
+ DECLARE  N_OVOL     CHAR(8)  STATIC INIT('(OVOL)');
+ DECLARE  N_PCK      CHAR(8)  STATIC INIT('(PCK)');
+ DECLARE  N_TYP      CHAR(8)  STATIC INIT('(TYP)');
+ DECLARE  N_ZCMD     CHAR(8)  STATIC INIT('(ZCMD)');
+
+ /* ISPF CONSTANTS - LENGTH INDICATORS */
+ DECLARE  L_1        FIXED BINARY(31) STATIC INIT(1);
+ DECLARE  L_6        FIXED BINARY(31) STATIC INIT(6);
+ DECLARE  L_8        FIXED BINARY(31) STATIC INIT(8);
+ DECLARE  L_44       FIXED BINARY(31) STATIC INIT(44);
+1/* DEFINE THE VARIABLES TO ISPF AND CREATE THE TABLE */
+ CALL ISPLINK(VDEFINE, N_TYP, TYP, CHAR, L_8);
+ CALL ISPLINK(VDEFINE, N_ZCMD, ZCMD, CHAR, L_44);
+
+ CALL ISPLINK(VDEFINE, N_PCK, PCK, CHAR, L_1);
+ CALL ISPLINK(VDEFINE, N_MEMNAME, MEMNAME, CHAR, L_8);
+ CALL ISPLINK(TBCREATE, MODCPDS, N_MEMNAME, N_PCK, NOWRITE);
+
+ DO I = 1 TO HBOUND(MEMLIST, 1);
+     MEMNAME = MEMLIST(I);
+     CALL ISPLINK(TBADD, MODCPDS);
+     END;
+
+ CALL ISPLINK(TBTOP, MODCPDS);
+
+ /* PROVIDE FOR EITHER SELECT OR OMIT */
+ TYP = 'SELECT';
+ CALL SELECTOR('*');
+ IF MAX = 1
+     THEN DO;
+          SELECTION = NO;
+          TYP = 'OMIT';
+          CALL SELECTOR('#');
+          IF MAX = 1
+              THEN OMITION = NO;
+          END;
+     ELSE OMITION = NO;
+
+ MAX = MAX - 1;
+ CALL ISPLINK(TBEND, MODCPDS);
+1/* ALLOW FOR AN EXIT POINT TO VERIFY SELECTIONS BEFORE COPY */
+ CALL ISPLINK(TBCREATE, MODCPDS, N_MEMNAME, NOWRITE);
+
+ MEMNAME = (8)'_';
+ CALL ISPLINK(TBADD, MODCPDS);
+ DO I = 1 TO MAX;
+     MEMNAME = CHOSEN(I);
+     CALL ISPLINK(TBADD, MODCPDS);
+     END;
+
+ CALL ISPLINK(VREPLACE, N_INDSN, L_44, DSNAME);
+ CALL ISPLINK(VREPLACE, N_IVOL, L_6, VOLUME);
+ CALL ISPLINK(VREPLACE, N_OUTDSN, L_44, OUTDSN);
+ CALL ISPLINK(VREPLACE, N_OVOL, L_6, OUTVOL);
+
+ CALL ISPLINK(TBTOP, MODCPDS);
+
+ CALL ISPLINK(TBDISPL, MODCPDS, MODCPDS1);
+
+ IF ZCMD = 'NO' ] ZCMD = 'QUIT'
+    THEN #ENTRIES = 0;
+
+ CALL ISPLINK(TBEND, MODCPDS);
+ CALL ISPLINK(VDELETE, '*');
+ CALL ISPLINK(CONTROL, DISPLAY, LINE);
+1SELECTOR:  PROCEDURE(FLAG_CHAR);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE BUILDS THE LIST OF MEMBERS FOR SELECT OR OMIT.     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FLAG_CHAR  CHAR(*);
+
+ CALL ISPLINK(TBDISPL, MODCPDS, MODCPDS);
+ LSTRETV = PLIRETV;
+
+ SHOW_TABLE:  /* DISPLAY TABLE UNTIL END KEY SIGNALED */
+ DO WHILE(LSTRETV < 8);
+     UNSPEC(PCK) = UNSPEC(PCK) ] '01000000'B;
+
+     SELECT(PCK);
+         WHEN('S') DO;
+             CHOSEN(MAX) = MEMNAME;
+             MAX = MAX + 1;
+             PCK = FLAG_CHAR;
+             CALL ISPLINK(TBMOD, MODCPDS);
+             CALL ISPLINK(SETMSG, MSG_ID1);
+             END;
+         WHEN(' ') CALL ISPLINK(SETMSG, MSG_ID2);
+         OTHERWISE CALL ISPLINK(SETMSG, MSG_ID3);
+         END;
+
+     IF LSTRETV = 0
+         THEN CALL ISPLINK(TBDISPL, MODCPDS, MODCPDS);
+         ELSE CALL ISPLINK(TBDISPL, MODCPDS);
+     LSTRETV = PLIRETV;
+     END SHOW_TABLE;
+
+ END SELECTOR;
+
+ END MEMISPF;
+
+ END MODCPDS;
+

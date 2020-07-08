@@ -1,0 +1,103 @@
+*PROCESS NM;
+ PDSMEMS:  PROCEDURE OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID  CHAR(36) VARYING STATIC EXTERNAL
+     INIT('PDSMEMS  V1.0  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING STATIC EXTERNAL INIT('ISA(5K)');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM WAS WRITTEN FOR THE CLIST MODCPDS.  THE PROGRAM GETS */
+ /* THE MEMBER NAMES OF A PDS ALLOCATED TO FILE "IN" AND WRITES THEM  */
+ /* OUT TO A VARIABLE RECORD FORMAT FILE "DIR".  THE CLIST USES THIS  */
+ /* FILE TO LOOP DOING SEQUENTIAL COPIES THROUGH THE MEMBERS OF THE   */
+ /* PDS THUS GIVING MODCOPY PDS CAPABILITY SIMULATION.                */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PDSPROC   ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  SYSPRINT  FILE OUTPUT STREAM PRINT;
+ DECLARE  DIR       FILE OUTPUT RECORD ENV(VB RECSIZE(12));
+ DECLARE  YES       BIT(1) INIT('1'B) STATIC;
+ DECLARE  MEM       CHAR(8) VARYING;
+ DECLARE  (I, POS)  FIXED BINARY;
+ DECLARE  (INDEX, PLIRETV, SUBSTR)  BUILTIN;
+ DECLARE  ERRMSG    BASED(ERRPTR) CHAR(32760) VARYING;
+
+ DECLARE
+   1  PARM,
+      2  DCBPTR      PTR,
+      2  DECBPTR     PTR,
+      2  BLDLPTR     PTR,
+      2  BUFADDR     PTR,
+      2  BUFPOS      PTR,
+      2  BUFEND      PTR, /* BLKSIZE WHEN OPEN FOR OUTPUT */
+      2  ERRPTR      PTR,
+      2  DDNAME      CHAR(8),
+      2  FINDTTR     CHAR(3),
+      2  TTRKPAD     CHAR(1),
+      2  MEMBER      CHAR(8),
+      2  CHECKIT     BIT(8),
+      2  INFLAG,
+         3  OPEN_FOR_INPUT  BIT(1),
+         3  FILLER          BIT(6),
+         3  END_OF_FILE     BIT(1),
+      2  DSNAME      CHAR(44),
+      2  VOLUME      CHAR(6);
+
+ DECLARE
+   1  IN_DIR  BASED(BLDLPTR),
+      2  #ENTRIES  FIXED BINARY,
+      2  MEMBER_ENTRY(MAX_EXT1 REFER(#ENTRIES)),
+         3  MEMNAME  CHAR(8),
+         3  TTRC,
+            4  TTR             CHAR(3),
+            4  C_FIELD,
+               5  ALIAS           BIT(1),
+               5  NUM_TTRN        BIT(2),
+               5  USER_HALFWORDS  BIT(5),
+         3  USER_DATA    CHAR(62);
+
+ OPEN_FOR_INPUT = YES;
+ DDNAME = 'IN';
+ CALL PDSFUNC('OPEN');
+ CALL PDSFUNC('BLDL');
+
+ DO I = 1 TO #ENTRIES;
+     POS = INDEX(MEMNAME(I), ' ');
+     IF POS = 0
+         THEN MEM = MEMNAME(I);
+         ELSE MEM = SUBSTR(MEMNAME(I), 1, POS-1);
+     WRITE FILE(DIR) FROM(MEM);
+     END;
+
+ CALL PDSFUNC('CLOSE');
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1PDSFUNC:  PROCEDURE(FUNCTION);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE PERFORMS THE CALL TO PDSPROC AND CHECKS THE RETURN   */
+ /* CODE FOR POSSIBLE ERRORS.  THE PARAMETER IS THE FUNCTION TO BE    */
+ /* PERFORMED BY PDSPROC.                                             */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  FUNCTION  CHAR(10);
+
+ CALL PDSPROC(FUNCTION, PARM);
+ IF PLIRETV ª= 0
+     THEN DO;
+          PUT SKIP EDIT(ERRMSG) (A);
+          PUT SKIP EDIT('RETURN CODE =', PLIRETV) (A, F(3));
+          SIGNAL ERROR;
+          END;
+
+ END PDSFUNC;
+ END PDSMEMS;
+

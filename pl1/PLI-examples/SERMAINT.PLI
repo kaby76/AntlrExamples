@@ -1,0 +1,943 @@
+*PROCESS NM INT;
+ SERMNT:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ /* FC0G042 VERSION 1.2  ALIAS  SERMAINT                              */
+ DECLARE  PGMID  CHAR(44) VARYING STATIC EXTERNAL
+     INIT('SERMAINT/FC0G042 V1.2  BY CLYDE THOMAS ZUBER');
+
+ DECLARE  PLIXOPT  CHAR(7) VARYING INIT('ISA(7K)') STATIC EXTERNAL;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM IS INTENDED TO REPLACE TO FOLLOWING PROGRAMS:        */
+ /* FC0G042  -REBLVSER, UPDATER OF "SERNUM.KSDS"                      */
+ /* FC0G043  -LISTVSER, LISTER OF "SERNUM.KSDS"                       */
+ /* FC0G044  -PRODUCES COPY OF SERIAL NUMBERS TO SEND TO EDSC         */
+ /* GSERNUM  - BUILDER OF "FCSERNUM(FCSERNUM)"                        */
+ /* $FCA100.SERNUM.VSBOBJ - PROCESSOR OF SPECIAL SERIAL NUMBERS       */
+ /*                                                                   */
+ /* THE FOLLOWING CLISTS:                                             */
+ /* $FCA100.SERNO.CLIST - EXECUTES SERNUM.VSBOBJ                      */
+ /* $FCA100.SERUPT.CLIST - STORES EDITED SPECIAL SERIAL NUMBERS IN    */
+ /*                    "DCC1.PANDATA"                                 */
+ /* THE FOLLOWING JCL:                                                */
+ /* $FCA100.FC0LIAA.CNTL - ON DEMAND UPDATING OF FCSERNUM AND         */
+ /*                    SERNUM.KSDS                                    */
+ /* FC0L1BI - PRODUCTION RUNS OF THE REPLACED PROGRAMS                */
+ /* FC0L1BJ - "                                                       */
+ /* FC0L1DI - "                                                       */
+ /* FC0L1DJ - "                                                       */
+ /* FC0L1EI - "                                                       */
+ /* FC0L1EJ - "                                                       */
+ /* FC0G044 - "                                                       */
+ /*                                                                   */
+ /* PARM                                                              */
+ /* ====                                                              */
+ /* ADD=REGULAR  FORCES ALL ADDITIONS TO REGULAR TYPE                 */
+ /* ADD=SPECIAL  FORCES ALL ADDITIONS TO SPECIAL TYPE                 */
+ /* ADD=URGENT   FORCES ALL ADDITIONS TO URGENT TYPE                  */
+ /* ASM          FORCES THE ASM CSECT FOR FCSERNUM EVEN WHEN NO       */
+ /*              UPDATES TO THE VSAM FILE ARE MADE                    */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /*    JOB STEAM IN UCC7.JCLRES(FC0L1FA)                              */
+ /*                                                                   */
+ /*  ---->  IMPLIES LOGICAL RELATIONSHIP                              */
+ /*                                                                   */
+ /*  _____  OR |  IMPLIES PHYSICAL DEPENDENCY, DDNAMES ARE LISTED     */
+ /*            |  UNDER THEIR RESPECTIVE PART OF THE DIAGRAM          */
+ /*            |                                                      */
+ /*                                                                   */
+ /*********************************************************************/
+ /*                                                                   */
+ /*                                                                   */
+ /*    ____________   ________________                                */
+ /*    | TERMINAL |   | DCC1.SERTAPE |      UPDATE CAN BE FROM EITHER */
+ /*    |__________|   |______________|      TERMINAL OR DCC1.SERTAPE  */
+ /*       | TERMIN       |      BATCH       (OR POSSIBLY BOTH).       */
+ /*       |   DD         |        DD                                  */
+ /*      _|______________|_                                           */
+ /*      |  FC0G042 ALIAS |                                           */
+ /*      |  SERMAINT      |______        _______________________      */
+ /*      |________________|     |________| DATASET FOR EASTERN |      */
+ /*               |             |    EDSC| CENTER UPDATE       |      */
+ /*               |(INPUT       |     DD |_____________________|      */
+ /*               | AND         |                                     */
+ /*               |OUTPUT)      |                                     */
+ /*         ______|________     |    .---> JES3 (BATCH JOB USAGE)     */
+ /*         | SERNUM.KSDS |---->|----|                                */
+ /*         |_____________|     |    '---> VM/370 (BY ANOTHER         */
+ /*                  KSDS       |          JOB/PROCEDURE)             */
+ /*                   DD        |                                     */
+ /*                             |                                     */
+ /*                   __________|___________    .---> TSO LOGON       */
+ /*                   | FCSERNUM(FCSERNUM) |----|                     */
+ /*                   |____________________|    '---> CADAM LOGON     */
+ /*                                  ASM                              */
+ /*                                   DD                              */
+ /*                                                                   */
+ /*                                                                   */
+ /* DDNAMES NOT REPRESENTED BY DIAGRAM:  TERMOUT, RPT, LISTING.  SEE  */
+ /* EXPLANATION OF USAGE BELOW.                                       */
+ /*                                                                   */
+ /*                                                                   */
+ /*********************************************************************/
+1/*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM IS DESIGNED TO MAKE CHANGES EASY AND FEASIBLE.  THE  */
+ /* INTENTION HAS BEEN TO COMPARTMENTALIZE THE SEPERATED FUNCTIONS AS */
+ /* MUCH AS POSSIBLE WHILE CONTAINING THEM ALL IN ONE PROGRAM, SO     */
+ /* THAT AT A FUTURE DATE IF A STANDARD WAY OF HANDLING THE SERIAL    */
+ /* NUMBERS IS DECIDED ON, SUCH AS THE VSAM FILE, THEN THE DISPOSED   */
+ /* OF PART CAN EASILY BE DELETED.                                    */
+ /*                                                                   */
+ /* THE PROGRAM HAS TWO BASIC MODES OF PROCESSING, BUT NOTHING        */
+ /* IS DONE TO PREVENT THE OVERLAPPING OF THE FUNCTIONS IF DESIRED OR */
+ /* NECESSARY.  THE CONTROL IS PROVIDED THROUGH THE INPUT FILES       */
+ /* PROVIDED BY THE USER.  THE TWO BASIC INPUT FILES ARE TERMIN AND   */
+ /* BATCH.  TERMIN IS INTENDED TO BE USED FROM A TERMINAL AND BATCH   */
+ /* IS INTENDED FOR BATCH UPDATE FROM THE SEQUENTIAL SERIAL NUMBER    */
+ /* MASTER FILE (STILL CALLED DCC1.SERTAPE AT THIS TIME).  IF ONE OR  */
+ /* THE OTHER IS DESIRED THAT FILE IS ALLOCATED APPROPRIATELY.  TERMIN*/
+ /* WOULD BE "ALLOC DA(*) F(TERMIN)" IN A CLIST AND BATCH WOULD REMAIN*/
+ /* UNALLOCATED (OR ALLOCATED DUMMY).  IN JCL FOR BATCH TERMIN WOULD  */
+ /* BE UNALLOCATED (OR ALLOCATED DUMMY) AND BATCH WOULD BE ALLOCATED  */
+ /* TO THE MASTER FILE. "//BATCH DD DSN=DCC1.SERTAPE,DISP=SHR".  THE  */
+ /* FUNCTIONS MAY BOTH BE USED IN TSO OR BATCH BY MAKING THE          */
+ /* APPROPRIATE ALLOCATIONS.                                          */
+ /*                                                                   */
+ /* DDNAME    PRESENCE   FUNCTION                                     */
+ /* ======    ========   ========                                     */
+ /* KSDS      REQUIRED   THIS FILE POINTS TO THE VSAM FILE            */
+ /*                      "SERNUM.KSDS" WHICH CONTAINS THE SERIAL      */
+ /*                      NUMBERS FOR THE USE OF THE JES EXIT.         */
+ /* TERMIN    OPTIONAL   ALLOWS THE ADDITION OF SPECIAL SERIAL        */
+ /*                      NUMBERS AND THE CHANGING, DELETING OR        */
+ /*                      LISTING OF EXISTING NUMBERS.                 */
+ /* TERMOUT   AS/TERMIN  MESSAGES WHEN USING TERMIN.                  */
+ /* BATCH     OPTIONAL   UPDATES THE REGULAR SERIAL NUMBERS FROM      */
+ /*                      "DCC1.SERTAPE".                              */
+ /* RPT       AS/BATCH   OUTPUT WHEN USING BATCH.  INCLUDES A LIST OF */
+ /*                      ALL SPECIAL SERIAL NUMBERS IN THE VSAM FILE. */
+ /* ASM       OPTIONAL   PRODUCES ASSEMBLER SOURCE AND JOB FOR        */
+ /*                      CREATING "FCSERNUM(FCSERNUM)".  THIS OUTPUT  */
+ /*                      MAY BE DIRECTED TO AN INTERNAL READER.       */
+ /* LISTING   OPTIONAL   PRODUCES A LISTING OF THE ENTIRE SERIAL      */
+ /*                      NUMBER FILE.                                 */
+ /* EDSC      OPTIONAL   CREATES A DATASET TO BE SENT TO THE EASTERN  */
+ /*                      CENTER SO THAT CENTRAL CENTER'S SERIAL       */
+ /*                      NUMBERS WILL WORK ON THEIR MACHINE.          */
+ /*                                                                   */
+ /*********************************************************************/
+1DECLARE  PARM  CHAR(100) VARYING;
+
+ /* THE POSSIBLE PROGRAM FILES */
+ DECLARE  TERMIN   FILE INPUT  STREAM;
+ DECLARE  BATCH    FILE INPUT  RECORD ENV(FB RECSIZE(80));
+ DECLARE  KSDS     FILE RECORD SEQUENTIAL KEYED
+                   ENV(VSAM GENKEY RECSIZE(20));
+ DECLARE  EDSC     FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  ASM      FILE OUTPUT RECORD ENV(FB RECSIZE(80));
+ DECLARE  TERMOUT  FILE OUTPUT STREAM PRINT;
+ DECLARE  LISTING  FILE OUTPUT STREAM PRINT;
+ DECLARE  RPT      FILE OUTPUT STREAM PRINT;
+
+ /* FLAGS FOR END OF FILE, ETC. */
+ DECLARE  MORE_BATCH      BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_TERMIN     BIT(1) INIT('1'B) STATIC;
+ DECLARE  MORE_KSDS       BIT(1) INIT('1'B) STATIC;
+ DECLARE  NEW_FROM_URGENT BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO_ASM_OUT      BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO_EDSC_OUT     BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO_LISTING_OUT  BIT(1) INIT('0'B) STATIC;
+ DECLARE  UPDATED_KSDS    BIT(1) INIT('0'B) STATIC;
+
+ /* CONSTANTS */
+ DECLARE  YES  BIT(1) INIT('1'B) STATIC;
+ DECLARE  NO   BIT(1) INIT('0'B) STATIC;
+
+ /* DATE AND TIME IDENTIFIERS */
+ DECLARE  RUN_DATE  CHAR(6),
+     1  SPLIT_DATE  DEFINED RUN_DATE,
+        2  YEAR   PIC '(2)9',
+        2  MONTH  PIC '(2)9',
+        2  DAY    PIC '(2)9';
+
+ DECLARE  ORDERED_RUN_DATE  PIC '99/99/99';
+ DECLARE  PAGENO  PIC '(4)Z9' INIT(1);
+
+ /* COMPILER ROUTINES */
+ DECLARE  (ADDR, DATE, INDEX, ONCODE, ONKEY, ONSOURCE,
+          STRING, SUBSTR, TRANSLATE, VERIFY)  BUILTIN;
+ DECLARE
+     1  SERNUM,  /* FORMAT OF "SERNUM.KSDS" */
+        /* REGULAR AND SPECIAL SERIAL NUMBERS */
+        2  S_SERIAL_NUMBER  CHAR(6),
+        /* 0=VALID */
+        2  S_STATUS_CODE    CHAR(1),
+        /* R=REGULAR, S=SPECIAL, U=URGENT */
+        2  S_TYPE_CODE      CHAR(1),
+        2  S_COMMENTS       CHAR(12);
+1ON ATTN BEGIN;
+     IF MORE_TERMIN
+         THEN PUT FILE(TERMOUT) SKIP(3)
+                  EDIT('Terminating due to attention!') (A);
+     STOP;
+     END;
+
+
+ RUN_DATE = DATE;
+ ORDERED_RUN_DATE = MONTH || DAY || YEAR;
+
+
+ /* FORCE MAKING OF FCSERNUM OUTPUT JOB */
+ IF INDEX(PARM, 'ASM') ª= 0
+     THEN UPDATED_KSDS = YES;
+
+ CALL TERM_CNTL;
+
+ CALL BATCH_CNTL;
+
+ IF UPDATED_KSDS
+     THEN CALL MAKE_FCSERNUM_ASM;
+
+ CALL MAKE_LISTING;
+
+ CALL MAKE_EDSC;
+
+
+ /*********************************************************************/
+ /* LOGICAL END OF PROGRAM FLOW                                       */
+ /*********************************************************************/
+1MAKE_LISTING:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PRODUCES A LISTING OF THE SERIAL NUMBER FILE FOR   */
+ /* WHATEVER PURPOSES ONE USES A LISTING OF A FILE FOR.               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ ON ENDFILE(KSDS) MORE_KSDS = NO;
+ ON UNDEFINEDFILE(LISTING) NO_LISTING_OUT = YES;
+ ON ENDPAGE(LISTING) CALL HEADING;
+
+ /* SEE IF LISTING FILE PRESENT */
+ OPEN FILE(LISTING) LINESIZE(132);
+ IF NO_LISTING_OUT
+     THEN RETURN;
+
+ /* TELL THE TERMINAL USER WE'RE STILL HERE */
+ IF MORE_TERMIN
+     THEN PUT FILE(TERMOUT) PAGE EDIT('LISTING BEING PRODUCED...') (A);
+
+ OPEN FILE(KSDS) INPUT;
+
+ /* FIRST PAGE HEADING */
+ CALL HEADING;
+
+ /* JUST GO THROUGH THE FILE SEQUENTIALLY */
+ READ FILE(KSDS) INTO(SERNUM);
+ DO WHILE(MORE_KSDS);
+     PUT FILE(LISTING) SKIP(1) EDIT(S_SERIAL_NUMBER, S_STATUS_CODE,
+         S_TYPE_CODE, S_COMMENTS)
+         (COL(5), A, COL(22), A, COL(43), A, COL(65), A);
+     READ FILE(KSDS) INTO(SERNUM);
+     END;
+
+ /* FREE UP THE FILE BUFFERS */
+ CLOSE FILE(LISTING);
+
+ /* RESET KSDS */
+ CLOSE FILE(KSDS);
+ MORE_KSDS= YES;
+1HEADING:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS ROUTINE IS INTERNAL TO THE MAKE_LISTING PROCEDURE.  IT DOES  */
+ /* A PAGE HEADING SUITABLE FOR THAT PROCEDURE.                       */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ PUT FILE(LISTING) PAGE EDIT('GENERAL DYNAMICS CORPORATION',
+     'CENTRAL CENTER', 'PAGE ', PAGENO)
+     (COL(1), A, COL(59), A, COL(119), A, X(3), A);
+
+ PUT FILE(LISTING) SKIP(1) EDIT('DATA SYSTEMS DIVISION',
+     'REPORT - FC0G042 (LISTING)', 'DATE ', ORDERED_RUN_DATE)
+     (COL(1), A, COL(53), A, COL(119), A, A);
+
+ PUT FILE(LISTING) SKIP(2) EDIT('SERIAL NUMBER',
+     'INVALID INDICATOR', 'SERIAL NUMBER TYPE', 'COMMENTS')
+     (COL(5), A, COL(22), A, COL(43), A, COL(65), A);
+
+ PUT FILE(LISTING) SKIP(0) EDIT('_____________',
+     '_________________', '__________________', '________')
+     (COL(5), A, COL(22), A, COL(43), A, COL(65), A);
+
+ PAGENO = PAGENO + 1;
+
+ END HEADING;
+ END MAKE_LISTING;
+1MAKE_FCSERNUM_ASM:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CREATES THE ASSEMBLER CSECT WHICH WILL BECOME      */
+ /* "FCSERNUM(FCSERNUM)" USED BY TSO AND CADAM LOGON ROUTINES FOR     */
+ /* SERIAL NUMBER VERIFICATION.  THIS CSECT IS SIMPLY A TABLE OF SIX  */
+ /* BYTE ENTRIES WHICH ARE THE VALID SERIAL NUMBERS.  THE END OF THE  */
+ /* TABLE IS SIX BYTES OF X'FF'.  SINCE THE INPUT FOR THIS TABLE IS   */
+ /* THE "SERNUM.KSDS" DATASET THE TABLE IS IN ASCENDING SEQUENCE      */
+ /* WHICH PROVIDES THE ROUTINES THE ABILITY TO USE BINARY SEARCH      */
+ /* ALGORITHMS RATHER THAN THE LINEAR SEARCH WHICH USED TO BE DONE.   */
+ /* THE OUTPUT ALSO CONTAINS THE JCL TO ASSEMBLE AND LINKEDIT THE     */
+ /* CSECT AND IS THEREFORE SUITABLE TO BE SUBMITTED DIRECTLY THROUGH  */
+ /* AN INTERNAL READER.                                               */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  JOB_STMT   CHAR(80) INIT('//FCSERNUM JOB 010,ZUBER,PRTY=13');
+ DECLARE  MAIN_STMT  CHAR(80) INIT('//*MAIN  SYSTEM=ANY,CLASS=EXPRESS');
+ DECLARE  EXEC_STMT  CHAR(80)
+          INIT('// EXEC ASMHCL,PARM.ASM=''NOLIST,OBJECT''');
+ DECLARE  SYSIN_STMT  CHAR(80) INIT('//SYSIN DD *');
+ DECLARE  SYSLMOD_STMT  CHAR(80)
+          INIT('//LKED.SYSLMOD DD DSN=FCSERNUM(FCSERNUM)');
+ DECLARE  CSECT_STMT  CHAR(80) INIT('SERTABL  CSECT');
+
+ DECLARE
+     1  SER_STMT  STATIC,
+        2  FILLER1  CHAR(9) INIT(' '),
+        2  FILLER2  CHAR(8) INIT('DC    C'''),
+        2  SERNO    CHAR(6),
+        2  FILLER3  CHAR(57) INIT('''');
+
+ DECLARE  END_TABLE_STMT
+          CHAR(80) INIT('         DC    X''FFFFFFFFFFFF''');
+
+ DECLARE  END_STMT  CHAR(80) INIT('         END');
+
+1ON ENDFILE(KSDS) MORE_KSDS = NO;
+ ON UNDEFINEDFILE(ASM) NO_ASM_OUT = YES;
+
+ /* SEE IF ASM FILE PRESENT */
+ OPEN FILE(ASM);
+ IF NO_ASM_OUT
+     THEN RETURN;
+
+ /* TELL TERMINAL USER WE'RE STILL WORKING ON THINGS */
+ IF MORE_TERMIN
+     THEN PUT FILE(TERMOUT) PAGE EDIT('FCSERNUM BEING PRODUCED...') (A);
+
+ OPEN FILE(KSDS) INPUT;
+
+ /* WRITE THE BEGINNIG STATEMENTS */
+ WRITE FILE(ASM) FROM(JOB_STMT);
+ WRITE FILE(ASM) FROM(MAIN_STMT);
+ WRITE FILE(ASM) FROM(EXEC_STMT);
+ WRITE FILE(ASM) FROM(SYSIN_STMT);
+ WRITE FILE(ASM) FROM(CSECT_STMT);
+
+ /* WRITE OUT ALL THE SERIAL NUMBERS */
+ READ FILE(KSDS) INTO(SERNUM);
+ DO WHILE(MORE_KSDS);
+     /* WRITE ONLY VALID SERIAL NUMBERS */
+     IF S_STATUS_CODE = '0'
+         THEN DO;
+              SERNO = S_SERIAL_NUMBER;
+              WRITE FILE(ASM) FROM(SER_STMT);
+              END;
+     READ FILE(KSDS) INTO(SERNUM);
+     END;
+
+ /* WRITE THE END OF TABLE INDICATOR X'FFFFFFFFFFFF' */
+ WRITE FILE(ASM) FROM(END_TABLE_STMT);
+
+ /* THE THE ENDING STATEMENTS FOR THE CSECT AND JOB */
+ WRITE FILE(ASM) FROM(END_STMT);
+ WRITE FILE(ASM) FROM(SYSLMOD_STMT);
+
+ /* FREE UP THE FILE BUFFERS */
+ CLOSE FILE(ASM);
+
+ /* RESET KSDS */
+ CLOSE FILE(KSDS);
+ MORE_KSDS= YES;
+
+ END MAKE_FCSERNUM_ASM;
+1MAKE_EDSC:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE WRITES OUT THE VALID SERIAL NUMBERS FROM THE VSAM  */
+ /* FILE SO THAT THEY MAY BE SENT OVER TO EASTERN CENTER.  THESE      */
+ /* NUMBERS ARE ADDED TO THEIR SCHEME OF THINGS SO WE CAN USE OUR     */
+ /* NUMBERS ON THEIR MACHINE.                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE
+     1  SER_STMT  STATIC,
+        2  SERNO_PT CHAR(20),
+        2  FILLER   CHAR(60) INIT(' ');
+
+ ON ENDFILE(KSDS) MORE_KSDS = NO;
+ ON UNDEFINEDFILE(EDSC) NO_EDSC_OUT = YES;
+
+ /* SEE IF EDSC FILE PRESENT */
+ OPEN FILE(EDSC);
+ IF NO_EDSC_OUT
+     THEN RETURN;
+
+ /* TELL THE TERMINAL USER WE'RE STILL HERE */
+ IF MORE_TERMIN
+     THEN PUT FILE(TERMOUT) PAGE EDIT('EDSC DATA BEING PRODUCED...')(A);
+
+ OPEN FILE(KSDS) INPUT;
+ READ FILE(KSDS) INTO(SERNUM);
+ DO WHILE(MORE_KSDS);
+     /* WRITE ONLY VALID SERIAL NUMBERS */
+     IF S_STATUS_CODE = '0'
+         THEN DO;
+              SERNO_PT = STRING(SERNUM);
+              WRITE FILE(EDSC) FROM(SER_STMT);
+              END;
+     READ FILE(KSDS) INTO(SERNUM);
+     END;
+
+ /* FREE UP THE FILE BUFFERS */
+ CLOSE FILE(EDSC);
+ /* RESET KSDS */
+ CLOSE FILE(KSDS);
+ MORE_KSDS= YES;
+ END MAKE_EDSC;
+1BATCH_CNTL:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE PROCESSES INPUT FROM "DCC1.SERTAPE".  ONLY RECORDS */
+ /* WHICH ARE FOR THE IBM SYSTEM AND ARE FLAGGED AS VALID ARE USED.   */
+ /* ANY NUMBERS WHICH ARE IN SERTAPE AND ON THE VSAM FILE ARE LEFT    */
+ /* ALONE.  ANY NUMBERS IN SERTAPE AND NOT ON THE VSAM FILE ARE ADDED */
+ /* AS REGULAR TYPE NUMBERS.  ANY NUMBERS NOT IN SERTAPE BUT IN THE   */
+ /* VSAM FILE ARE LEFT ALONE IF THEY ARE SPECIAL TYPE, IF THEY ARE    */
+ /* REGULAR TYPE THEY ARE DELETED.                                    */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE
+     1  NEW_SERNUM,  /* FORMAT OF "SERNUM.KSDS" */
+        /* REGULAR AND SPECIAL SERIAL NUMBERS */
+        2  N_SERIAL_NUMBER  CHAR(6),
+        /* 0=VALID */
+        2  N_STATUS_CODE    CHAR(1),
+        /* R=REGULAR, S=SPECIAL */
+        2  N_TYPE_CODE      CHAR(1),
+        2  N_COMMENTS       CHAR(12);
+
+ DECLARE
+     1  MASTER,   /* "DCC1.SERTAPE" 01F MASTER SERIAL NUMBER FILE */
+        /* REGULAR NUMBERS */
+        2  M_SERIAL_NUMBER  CHAR(6),
+        /* 19=SES, 31=IBM, 35=CDC, 41=VAX */
+        2  M_COST_CENTER    CHAR(2),
+        2  FILLER           CHAR(71),
+        /* 3  ACCT_CODE     CHAR(4),  THIS STRUCTURE DEFINES THE FILLER
+           3  USER_GROUP    CHAR(7),  FOR DOCUMENTATION PURPOSES, NOTE
+           3  CC_GROUP      CHAR(7),  THAT IT IS COMMENTED OUT.
+           3  WORK_ORDER    CHAR(8),
+           3  AUTH_CUU      CHAR(8),
+           3  AUTH_DATE     CHAR(6),
+           3  EXP_DATE      CHAR(6),
+           3  REM_CUU       CHAR(8),
+           3  TASK_DESCR    CHAR(17), */
+        /* 0=VALID 1=CANCELLED */
+        2  M_STATUS_CODE    CHAR(1);
+
+ DECLARE  SKIP_BATCH_READ  BIT(1) INIT('0'B);
+ DECLARE  PAGENO  PIC '(4)Z9' INIT(1);
+1ON ENDFILE(KSDS) MORE_KSDS = NO;
+ ON ENDFILE(BATCH) MORE_BATCH = NO;
+ ON UNDEFINEDFILE(BATCH)  MORE_BATCH = NO;
+ ON ENDPAGE(RPT) CALL HEADING;
+
+ ON KEY(KSDS) BEGIN;
+ /* FIGURE OUT WHAT WAS WRONG, PRINT ERROR MESSAGE AND RESTART */
+     SELECT(ONCODE);
+         WHEN(51) PUT FILE(RPT) SKIP(5)
+             EDIT('***** LOGIC ERROR IN PROGRAM, SERIAL NUMBER NOT ',
+                 'FOUND, SERIAL NUMBER=', ONKEY) (A);
+         WHEN(52) PUT FILE(RPT) SKIP(5)
+             EDIT('***** DUPLICATE SERIAL NUMBER ON SERTAPE MASTER ',
+                 'FILE, SERIAL NUMBER=', ONKEY) (A);
+         WHEN(54, 55, 56, 58) PUT FILE(RPT) SKIP(5)
+             EDIT('***** INVALID SERIAL NUMBER. ONCODE=', ONCODE,
+                 ' SERIAL NUMBER=', ONKEY) (A, F(10), A, A);
+         WHEN(57) PUT FILE(RPT) SKIP(5)
+             EDIT('***** NO SPACE AVAILABLE FOR RECORD TO BE ADDED, ',
+                  'RECREATE VSAM DATASET.') (A);
+         OTHERWISE PUT FILE(RPT) SKIP(5)
+             EDIT('***** UNEXPECTED ERROR ENCOUNTERED WITH ',
+                  'SERIAL NUMBER=', ONKEY, ' ONCODE=', ONCODE)
+                  (A, A, A, A, F(10));
+         END;
+     PUT FILE(RPT) SKIP(5) EDIT(' ') (A);
+     END;
+
+ /* SEE IF BATCH FILE PRESENT */
+ OPEN FILE(BATCH);
+ IF ªMORE_BATCH
+     THEN RETURN;
+
+ /* INDICATE BATCH UPDATE DONE */
+ UPDATED_KSDS = YES;
+
+ /* PREPARE FOR REPORT */
+ OPEN FILE(RPT) LINESIZE(132);
+ CALL HEADING;
+
+ OPEN FILE(KSDS) UPDATE;
+
+ /* ONLY DESIRE IBM VALID RECORDS */
+ READ FILE(BATCH) INTO(MASTER);
+ DO WHILE(MORE_BATCH & (M_COST_CENTER ª= '31' | M_STATUS_CODE ª= '0'));
+     READ FILE(BATCH) INTO(MASTER);
+     END;
+
+ /* SEQUENTIAL MATCH, BATCH IS THE CONTROLER */
+ READ FILE(KSDS) INTO(SERNUM);
+1MAIN_LOOP:  /* PROCESSES WHILE BOTH FILES REMAIN */
+ DO WHILE(MORE_BATCH & MORE_KSDS);
+
+     COMPARE:  SELECT;   /* COMPARE KEY VALUES <, >, = */
+
+         WHEN(S_SERIAL_NUMBER < M_SERIAL_NUMBER) DO;
+             SELECT(S_TYPE_CODE);
+                 WHEN('R') DO; /* DELETE, NO LONGER REGULAR */
+                     PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER,
+                         S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                         (COL(28), A, X(1), A, X(1), A, X(1), A);
+                     DELETE FILE(KSDS);
+                     END;
+                 WHEN('U')  /* WRITE RPT ON URGENT */
+                     PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER,
+                         S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                         (COL(82), A, X(1), A, X(1), A, X(1), A);
+                 WHEN('S')  /* WRITE RPT ON SPECIALS */
+                     PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER,
+                         S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                         (COL(109), A, X(1), A, X(1), A, X(1), A);
+                 OTHERWISE  /* WRITE RPT SPECIAL INVALID */
+                     PUT FILE(RPT) SKIP(1) EDIT('***', S_SERIAL_NUMBER,
+                         S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                         (COL(105),A,X(1),A,X(1),A,X(1),A,X(1),A);
+                 END;
+             READ FILE(KSDS) INTO(SERNUM);
+             SKIP_BATCH_READ = YES;
+             END;
+
+         WHEN(S_SERIAL_NUMBER > M_SERIAL_NUMBER) DO; /* ADD */
+             N_SERIAL_NUMBER = M_SERIAL_NUMBER;
+             N_STATUS_CODE = M_STATUS_CODE;
+             N_TYPE_CODE = 'R';
+             N_COMMENTS = ' ';
+             PUT FILE(RPT) SKIP(1) EDIT(N_SERIAL_NUMBER, N_STATUS_CODE,
+                 N_TYPE_CODE) (COL(55), A, X(1), A, X(1), A);
+             WRITE FILE(KSDS) FROM(NEW_SERNUM)
+                 KEYFROM(N_SERIAL_NUMBER);
+             /* REREAD BECAUSE WE LOST OUR POSITION ON WRITE */
+             READ FILE(KSDS) INTO(SERNUM) KEY(S_SERIAL_NUMBER);
+             END;
+1        /* S_SERIAL_NUMBER = M_SERIAL_NUMBER */
+         OTHERWISE DO; /* REMAINS */
+             IF S_TYPE_CODE = 'U'
+                 THEN DO;
+                      S_TYPE_CODE = 'R';
+                      REWRITE FILE(KSDS) FROM(SERNUM);
+                      NEW_FROM_URGENT = YES;
+                      END;
+                 ELSE NEW_FROM_URGENT = NO;
+             PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER, S_STATUS_CODE,
+                 S_TYPE_CODE, S_COMMENTS)
+                 (COL(1), A, X(1), A, X(1), A, X(1), A);
+             IF NEW_FROM_URGENT
+                 THEN PUT FILE(RPT) EDIT('NEW FROM URGENT') (COL(55),A);
+             READ FILE(KSDS) INTO(SERNUM);
+             END;
+         END COMPARE;
+
+     IF SKIP_BATCH_READ
+         THEN SKIP_BATCH_READ = NO;
+         ELSE DO WHILE(MORE_BATCH)
+                 UNTIL(M_COST_CENTER = '31' & M_STATUS_CODE = '0');
+                  READ FILE(BATCH) INTO(MASTER);
+                  END;
+     END MAIN_LOOP;
+
+ /* PROCESS THE REMAINDER IF MORE BATCH LEFT */
+ DO WHILE(MORE_BATCH); /* ADD */
+     N_SERIAL_NUMBER = M_SERIAL_NUMBER;
+     N_STATUS_CODE = M_STATUS_CODE;
+     N_TYPE_CODE = 'R';
+     N_COMMENTS = ' ';
+     PUT FILE(RPT) SKIP(1) EDIT(N_SERIAL_NUMBER, N_STATUS_CODE,
+         N_TYPE_CODE) (COL(55), A, X(1), A, X(1), A);
+     WRITE FILE(KSDS) FROM(NEW_SERNUM)
+         KEYFROM(N_SERIAL_NUMBER);
+     DO WHILE(MORE_BATCH)
+        UNTIL(M_COST_CENTER = '31' & M_STATUS_CODE = '0');
+         READ FILE(BATCH) INTO(MASTER);
+         END;
+     END;
+1/* PROCESS THE REMAINDER IF MORE KSDS LEFT */
+ DO WHILE(MORE_KSDS);
+     SELECT(S_TYPE_CODE);
+         WHEN('R') DO; /* DELETE, NO LONGER REGULAR */
+             PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER,
+                 S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                 (COL(28), A, X(1), A, X(1), A, X(1), A);
+             DELETE FILE(KSDS);
+             END;
+         WHEN('U')     /* WRITE RPT ON SPECIALS */
+             PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER,
+                 S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                 (COL(82), A, X(1), A, X(1), A, X(1), A);
+         WHEN('S')     /* WRITE RPT ON SPECIALS */
+             PUT FILE(RPT) SKIP(1) EDIT(S_SERIAL_NUMBER,
+                 S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                 (COL(109), A, X(1), A, X(1), A, X(1), A);
+         OTHERWISE     /* WRITE RPT ON SPECIAL INVALID */
+             PUT FILE(RPT) SKIP(1) EDIT('***', S_SERIAL_NUMBER,
+                 S_STATUS_CODE, S_TYPE_CODE, S_COMMENTS)
+                 (COL(105), A, X(1), A, X(1), A, X(1), A, X(1), A);
+         END;
+     READ FILE(KSDS) INTO(SERNUM);
+     END;
+
+ /* FREE FILE BUFFERS */
+ CLOSE FILE(BATCH);
+ CLOSE FILE(RPT);
+
+ /* RESET KSDS */
+ CLOSE FILE(KSDS);
+ MORE_KSDS = YES;
+1HEADING:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO BATCH_CNTL.  IT PRODUCES THE HEADER */
+ /* FOR THE RPT FILE WHICH IS MADE IN THE PROCEDURE.                  */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ PUT FILE(RPT) PAGE EDIT('GENERAL DYNAMICS CORPORATION',
+     'CENTRAL CENTER', 'PAGE ', PAGENO)
+     (COL(1), A, COL(59), A, COL(119), A, X(3), A);
+
+ PUT FILE(RPT) SKIP(1) EDIT('DATA SYSTEMS DIVISION',
+     'REPORT - FC0G042 (RPT)', 'DATE ', ORDERED_RUN_DATE)
+     (COL(1), A, COL(55), A, COL(119), A, A);
+
+ PUT FILE(RPT) SKIP(2) EDIT('REMAINS', 'DELETED', 'ADDED', 'URGENT',
+     'SPECIAL/NOT ON SERTAPE')
+     (COL(1), A, COL(28), A, COL(55), A, COL(82), A, COL(109), A);
+
+ PUT FILE(RPT) SKIP(0) EDIT('_______', '_______', '_____', '______',
+     '______________________')
+     (COL(1), A, COL(28), A, COL(55), A, COL(82), A, COL(109), A);
+
+ PAGENO = PAGENO + 1;
+
+ END HEADING;
+ END BATCH_CNTL;
+1TERM_CNTL:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE ALLOWS THE ON-LINE UPDATE OF THE SERIAL NUMBER     */
+ /* DATASET.  THE BASIC COMMANDS ARE ADD, CHANGE, DELETE, AND LIST.   */
+ /* BEFORE ANY CHANGE IS COMPLETED THE USER MUST VERIFY THE DATA BY   */
+ /* ANSWERING YES OR NO.  WHEN A SERIAL NUMBER IS ADDED THE           */
+ /* ASSUMPTION IS THAT IT IS A SPECIAL TYPE NUMBER AS REGULAR TYPE    */
+ /* NUMBERS ARE ENTERED THROUGH THE BATCH UPDATE THROUGH              */
+ /* "DCC1.SERTAPE".  GENERALLY, AT THE TIME OF VERSION 1.0 THERE ARE  */
+ /* NO INVALID CODED SERIAL NUMBERS IN THE DATASET.  SINCE THE FLAG   */
+ /* IS THERE IN THE DESIGN PROVISION IS PROVIDED FOR CHANGING THIS    */
+ /* FIELD.                                                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  CAPITAL_LETTERS CHAR(26) STATIC INIT(
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+ DECLARE  SMALL_LETTERS CHAR(26) STATIC INIT(
+      'abcdefghijklmnopqrstuvwxyz');
+
+ DECLARE  ANSW  CHAR(12);
+ DECLARE  NNN   FIXED BINARY;
+ DECLARE  POS   FIXED BINARY(31);
+1ON UNDEFINEDFILE(TERMIN) MORE_TERMIN = NO;
+
+ ON ENDFILE(TERMIN)       MORE_TERMIN = NO;
+
+
+ ON ENDFILE(KSDS) BEGIN;
+ /* TRIED TO READ BEYOND END OF FILE ON A LIST COMMAND, JUST RESTART */
+     CLOSE FILE(KSDS);
+     GOTO REINIT;
+     END;
+
+
+ ON CONVERSION BEGIN;
+ /* GET THE INPUT FROM THE TERMINAL WITHOUT REQUIRING QUOTED STRINGS */
+     ANSW = ONSOURCE;
+     ONSOURCE = (16) '0';
+     ANSW = TRANSLATE(ANSW, CAPITAL_LETTERS, SMALL_LETTERS);
+     END;
+
+
+ ON KEY(KSDS) BEGIN;
+ /* FIGURE OUT WHAT WAS WRONG, PRINT ERROR MESSAGE AND RESTART */
+     SELECT(ONCODE);
+         WHEN(51) PUT FILE(TERMOUT) SKIP(2)
+             EDIT('Start over, serial number was not found.')(A);
+         WHEN(52) PUT FILE(TERMOUT) SKIP(2)
+             EDIT('Start over, serial number already present.')(A);
+         WHEN(54, 55, 56, 58) PUT FILE(TERMOUT) SKIP(2)
+             EDIT('Start over, serial number invalid.  ONCODE=',
+                 ONCODE, ' ONKEY=', ONKEY) (A, F(10), A, A);
+         WHEN(57) PUT FILE(TERMOUT) SKIP(2)
+             EDIT('No space available, recreate vsam dataset.')(A);
+         OTHERWISE PUT FILE(TERMOUT) SKIP(2)
+             EDIT('Unexpected error encountered with serial number.',
+                  '  ONCODE=', ONCODE) (A, A, F(10));
+         END;
+     GOTO REINIT;
+     END;
+1/* CHECK FOR THE PRESENCE OF THE TERMIN FILE */
+ OPEN FILE(TERMIN);
+ IF ªMORE_TERMIN
+     THEN RETURN;
+
+ OPEN FILE(KSDS) UPDATE;
+
+ REINIT:  /* COME HERE AFTER KEY ERROR OR ENDFILE ON INOUT */
+ PUT FILE(TERMOUT) SKIP(1)
+     EDIT('ENTER: Stop (S) or End (E) to exit.') (A);
+
+ PUT FILE(TERMOUT) SKIP(2) EDIT('ENTER: Add (A), Change (C), ',
+     'Delete (D), List (L), followed by a serial number.') (A);
+ GET FILE(TERMIN) LIST(NNN);
+
+ /* INPUT CONTROL LOOP */
+ DO WHILE(ANSW ª= 'STOP' & ANSW ª= 'END' & ANSW ª= 'S' & ANSW ª= 'E'
+    & MORE_TERMIN);
+
+     SELECT(SUBSTR(ANSW, 1, 1));
+     /* FIGURE OUT WHAT TO DO */
+
+1        WHEN('A') DO;  /* ADD */
+             ANSW = ' ';
+             DO WHILE(ANSW = ' ');
+                 GET FILE(TERMIN) LIST(NNN);
+                 IF NNN ª= 0
+                     THEN CALL ENTER_NUMBER;
+                 END;
+             S_SERIAL_NUMBER = ANSW;
+             S_STATUS_CODE = '0';
+             S_TYPE_CODE = ' ';
+             S_COMMENTS = ' ';
+             SELECT;
+                 WHEN(INDEX(PARM,'ADD=SPECIAL') ª= 0) S_TYPE_CODE = 'S';
+                 WHEN(INDEX(PARM,'ADD=REGULAR') ª= 0) S_TYPE_CODE = 'R';
+                 WHEN(INDEX(PARM, 'ADD=URGENT') ª= 0) S_TYPE_CODE = 'U';
+                 OTHERWISE DO UNTIL(S_TYPE_CODE = 'R'  |
+                     S_TYPE_CODE = 'S'  |  S_TYPE_CODE = 'U');
+                     PUT FILE(TERMOUT) SKIP(1) EDIT('Enter type:  ',
+                         'Regular (R), Special (S), Urgent (U).') (A);
+                     GET FILE(TERMIN) LIST(NNN);
+                     S_TYPE_CODE = ANSW;
+                     END;
+                 END;
+             DO UNTIL((VERIFY(S_COMMENTS, ' 0') ª= 0) |
+                 (INDEX(S_COMMENTS, '0') = 0));
+                 PUT FILE(TERMOUT) SKIP(1)
+                     EDIT('Enter comments within single quotes.') (A);
+                 GET FILE(TERMIN) LIST(S_COMMENTS);
+                 S_COMMENTS = TRANSLATE(S_COMMENTS, CAPITAL_LETTERS,
+                     SMALL_LETTERS);
+                 END;
+             PUT FILE(TERMOUT) SKIP(1) EDIT('Verify following addition',
+                 ' by answering Yes (Y) or No (N).') (A);
+             PUT FILE(TERMOUT) SKIP(1) EDIT('Serial#=', S_SERIAL_NUMBER,
+                 'Status=', S_STATUS_CODE, 'Type=', S_TYPE_CODE,
+                 'Comments=', S_COMMENTS)
+                 (A, A, X(3), A, A, X(3), A, A, X(3), A, A);
+             GET FILE(TERMIN) LIST(NNN);
+             IF ANSW = 'YES' | ANSW = 'Y'
+                 THEN DO;
+                      UPDATED_KSDS = YES;
+                      WRITE FILE(KSDS) FROM(SERNUM)
+                          KEYFROM(S_SERIAL_NUMBER);
+                      END;
+                 ELSE PUT FILE(TERMOUT) SKIP(2)
+                          EDIT('ADDITION NOT DONE') (A);
+             END;
+1        WHEN('C') DO;  /* CHANGE */
+             ANSW = ' ';
+             DO WHILE(ANSW = ' ');
+                 GET FILE(TERMIN) LIST(NNN);
+                 IF NNN ª= 0
+                     THEN CALL ENTER_NUMBER;
+                 END;
+             S_SERIAL_NUMBER = ANSW;
+             READ FILE(KSDS) INTO(SERNUM) KEY(S_SERIAL_NUMBER);
+             PUT FILE(TERMOUT) SKIP(1) EDIT('Serial#=', S_SERIAL_NUMBER,
+                 'Status=', S_STATUS_CODE, 'Type=', S_TYPE_CODE,
+                 'Comments=', S_COMMENTS)
+                 (A, A, X(3), A, A, X(3), A, A, X(3), A, A);
+             DO UNTIL(SUBSTR(ANSW,1,1)='S' | SUBSTR(ANSW,1,1)='T' |
+                 SUBSTR(ANSW,1,1)='C');
+                 PUT FILE(TERMOUT) SKIP(1) EDIT('Choose field to be ch',
+                     'anged:  Status (S), Type (T), Comments (C).') (A);
+                 GET FILE(TERMIN) LIST(NNN);
+                 END;
+             SELECT(SUBSTR(ANSW, 1, 1));
+                 WHEN('S')
+                     IF S_STATUS_CODE = '0'
+                         THEN S_STATUS_CODE = '1';
+                         ELSE S_STATUS_CODE = '0';
+                 WHEN('T') DO UNTIL(SUBSTR(ANSW,1,1)='R' |
+                     SUBSTR(ANSW,1,1)='S' | SUBSTR(ANSW,1,1)='U');
+                     PUT FILE(TERMOUT) SKIP(1) EDIT('Enter type:  ',
+                        'Regular (R), Special (S), Urgent (U).') (A);
+                     GET FILE(TERMIN) LIST(NNN);
+                     S_TYPE_CODE = ANSW;
+                     END;
+                 WHEN('C') DO;
+                     S_COMMENTS = ' ';
+                     DO UNTIL((VERIFY(S_COMMENTS, ' 0') ª= 0)
+                     |  (INDEX(S_COMMENTS, '0') = 0));
+                         PUT FILE(TERMOUT) SKIP(1) EDIT(
+                             'Enter comments within single quotes.')(a);
+                         GET FILE(TERMIN) LIST(S_COMMENTS);
+                         S_COMMENTS = TRANSLATE(S_COMMENTS,
+                             CAPITAL_LETTERS, SMALL_LETTERS);
+                         END;
+                     END;
+                 OTHERWISE;
+                 END;
+1            PUT FILE(TERMOUT) SKIP(1) EDIT('Verify following change',
+                 ' by answering Yes (Y) or No (N).') (A);
+             PUT FILE(TERMOUT) SKIP(1) EDIT('Serial#=', S_SERIAL_NUMBER,
+                 'Status=', S_STATUS_CODE, 'Type=', S_TYPE_CODE,
+                 'Comments=', S_COMMENTS)
+                 (A, A, X(3), A, A, X(3), A, A, X(3), A, A);
+             GET FILE(TERMIN) LIST(NNN);
+             IF ANSW = 'YES' | ANSW = 'Y'
+                 THEN DO;
+                      UPDATED_KSDS = YES;
+                      REWRITE FILE(KSDS) FROM(SERNUM);
+                      END;
+                 ELSE PUT FILE(TERMOUT) SKIP(2)
+                          EDIT('CHANGE NOT DONE') (A);
+             END;
+
+
+         WHEN('L') DO;  /* LIST, ALLOW FOR GENERIC KEYS */
+             ANSW = ' ';
+             DO WHILE(ANSW = ' ');
+                 GET FILE(TERMIN) LIST(NNN);
+                 IF NNN ª= 0
+                     THEN CALL ENTER_NUMBER;
+                 END;
+             S_SERIAL_NUMBER = ANSW;
+             POS = INDEX(ANSW || ' ', ' ') - 1;
+             READ FILE(KSDS) INTO(SERNUM)
+                 KEY(SUBSTR(S_SERIAL_NUMBER, 1, POS));
+             DO WHILE(SUBSTR(ANSW, 1, POS) =
+                 SUBSTR(S_SERIAL_NUMBER, 1, POS));
+                 PUT FILE(TERMOUT) SKIP(1) EDIT('Serial#=',
+                     S_SERIAL_NUMBER, 'Status=', S_STATUS_CODE, 'Type=',
+                     S_TYPE_CODE, 'Comments=', S_COMMENTS)
+                     (A, A, X(3), A, A, X(3), A, A, X(3), A, A);
+                 READ FILE(KSDS) INTO(SERNUM);
+                 END;
+             END;
+1        WHEN('D') DO;  /* DELETE */
+             ANSW = ' ';
+             DO WHILE(ANSW = ' ');
+                 GET FILE(TERMIN) LIST(NNN);
+                 IF NNN ª= 0
+                     THEN CALL ENTER_NUMBER;
+                 END;
+             S_SERIAL_NUMBER = ANSW;
+             READ FILE(KSDS) INTO(SERNUM) KEY(S_SERIAL_NUMBER);
+             PUT FILE(TERMOUT) SKIP(1) EDIT('Verify following delete',
+                 ' by answering Yes (Y) or No (N).') (A);
+             PUT FILE(TERMOUT) SKIP(1) EDIT('Serial#=', S_SERIAL_NUMBER,
+                 'Status=', S_STATUS_CODE, 'Type=', S_TYPE_CODE,
+                 'Comments=', S_COMMENTS)
+                 (A, A, X(3), A, A, X(3), A, A, X(3), A, A);
+             GET FILE(TERMIN) LIST(NNN);
+             IF ANSW = 'YES' | ANSW = 'Y'
+                 THEN DO;
+                      UPDATED_KSDS = YES;
+                      DELETE FILE(KSDS);
+                      END;
+                 ELSE PUT FILE(TERMOUT) SKIP(2)
+                          EDIT('DELETE NOT DONE') (A);
+             END;
+
+         OTHERWISE  /* NOT A VALID COMMAND */
+             PUT FILE(TERMOUT) SKIP(2)
+                 EDIT('<< Response unrecognized, reenter >>') (A);
+         END;
+
+     PUT FILE(TERMOUT) SKIP(2) EDIT('ENTER: ADD (A), CHANGE (C), ',
+         'Delete (D), List (L), followed by a serial number.') (A);
+
+     ANSW = ' ';
+     GET FILE(TERMIN) LIST(NNN);
+     END;
+
+ /* FREE THE FILE BUFFERS */
+ CLOSE FILE(TERMIN);
+ CLOSE FILE(KSDS);
+1ENTER_NUMBER:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS INTERNAL TO TERM_CNTL.  IT IS FOR THE PURPOSE   */
+ /* OF GETTING NUMERIC CHARACTER INPUT FROM A TERMINAL.  THE          */
+ /* CONVERSION ROUTINE IS NOT ENTERED FOR NUMERIC INPUT SO IT IS      */
+ /* IMPOSSIBLE TO CATCH THROUGH THE METHOD WE USE FOR OTHER DATA.     */
+ /* THIS IS UNFORTUNATE BUT AS OF NOW I KNOW OF NO BETTER METHOD.     */
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DO UNTIL((VERIFY(ANSW, ' 0') ª= 0) | (INDEX(ANSW, '0') = 0));
+     PUT FILE(TERMOUT) SKIP(1) EDIT('Please re-enter numeric serial ',
+         'number within single quotes.') (A);
+
+     GET FILE(TERMIN) LIST(ANSW);
+
+     /* JUST IN CASE HE CHANGED HIS MIND */
+     ANSW = TRANSLATE(ANSW, CAPITAL_LETTERS, SMALL_LETTERS);
+     end;
+
+
+ END ENTER_NUMBER;
+ END TERM_CNTL;
+ END SERMNT;
+

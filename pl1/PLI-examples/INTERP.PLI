@@ -1,0 +1,610 @@
+*PROCESS NM;
+ INTERP:  PROCEDURE OPTIONS(MAIN) REORDER;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROGRAM CONVERTS A FOUR CHARACTER HEX INPUT STRING INTO AN   */
+ /* ASSEMBLER INSTRUCTION FOR THE 3705.  IT'S MAIN PURPOSE IS AS A    */
+ /* HELP FOR DEBUGGING 3705 DUMPS.                                    */
+ /*                                                                   */
+ /* METHOD:  THE FOUR CHARACTER HEX INPUT STRING IS INTERPRETED INTO  */
+ /*          A SIXTEEN LENGTH BIT STRING.  THIS STRING IS USED TO     */
+ /*          DETERMINE THE SYMBOLIC REPRESENTATION IN 3705 ASSEMBLER  */
+ /*          LANGUAGE.  SUBSETS OF THE BIT STRING ARE SELECTED ON     */
+ /*          UNTIL A UNIQUE INSTRUCTION IS DETERMINED.                */
+ /*                                                                   */
+ /*********************************************************************/
+1/* THE FOLLOWING IDENTIFIERS ARE IN ALPHABETICAL ORDER. */
+ DECLARE  CAPITAL_LETTERS  CHAR(26)
+              INIT('ABCDEFGHIJKLMNOPQRSTUVWXYZ') STATIC;
+ DECLARE  END_LOOP  CHAR(3)  INIT('END') STATIC;
+ DECLARE  ERR_FLAG  FIXED DECIMAL(1) INIT(0) STATIC;
+ DECLARE  HELP  CHAR(4)  INIT('HELP') STATIC;
+ DECLARE  HELP_MSG  FIXED DECIMAL(1) INIT(-1) STATIC;
+ DECLARE  I  FIXED BINARY;
+ DECLARE  INSTR  BIT(16);
+ DECLARE  INPUT  CHAR(4);
+ DECLARE  INVALID_CHAR  FIXED DECIMAL(1) INIT(1) STATIC;
+ DECLARE  INVALID_OP  FIXED DECIMAL(1) INIT(2) STATIC;
+ DECLARE  MORE_SYSIN  BIT(1)   INIT('1'B) STATIC;
+ DECLARE  MNEMONIC  CHAR(4);
+ DECLARE  NO  BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO_ERROR  FIXED DECIMAL(1) INIT(0) STATIC;
+ DECLARE  OPERAND  CHAR(20) VARYING;
+ DECLARE  PIC_EDIT  PIC '(4)Z9';
+ DECLARE  PIC_CHAR  CHAR(5) DEFINED PIC_EDIT;
+ DECLARE  POS  FIXED BINARY;
+ DECLARE  SMALL_LETTERS  CHAR(26)
+              INIT('abcdefghijklmnopqrstuvwxyz') STATIC;
+ DECLARE  STOP_LOOP  CHAR(4) INIT('STOP') STATIC;
+ DECLARE  YES  BIT(1) INIT('1'B) STATIC;
+
+ DECLARE  (LENGTH, SUBSTR, STRING, TRANSLATE, UNSPEC, VERIFY)  BUILTIN;
+
+ DECLARE  ERR_MSG(2)  CHAR(68) STATIC INIT(
+ /* THESE MESSAGES ARE INDEXED BY THE ERROR FLAG VALUE */
+ '*** ERROR ***  Invalid character in hex input string.               ',
+ '*** ERROR ***  Invalid operation specified by hex input string.    ');
+
+ DECLARE  HELP_MESSAGE(3)  CHAR(68) STATIC INIT(
+ /* IF THIS HELP IS EXPANDED IT IS NECESSARY TO CHANGE THE UPPER BOUND
+    OF THE LOOP THAT PRINTS THE HELP. */
+ '    This is an interpreter program for converting hex input to 3705 ',
+ 'assembler language instructions.  The input must be entered with no ',
+ 'leading blanks and must consist of four hex digits.  Example:  A4F5');
+1ON ENDFILE(SYSIN)  MORE_SYSIN = NO;
+
+ GET SKIP EDIT(INPUT) (A(4));
+ INPUT = TRANSLATE(INPUT, CAPITAL_LETTERS, SMALL_LETTERS);
+ DO WHILE((INPUT ª= END_LOOP) & (INPUT ª= STOP_LOOP) & MORE_SYSIN);
+     IF INPUT = HELP
+         THEN ERR_FLAG = HELP_MSG;
+         ELSE DO;
+              INSTR = CONV_BIT(INPUT);
+              IF ERR_FLAG = NO_ERROR
+                  THEN DO;
+                       PUT DATA(INPUT);
+                       OPERAND = '';
+                       SELECT;
+                           WHEN(SUBSTR(INSTR, 1, 1)) CALL TABLE1_4;
+                           WHEN(SUBSTR(INSTR, 5, 1)) CALL TABLE2;
+                           OTHERWISE CALL TABLE3;
+                           END;
+                       END;
+             END;
+     SELECT(ERR_FLAG); /* PRINT ANY ERROR MESSAGES OR THE INSTR */
+         WHEN(HELP_MSG)
+             DO I = 1 TO 3;
+                 PUT SKIP EDIT(HELP_MESSAGE(I)) (A);
+                 END;
+         WHEN(INVALID_CHAR) PUT SKIP EDIT(ERR_MSG(ERR_FLAG)) (A);
+         WHEN(INVALID_OP) PUT SKIP EDIT(ERR_MSG(ERR_FLAG)) (A);
+         OTHERWISE PUT SKIP(2) EDIT(MNEMONIC, OPERAND)
+                       (COL(10), A, COL(16), A);
+         END;
+     ERR_FLAG = NO_ERROR;
+     GET SKIP EDIT(INPUT) (A(4));
+     INPUT = TRANSLATE(INPUT, CAPITAL_LETTERS, SMALL_LETTERS);
+     END;
+1CONV_ARITH:  PROCEDURE(STR) RETURNS(FIXED BINARY);
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CONVERTS A BIT STRING OF LENGTH LESS THAN OR EQUAL */
+ /* TO SIXTEEN TO A FIXED BINARY (HALFWORD) ARITHMETIC QUANTITY.      */
+ /* THIS PROCEDURE IS USED FOR THE FOLLOWING INSTRUCTIONS:  BB BCT    */
+ /* STC IC STH LH ST L AND INDIRECTLY THROUGH THE PROCEDURE T:  B BCL */
+ /* BZL.                                                              */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  STR  BIT(*);
+ DECLARE  NUM  FIXED BINARY;
+ DECLARE  WORK_STR  BIT(16) VARYING;
+
+ WORK_STR = STR;
+ DO WHILE(LENGTH(WORK_STR) < 16);
+     WORK_STR = '0'B || WORK_STR;
+     END;
+ UNSPEC(NUM) = WORK_STR;
+ RETURN(NUM);
+ END CONV_ARITH;
+1CONV_BIT:  PROCEDURE(HEXCHAR) RETURNS(BIT(16));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CONVERTS THE FOUR CHARACTER INPUT HEX DIGITS INTO  */
+ /* A SIXTEEN LENGTH BIT STRING WHICH IS THEN PARSED TO DETERMINE     */
+ /* WHAT 3705 SYMBOLIC ASSEMBLER INSTRUCTION IT REPRESENTS.           */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  HEXCHAR  CHAR(*);
+ DECLARE  BITSTR  BIT(16) VARYING INIT('');
+ DECLARE  RETURN_STR  BIT(16);
+
+ DO I = 1 TO 4;
+     SELECT(SUBSTR(HEXCHAR, I, 1));
+         WHEN('0') BITSTR = BITSTR || '0000'B;
+         WHEN('1') BITSTR = BITSTR || '0001'B;
+         WHEN('2') BITSTR = BITSTR || '0010'B;
+         WHEN('3') BITSTR = BITSTR || '0011'B;
+         WHEN('4') BITSTR = BITSTR || '0100'B;
+         WHEN('5') BITSTR = BITSTR || '0101'B;
+         WHEN('6') BITSTR = BITSTR || '0110'B;
+         WHEN('7') BITSTR = BITSTR || '0111'B;
+         WHEN('8') BITSTR = BITSTR || '1000'B;
+         WHEN('9') BITSTR = BITSTR || '1001'B;
+         WHEN('A') BITSTR = BITSTR || '1010'B;
+         WHEN('B') BITSTR = BITSTR || '1011'B;
+         WHEN('C') BITSTR = BITSTR || '1100'B;
+         WHEN('D') BITSTR = BITSTR || '1101'B;
+         WHEN('E') BITSTR = BITSTR || '1110'B;
+         WHEN('F') BITSTR = BITSTR || '1111'B;
+         OTHERWISE ERR_FLAG = INVALID_CHAR;
+         END;
+     END;
+
+ RETURN_STR = BITSTR;
+ RETURN(RETURN_STR);
+ END CONV_BIT;
+1CONV_HEX:  PROCEDURE(STR) RETURNS(CHAR(5));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE RETURNS A HEX REPRESENTATION X'00' FOR A BIT       */
+ /* STRING OF LENGTH EIGHT.  IT USES AN INTERNAL PROCEDURE CALLED HEX */
+ /* TO OBTAIN THE ACTUAL HEX DIGITS.  THIS PROCEDURE IS USED BY THE   */
+ /* FOLLOWING INSTRUCTIONS:  LRI ARI SRI CRI XRI ORI NRI TRM IN OUT.  */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  STR  BIT(*);
+ DECLARE  WORK_STR  BIT(8);
+ DECLARE
+     1  HEX_REP  STATIC,
+        2  FILLER  CHAR(2) INIT('X'''),
+        2  HEX_DIG1  CHAR(1),
+        2  HEX_DIG2  CHAR(1),
+        2  FILLER2  CHAR(1) INIT('''');
+
+ IF LENGTH(STR) = 7
+     THEN WORK_STR = '0'B || STR;
+     ELSE WORK_STR = STR;
+ HEX_DIG1 = HEX(SUBSTR(WORK_STR, 1, 4));
+ HEX_DIG2 = HEX(SUBSTR(WORK_STR, 5, 4));
+ RETURN(STRING(HEX_REP));
+1HEX:  PROCEDURE(STR) RETURNS(CHAR(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE RETURNS A HEX CHARACTER FOR A BIT STRING STRING OF */
+ /* LENGTH FOUR.  THIS PROCEDURE IS INTERNAL TO CONV_HEX.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  STR  BIT(*);
+
+ SELECT(STR);
+     WHEN('0000'B) RETURN('0');
+     WHEN('0001'B) RETURN('1');
+     WHEN('0010'B) RETURN('2');
+     WHEN('0011'B) RETURN('3');
+     WHEN('0100'B) RETURN('4');
+     WHEN('0101'B) RETURN('5');
+     WHEN('0110'B) RETURN('6');
+     WHEN('0111'B) RETURN('7');
+     WHEN('1000'B) RETURN('8');
+     WHEN('1001'B) RETURN('9');
+     WHEN('1010'B) RETURN('A');
+     WHEN('1011'B) RETURN('B');
+     WHEN('1100'B) RETURN('C');
+     WHEN('1101'B) RETURN('D');
+     WHEN('1110'B) RETURN('E');
+     WHEN('1111'B) RETURN('F');
+     END;
+ END HEX;
+
+ END CONV_HEX;
+1REGISTER:  PROCEDURE(STR) RETURNS(CHAR(2));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE IS USED TO DETERMINE WHAT THE REGISTER FIELD OF AN */
+ /* INSTRUCTION IS REFERING TO.  FOR TWO BIT REGISTER FIELDS ONLY ODD */
+ /* REGISTERS MAY BE REFERENCED.  FOR THREE BIT FIELDS ALL SEVEN      */
+ /* REGISTERS ARE AVAILABLE.  THIS PROCEDURE IS USED BY ALL THE       */
+ /* INSTRUCTIONS EXCEPT:  B BCL BZL EXIT.  IT IS ALSO USED TO FIGURE  */
+ /* BASE REGISTERS.                                                   */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  STR  BIT(*);
+
+ IF LENGTH(STR) = 2
+     THEN SELECT(STR);
+              WHEN('00'B) RETURN('R1');
+              WHEN('01'B) RETURN('R3');
+              WHEN('10'B) RETURN('R5');
+              WHEN('11'B) RETURN('R7');
+              END;
+     ELSE SELECT(STR);
+              WHEN('000'B) RETURN('R0');
+              WHEN('001'B) RETURN('R1');
+              WHEN('010'B) RETURN('R2');
+              WHEN('011'B) RETURN('R3');
+              WHEN('100'B) RETURN('R4');
+              WHEN('101'B) RETURN('R5');
+              WHEN('110'B) RETURN('R6');
+              WHEN('111'B) RETURN('R7');
+              END;
+ END REGISTER;
+1RN:  PROCEDURE(STR) RETURNS(CHAR(5));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE FIGURES AND RETURNS THE SYMBOLIC REPRESENTATION    */
+ /* R(N) FOR THE FOLLOWING INSTRUCTIONS:  LRI ARI SRI CRI XRI ORI NRI */
+ /* TRM BCT STC IC LCR ACR SCR CCR XCR OCR NCR LCOR ICT STCT.         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  STR BIT(*);
+ DECLARE  RN  CHAR(5);
+ DECLARE  WORK_CHAR  CHAR(5) VARYING;
+
+ WORK_CHAR = REGISTER(SUBSTR(STR, 1, 2));
+ IF SUBSTR(STR, 3, 1)
+     THEN WORK_CHAR = WORK_CHAR || '(1)';
+     ELSE WORK_CHAR = WORK_CHAR || '(0)';
+ RN = WORK_CHAR;
+ RETURN(RN);
+ END RN;
+1T:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE INTERPRETES THE T FIELD OF THE FOLLOWING           */
+ /* INSTRUCTIONS:  B BCL BZL.                                         */
+ /*                                                                   */
+ /*********************************************************************/
+
+ PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 6, 10));
+ POS = VERIFY(PIC_CHAR, ' ');
+ IF SUBSTR(INSTR, 16, 1)
+     THEN OPERAND = '-' || SUBSTR(PIC_CHAR, POS);
+     ELSE OPERAND = '+' || SUBSTR(PIC_CHAR, POS);
+ END T;
+1TABLE1_4:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CORRESPONDS TO THE TABLE I ON PAGE 10-3 OF THE     */
+ /* ACF/NCP/VS NETWORK CONTROL PROGRAM, PROGRAM REFERENCE SUMMERY     */
+ /* RELEASE 2.1 (PROGRAM NUMBER 5735-XX1).                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+ SELECT(SUBSTR(INSTR, 2, 4));
+     WHEN('0101'B) DO;
+         MNEMONIC = 'B';
+         CALL T;
+         END;
+     WHEN('0011'B) DO;
+         MNEMONIC = 'BCL';
+         CALL T;
+         END;
+     WHEN('0001'B) DO;
+         MNEMONIC = 'BZL';
+         CALL T;
+         END;
+     WHEN('0000'B) DO;
+         MNEMONIC = 'LRI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('0010'B) DO;
+         MNEMONIC = 'ARI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('0100'B) DO;
+         MNEMONIC = 'SRI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('0110'B) DO;
+         MNEMONIC = 'CRI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('1000'B) DO;
+         MNEMONIC = 'XRI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+1    WHEN('1010'B) DO;
+         MNEMONIC = 'ORI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('1100'B) DO;
+         MNEMONIC = 'NRI';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('1110'B) DO;
+         MNEMONIC = 'TRM';
+         OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ','
+             || CONV_HEX(SUBSTR(INSTR, 9));
+         END;
+     WHEN('0111'B) CALL TABLE4;
+     OTHERWISE DO;
+         MNEMONIC = 'BB';
+         OPERAND = REGISTER(SUBSTR(INSTR, 6, 2));
+         IF SUBSTR(INSTR, 8, 1)
+             THEN OPERAND = OPERAND || '(1,';
+             ELSE OPERAND = OPERAND || '(0,';
+         PIC_EDIT = CONV_ARITH(SUBSTR(INSTR,3,2) || SUBSTR(INSTR,9,1));
+         POS = VERIFY(PIC_CHAR, ' ');
+         OPERAND = OPERAND || SUBSTR(PIC_CHAR, POS) || '),';
+         PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10, 6));
+         POS = VERIFY(PIC_CHAR, ' ');
+         IF SUBSTR(INSTR, 16, 1)
+             THEN OPERAND = OPERAND || '-' || SUBSTR(PIC_CHAR, POS);
+             ELSE OPERAND = OPERAND || '+' || SUBSTR(PIC_CHAR, POS);
+         END;
+     END;
+ END TABLE1_4;
+1TABLE2:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CORRESPONDS TO THE TABLE II ON PAGE 10-3 OF THE    */
+ /* ACF/NCP/VS NETWORK CONTROL PROGRAM, PROGRAM REFERENCE SUMMERY     */
+ /* RELEASE 2.1 (PROGRAM NUMBER 5735-XX1).                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+ IF SUBSTR(INSTR, 9, 1)
+     THEN MNEMONIC = 'STC';
+     ELSE MNEMONIC = 'IC';
+ OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ',';
+ PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10));
+ POS = VERIFY(PIC_CHAR, ' ');
+ OPERAND = OPERAND || SUBSTR(PIC_CHAR, POS) || '('
+     || REGISTER(SUBSTR(INSTR, 2, 3)) || ')';
+ END TABLE2;
+1TABLE3:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CORRESPONDS TO THE TABLE III ON PAGE 10-4 OF THE   */
+ /* ACF/NCP/VS NETWORK CONTROL PROGRAM, PROGRAM REFERENCE SUMMERY     */
+ /* RELEASE 2.1 (PROGRAM NUMBER 5735-XX1).                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+ IF SUBSTR(INSTR, 16, 1)
+     THEN DO;
+          IF SUBSTR(INSTR, 9, 1)
+              THEN DO;
+                   MNEMONIC = 'STH';
+                   OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',';
+                   PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10, 6));
+                   POS = VERIFY(PIC_CHAR, ' ');
+                   OPERAND = OPERAND || SUBSTR(PIC_CHAR, POS) || '('
+                       || REGISTER(SUBSTR(INSTR, 2, 3)) || ')';
+                   END;
+              ELSE DO;
+                   MNEMONIC = 'LH';
+                   OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',';
+                   PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10, 6));
+                   POS = VERIFY(PIC_CHAR, ' ');
+                   OPERAND = OPERAND || SUBSTR(PIC_CHAR, POS) || '('
+                       || REGISTER(SUBSTR(INSTR, 2, 3)) || ')';
+                   END;
+          RETURN;
+          END;
+ IF SUBSTR(INSTR, 15, 1)
+     THEN DO;
+          IF SUBSTR(INSTR, 9, 1)
+              THEN DO;
+                   MNEMONIC = 'ST';
+                   OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',';
+                   PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10, 5));
+                   POS = VERIFY(PIC_CHAR, ' ');
+                   OPERAND = OPERAND || SUBSTR(PIC_CHAR, POS) || '('
+                       || REGISTER(SUBSTR(INSTR, 2, 3)) || ')';
+                   END;
+              ELSE DO;
+                   MNEMONIC = 'L';
+                   OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',';
+                   PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10, 5));
+                   POS = VERIFY(PIC_CHAR, ' ');
+                   OPERAND = OPERAND || SUBSTR(PIC_CHAR, POS) || '('
+                       || REGISTER(SUBSTR(INSTR, 2, 3)) || ')';
+                   END;
+          RETURN;
+          END;
+1SELECT(SUBSTR(INSTR, 9, 6));
+     WHEN('000010'B) DO;
+         MNEMONIC = 'LCR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('000110'B) DO;
+         MNEMONIC = 'ACR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('001010'B) DO;
+         MNEMONIC = 'SCR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('001110'B) DO;
+         MNEMONIC = 'CCR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('010010'B) DO;
+         MNEMONIC = 'XCR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('010110'B) DO;
+         MNEMONIC = 'OCR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('011010'B) DO;
+         MNEMONIC = 'NCR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('011110'B) DO;
+         MNEMONIC = 'LCOR';
+         OPERAND= RN(SUBSTR(INSTR,6,3)) || ',' || RN(SUBSTR(INSTR,2,3));
+         END;
+     WHEN('000100'B) DO;
+         MNEMONIC = 'ICT';
+         OPERAND= RN(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('001100'B) DO;
+         MNEMONIC = 'STCT';
+         OPERAND= RN(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('100000'B) DO;
+         MNEMONIC = 'LHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('100100'B) DO;
+         MNEMONIC = 'AHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+1    WHEN('101000'B) DO;
+         MNEMONIC = 'SHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('101100'B) DO;
+         MNEMONIC = 'CHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('110000'B) DO;
+         MNEMONIC = 'XHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('110100'B) DO;
+         MNEMONIC = 'OHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('111000'B) DO;
+         MNEMONIC = 'NHR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('111100'B) DO;
+         MNEMONIC = 'LHOR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('100010'B) DO;
+         MNEMONIC = 'LR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('100110'B) DO;
+         MNEMONIC = 'AR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('101010'B) DO;
+         MNEMONIC = 'SR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('101110'B) DO;
+         MNEMONIC = 'CR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+1    WHEN('110010'B) DO;
+         MNEMONIC = 'XR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('110110'B) DO;
+         MNEMONIC = 'OR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('111010'B) DO;
+         MNEMONIC = 'NR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('111110'B) DO;
+         MNEMONIC = 'LOR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     WHEN('010000'B) DO;
+         MNEMONIC = 'BALR';
+         OPERAND= REGISTER(SUBSTR(INSTR, 6, 3)) || ','
+             || REGISTER(SUBSTR(INSTR, 2, 3));
+         END;
+     OTHERWISE SELECT(SUBSTR(INSTR, 13, 2));
+         WHEN('11'B) DO;
+             MNEMONIC = 'IN';
+             OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',' ||
+                 CONV_HEX(SUBSTR(INSTR, 2, 3) || SUBSTR(INSTR, 9, 4));
+             END;
+         WHEN('01'B) DO;
+             MNEMONIC = 'OUT';
+             OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',' ||
+                 CONV_HEX(SUBSTR(INSTR, 2, 3) || SUBSTR(INSTR, 9, 4));
+             END;
+         OTHERWISE ERR_FLAG = INVALID_OP;
+         END;
+     END;
+ END TABLE3;
+1TABLE4:  PROCEDURE;
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CORRESPONDS TO THE TABLE IV ON PAGE 10-4 OF THE    */
+ /* ACF/NCP/VS NETWORK CONTROL PROGRAM, PROGRAM REFERENCE SUMMERY     */
+ /* RELEASE 2.1 (PROGRAM NUMBER 5735-XX1).                            */
+ /*                                                                   */
+ /*********************************************************************/
+
+ IF SUBSTR(INSTR, 9, 1)
+     THEN DO;
+          MNEMONIC = 'BCT';
+          OPERAND = RN(SUBSTR(INSTR, 6, 3)) || ',';
+          PIC_EDIT = CONV_ARITH(SUBSTR(INSTR, 10, 6));
+          POS = VERIFY(PIC_CHAR, ' ');
+          IF SUBSTR(INSTR, 16, 1)
+              THEN OPERAND = OPERAND || '-' || SUBSTR(PIC_CHAR, POS);
+              ELSE OPERAND = OPERAND || '+' || SUBSTR(PIC_CHAR, POS);
+          END;
+     ELSE DO;
+          SELECT(SUBSTR(INSTR, 10, 3));
+              WHEN('000'B) MNEMONIC = 'BAL';
+              WHEN('010'B) MNEMONIC = 'LA';
+              WHEN('100'B)
+                  IF SUBSTR(INSTR, 13, 2) = '00'B
+                      THEN DO;
+                           MNEMONIC = 'EXIT';
+                           RETURN;
+                           END;
+                      ELSE ERR_FLAG = INVALID_OP;
+              OTHERWISE ERR_FLAG = INVALID_OP;
+              END;
+          OPERAND = REGISTER(SUBSTR(INSTR, 6, 3)) || ',ADDR';
+          END;
+ END TABLE4;
+ END INTERP;
+

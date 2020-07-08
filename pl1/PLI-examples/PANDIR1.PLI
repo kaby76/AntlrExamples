@@ -1,0 +1,171 @@
+*PROCESS NM;
+ PANDIR:  PROCEDURE(PARM) OPTIONS(MAIN) REORDER;
+ DECLARE  PGMID    CHAR(34) VARYING STATIC EXTERNAL
+     INIT('PANDIR V0.0  BY CLYDE THOMAS ZUBER');
+ DECLARE  PLIXOPT  CHAR(8)  VARYING STATIC EXTERNAL INIT('      ');
+
+ /*********************************************************************/
+ /*                                                                   */
+ /*********************************************************************/
+
+
+ DECLARE  PARM  CHAR(100) VARYING;
+ DECLARE  ERR_FLAG  FIXED DECIMAL(1) INIT(0) STATIC;
+ DECLARE  HELP  CHAR(4)  INIT('HELP') STATIC;
+ DECLARE  HELP_MSG  FIXED DECIMAL(1) INIT(-1) STATIC;
+ DECLARE  I  FIXED BINARY;
+ DECLARE  BITSTR  BIT(64);
+ DECLARE  NAME  CHAR(10) VARYING;
+ DECLARE  INVALID_CHAR  FIXED DECIMAL(1) INIT(1) STATIC;
+ DECLARE  NO  BIT(1) INIT('0'B) STATIC;
+ DECLARE  NO_ERROR  FIXED DECIMAL(1) INIT(0) STATIC;
+ DECLARE  YES  BIT(1) INIT('1'B) STATIC;
+
+ DECLARE  ERR_MSG(2)  CHAR(68) STATIC INIT(
+ /* THESE MESSAGES ARE INDEXED BY THE ERROR FLAG VALUE */
+ '*** ERROR ***  INVALID CHARACTER IN HEX INPUT STRING.               ',
+ ' ');
+
+ DECLARE  HELP_MESSAGE(3)  CHAR(68) STATIC INIT(
+ ' ',
+ ' ',
+ ' ');
+ DECLARE  CHAR           CHAR(4)  STATIC INIT('CHAR');
+ DECLARE  DISPLAY        CHAR(8)  STATIC INIT('DISPLAY');
+ DECLARE  TALKPAN        CHAR(8)  STATIC INIT('TALKPAN');
+ DECLARE  VDEFINE        CHAR(8)  STATIC INIT('VDEFINE');
+
+ DECLARE  CMD      CHAR(30) STATIC INIT(' ');
+ DECLARE  L_CMD    FIXED BINARY(31) STATIC INIT(30);
+ DECLARE  N_CMD    CHAR(8) STATIC INIT('(CMD)');
+
+ DECLARE  TRANS    CHAR(10) STATIC INIT(' ');
+ DECLARE  L_TRANS  FIXED BINARY(31) STATIC INIT(10);
+ DECLARE  N_TRANS  CHAR(8) STATIC INIT('(TRANS)');
+
+ DECLARE  ISPLINK  ENTRY OPTIONS(ASM, INTER, RETCODE);
+ DECLARE  (ADDR, PLIRETV, STRING, SUBSTR, UNSPEC) BUILTIN;
+
+ CALL ISPLINK(VDEFINE, N_CMD, CMD, CHAR, L_CMD);
+ CALL ISPLINK(VDEFINE, N_TRANS, TRANS, CHAR, L_TRANS);
+ CALL ISPLINK(DISPLAY, TALKPAN);
+ DO WHILE(PLIRETV = 0);
+     IF CMD = HELP
+         THEN ERR_FLAG = HELP_MSG;
+         ELSE DO;
+              BITSTR = HEXTOBIT(CMD);
+              NAME = '';
+              DO I = 0 TO 9;
+                  NAME = NAME || BITTOCHAR(SUBSTR(BITSTR, I*6+1, 6));
+                  END;
+              END;
+     SELECT(ERR_FLAG);
+         WHEN(HELP_MSG)
+             DO I = 1 TO 3;
+                 PUT SKIP EDIT(HELP_MESSAGE(I)) (A);
+                 END;
+         WHEN(INVALID_CHAR) PUT SKIP EDIT(ERR_MSG(ERR_FLAG)) (A);
+         OTHERWISE TRANS = NAME;
+         END;
+     ERR_FLAG = NO_ERROR;
+     CALL ISPLINK(DISPLAY, TALKPAN);
+     TRANS = ' ';
+     END;
+1HEXTOBIT:  PROCEDURE(HEXCHAR) RETURNS(BIT(64));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE CONVERTS THE 16 CHARACTER INPUT HEX DIGITS INTO    */
+ /* A 64 LENGTH BIT STRING.                                           */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  HEXCHAR  CHAR(*);
+ DECLARE  BITSTR  BIT(64) VARYING INIT('');
+ DECLARE  RETURN_STR  BIT(64);
+
+ DO I = 1 TO 16;
+     SELECT(SUBSTR(HEXCHAR, I, 1));
+         WHEN(' ') BITSTR = BITSTR || '0000'B;
+         WHEN('0') BITSTR = BITSTR || '0000'B;
+         WHEN('1') BITSTR = BITSTR || '0001'B;
+         WHEN('2') BITSTR = BITSTR || '0010'B;
+         WHEN('3') BITSTR = BITSTR || '0011'B;
+         WHEN('4') BITSTR = BITSTR || '0100'B;
+         WHEN('5') BITSTR = BITSTR || '0101'B;
+         WHEN('6') BITSTR = BITSTR || '0110'B;
+         WHEN('7') BITSTR = BITSTR || '0111'B;
+         WHEN('8') BITSTR = BITSTR || '1000'B;
+         WHEN('9') BITSTR = BITSTR || '1001'B;
+         WHEN('A') BITSTR = BITSTR || '1010'B;
+         WHEN('B') BITSTR = BITSTR || '1011'B;
+         WHEN('C') BITSTR = BITSTR || '1100'B;
+         WHEN('D') BITSTR = BITSTR || '1101'B;
+         WHEN('E') BITSTR = BITSTR || '1110'B;
+         WHEN('F') BITSTR = BITSTR || '1111'B;
+         OTHERWISE ERR_FLAG = INVALID_CHAR;
+         END;
+     END;
+
+ RETURN_STR = BITSTR;
+ RETURN(RETURN_STR);
+
+ END HEXTOBIT;
+1BITTOCHAR:  PROCEDURE(STR) RETURNS(CHAR(1));
+
+ /*********************************************************************/
+ /*                                                                   */
+ /* THIS PROCEDURE RETURNS A HEX CHARACTER FOR A BIT STRING OF        */
+ /* LENGTH FOUR.  THIS PROCEDURE IS INTERNAL TO CONV_HEX.             */
+ /*                                                                   */
+ /*********************************************************************/
+
+ DECLARE  STR  BIT(*);
+
+ SELECT(STR);
+     WHEN('000000'B) RETURN(' ');
+     WHEN('000001'B) RETURN('A');
+     WHEN('000010'B) RETURN('B');
+     WHEN('000011'B) RETURN('C');
+     WHEN('000100'B) RETURN('D');
+     WHEN('000101'B) RETURN('E');
+     WHEN('000110'B) RETURN('F');
+     WHEN('000111'B) RETURN('G');
+     WHEN('001000'B) RETURN('H');
+     WHEN('001001'B) RETURN('I');
+     WHEN('010001'B) RETURN('J');
+     WHEN('010010'B) RETURN('K');
+     WHEN('010011'B) RETURN('L');
+     WHEN('010100'B) RETURN('M');
+     WHEN('010101'B) RETURN('N');
+     WHEN('010110'B) RETURN('O');
+     WHEN('010111'B) RETURN('P');
+     WHEN('011000'B) RETURN('Q');
+     WHEN('011001'B) RETURN('R');
+     WHEN('100010'B) RETURN('S');
+     WHEN('100011'B) RETURN('T');
+     WHEN('100100'B) RETURN('U');
+     WHEN('100101'B) RETURN('V');
+     WHEN('100110'B) RETURN('W');
+     WHEN('100111'B) RETURN('X');
+     WHEN('101000'B) RETURN('Y');
+     WHEN('101001'B) RETURN('Z');
+     WHEN('110000'B) RETURN('0');
+     WHEN('110001'B) RETURN('1');
+     WHEN('110010'B) RETURN('2');
+     WHEN('110011'B) RETURN('3');
+     WHEN('110100'B) RETURN('4');
+     WHEN('110101'B) RETURN('5');
+     WHEN('110110'B) RETURN('6');
+     WHEN('110111'B) RETURN('7');
+     WHEN('111000'B) RETURN('8');
+     WHEN('111001'B) RETURN('9');
+     OTHERWISE DO;
+         PUT SKIP EDIT('UNDEFINED:  ', STR) (A, B(6));
+         RETURN('?');
+         END;
+     END;
+ END BITTOCHAR;
+
+ END PANDIR;
+
