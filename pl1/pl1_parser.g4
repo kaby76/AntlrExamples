@@ -597,55 +597,35 @@ assignstmt  : (
 		  | IF '(' expr ')' SELFOP expr ',' BY NAME
 	)
  ;
-
-expr :
-  varnameref expr1
-  | exprconst expr1
-  | '-' expr expr1
-  | '+' expr expr1
-  | NOT expr expr1
-  | '(' expr ')' expr1
-  | '(' expr ')' exprstrconst expr1
-  ;
-exprbase  :
-  expr '+' expr
-  | expr '-' expr
-  | expr '*' expr
-  | expr '/' expr
-  | expr AND expr
-  | expr OR expr
-  | expr CONCAT expr
-  | expr POWER expr
-  | expr '=' expr
-  | expr '<' expr
-  | expr '>' expr
-  | expr LE expr
-  | expr GE expr
-  | expr NE expr
+expr : exprbase | exprnested;
+exprbase :
+  NOT exprnested
+  | '+' exprnested
+  | '-' exprnested
+  | exprnested POWER exprnested
+  | exprnested ('*' | '/' | AND) exprnested
+  | exprnested ('+' | '-' | OR | CONCAT) exprnested
+  | exprnested ('=' | '<' | '>' | LE | GE | NE) exprnested
+  | ('-' | '+') exprnested
+  | NOT exprnested
   | varnameref
   | exprconst
-  | '-' expr
-  | '+' expr
-  | NOT expr
   ;
-expr1 :
-  '+' expr expr1
-  | '-' expr expr1
-  | '*' expr expr1
-  | '/' expr expr1
-  | AND expr expr1
-  | OR expr expr1
-  | CONCAT expr expr1
-  | POWER expr expr1
-  | '=' expr expr1
-  | '<' expr expr1
-  | '>' expr expr1
-  | LE expr expr1
-  | GE expr expr1
-  | NE expr expr1
-  |
+exprnested :
+  NOT exprnested
+  | '+' exprnested
+  | '-' exprnested
+  | exprnested POWER exprnested
+  | exprnested ('*' | '/' | AND) exprnested
+  | exprnested ('+' | '-' | OR | CONCAT) exprnested
+  | exprnested ('=' | '<' | '>' | LE | GE | NE) exprnested
+  | ('-' | '+') exprnested
+  | NOT exprnested
+  | varnameref
+  | exprconst
+  | '(' exprnested ')'
+  | '(' exprnested ')' exprstrconst
   ;
-
 exprconst  : exprnumconst
   | exprstrconst
   ;
