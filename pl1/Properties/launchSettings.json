@@ -2,7 +2,7 @@
   "profiles": {
     "pl1": {
       "commandName": "Project",
-      "commandLineArgs": "examples/psam1.pli",
+      "commandLineArgs": "-tree -tokens examples/xx.txt",
       "workingDirectory": "$(ProjectDir)"
     }
   }

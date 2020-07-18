@@ -24,6 +24,7 @@ namespace pl1
             _first_time = true;
         }
 
+        private static int count = 0;
         public override void SyntaxError(TextWriter output, IRecognizer recognizer, S offendingSymbol, int line,
             int col, string msg, RecognitionException e)
         {
@@ -32,6 +33,7 @@ namespace pl1
             {
                 try
                 {
+                    System.Console.WriteLine("Count " + ++count);
                     LASets la_sets = new LASets();
                     IntervalSet set = la_sets.Compute(_parser, _token_stream, line, col);
                     List<string> result = new List<string>();

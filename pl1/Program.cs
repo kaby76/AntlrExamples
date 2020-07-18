@@ -44,7 +44,7 @@ namespace pl1
                 var parser = new pl1_parserParser(tokens);
                 var listener = new ErrorListener<IToken>(parser, lexer, tokens);
                 parser.AddErrorListener(listener);
-                lexer.AddErrorListener(new ErrorListener<int>(parser, lexer, tokens));
+                //lexer.AddErrorListener(new ErrorListener<int>(parser, lexer, tokens));
                 var tree = parser.pl1pgm();
                 if (listener.had_error)
                     System.Console.WriteLine("error in parse.");

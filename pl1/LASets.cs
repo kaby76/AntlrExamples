@@ -19,8 +19,9 @@ namespace pl1
         private readonly Dictionary<Pair<ATNState, int>, bool> _visited = new Dictionary<Pair<ATNState, int>, bool>();
         private HashSet<ATNState> _stop_states;
         private HashSet<ATNState> _start_states;
-        private readonly bool _log_parse = false;
-        private readonly bool _log_closure = false;
+        private bool _log_parse = false;
+        private bool _log_closure = false;
+        private static bool _reentry;
 
         private class Edge
         {
@@ -40,6 +41,9 @@ namespace pl1
 
         public IntervalSet Compute(Parser parser, CommonTokenStream token_stream, int line, int col)
         {
+            IntervalSet result = new IntervalSet();
+            _log_closure = true;
+            _log_parse = true;
             _input = new List<IToken>();
             _parser = parser;
             _token_stream = token_stream;
@@ -56,6 +60,10 @@ namespace pl1
             int currentIndex = _token_stream.Index;
             _token_stream.Seek(0);
             int offset = 1;
+            // Copy to _input the entire _token_stream.
+            // Must take care to not come back here reentrancy from Antlr.
+            if (_reentry) return result;
+            _reentry = true;
             while (true)
             {
                 IToken token = _token_stream.LT(offset++);
@@ -70,17 +78,18 @@ namespace pl1
                     break;
                 }
             }
+            // Remove last token on input.
+            _input.RemoveAt(_input.Count - 1);
             _token_stream.Seek(currentIndex);
-
+            _reentry = false;
+            // Start parse from a fake initial state.
             List<List<Edge>> all_parses = EnterState(new Edge()
             {
                 _index = 0,
                 _index_at_transition = 0,
                 _to = _parser.Atn.states[0],
                 _type = TransitionType.EPSILON
-            });
-            // Remove last token on input.
-            _input.RemoveAt(_input.Count - 1);
+            }, 0);
             // Eliminate all paths that don't consume all input.
             List<List<Edge>> temp = new List<List<Edge>>();
             if (all_parses != null)
@@ -102,7 +111,6 @@ namespace pl1
                     System.Console.Error.WriteLine("Path " + PrintSingle(p));
                 }
             }
-            IntervalSet result = new IntervalSet();
             if (all_parses != null)
             {
                 foreach (List<Edge> p in all_parses)
@@ -153,7 +161,7 @@ namespace pl1
 
         // Step to state and continue parsing input.
         // Returns a list of transitions leading to a state that accepts input.
-        private List<List<Edge>> EnterState(Edge t)
+        private List<List<Edge>> EnterState(Edge t, int indent)
         {
             int here = ++entry_value;
             int index_on_transition = t._index_at_transition;
@@ -163,11 +171,13 @@ namespace pl1
 
             if (_log_parse)
             {
-                System.Console.Error.WriteLine("Entry " + here
-                                    + " State " + state
-                                    + " tokenIndex " + token_index
-                                    + " " + input_token.Text
-                                    );
+                System.Console.Error.WriteLine(
+                    new String(' ', indent * 2)
+                    + "Entry " + here
+                    + " State " + state
+                    + " tokenIndex " + token_index
+                    + " " + input_token.Text
+                );
             }
 
             // Upon reaching the cursor, return match.
@@ -176,21 +186,31 @@ namespace pl1
             {
                 if (_log_parse)
                 {
-                    System.Console.Error.Write("Entry " + here
-                                         + " return ");
+                    System.Console.Error.Write(
+                        new String(' ', indent * 2)
+                        + "Entry "
+                        + here
+                        + " return ");
                 }
 
                 List<List<Edge>> res = new List<List<Edge>>() { new List<Edge>() { t } };
                 if (_log_parse)
                 {
                     string str = PrintResult(res);
-                    System.Console.Error.WriteLine(str);
+                    System.Console.Error.WriteLine(
+                        str);
                 }
                 return res;
             }
 
             if (_visited.ContainsKey(new Pair<ATNState, int>(state, token_index)))
             {
+                if (_log_parse)
+                {
+                    System.Console.Error.WriteLine(
+                        new String(' ', indent * 2)
+                        + "already visited.");
+                }
                 return null;
             }
 
@@ -202,15 +222,19 @@ namespace pl1
             {
                 if (_log_parse)
                 {
-                    System.Console.Error.Write("Entry " + here
-                                              + " return ");
+                    System.Console.Error.Write(
+                        new String(' ', indent * 2)
+                        + "Entry "
+                        + here
+                        + " return ");
                 }
 
                 List<List<Edge>> res = new List<List<Edge>>() { new List<Edge>() { t } };
                 if (_log_parse)
                 {
                     string str = PrintResult(res);
-                    System.Console.Error.WriteLine(str);
+                    System.Console.Error.WriteLine(
+                        str);
                 }
                 return res;
             }
@@ -234,9 +258,15 @@ namespace pl1
                                 _type = rule.TransitionType,
                                 _index = token_index,
                                 _index_at_transition = token_index
-                            });
+                            }, indent + 1);
                             if (matches != null && matches.Count == 0)
                             {
+                                if (_log_parse)
+                                {
+                                    System.Console.Error.WriteLine(
+                                        new String(' ', indent * 2)
+                                        + "throwing exception.");
+                                }
                                 throw new Exception();
                             }
 
@@ -263,9 +293,15 @@ namespace pl1
                                             _type = TransitionType.EPSILON,
                                             _index = f._index,
                                             _index_at_transition = f._index
-                                        });
+                                        }, indent + 1);
                                         if (xxx != null && xxx.Count == 0)
                                         {
+                                            if (_log_parse)
+                                            {
+                                                System.Console.Error.WriteLine(
+                                                    new String(' ', indent * 2)
+                                                    + "throwing exception.");
+                                            }
                                             throw new Exception();
                                         }
 
@@ -300,9 +336,15 @@ namespace pl1
                                 _type = transition.TransitionType,
                                 _index = token_index,
                                 _index_at_transition = token_index
-                            });
+                            }, indent + 1);
                             if (matches != null && matches.Count == 0)
                             {
+                                if (_log_parse)
+                                {
+                                    System.Console.Error.WriteLine(
+                                        new String(' ', indent * 2)
+                                        + "throwing exception.");
+                                }
                                 throw new Exception();
                             }
                         }
@@ -317,9 +359,15 @@ namespace pl1
                             _type = transition.TransitionType,
                             _index = token_index + 1,
                             _index_at_transition = token_index
-                        });
+                        }, indent + 1);
                         if (matches != null && matches.Count == 0)
                         {
+                            if (_log_parse)
+                            {
+                                System.Console.Error.WriteLine(
+                                    new String(' ', indent * 2)
+                                    + "throwing exception.");
+                            }
                             throw new Exception();
                         }
 
@@ -336,9 +384,15 @@ namespace pl1
                                 _type = transition.TransitionType,
                                 _index = token_index,
                                 _index_at_transition = token_index
-                            });
+                            }, indent + 1);
                             if (matches != null && matches.Count == 0)
                             {
+                                if (_log_parse)
+                                {
+                                    System.Console.Error.WriteLine(
+                                        new String(' ', indent * 2)
+                                        + "throwing exception.");
+                                }
                                 throw new Exception();
                             }
                         }
@@ -362,9 +416,15 @@ namespace pl1
                                         _type = transition.TransitionType,
                                         _index = token_index + 1,
                                         _index_at_transition = token_index
-                                    });
+                                    }, indent + 1);
                                     if (matches != null && matches.Count == 0)
                                     {
+                                        if (_log_parse)
+                                        {
+                                            System.Console.Error.WriteLine(
+                                                new String(' ', indent * 2)
+                                                + "throwing exception.");
+                                        }
                                         throw new Exception();
                                     }
                                 }
@@ -389,7 +449,10 @@ namespace pl1
                                 {
                                     if (prev._from != ff)
                                     {
-                                        System.Console.Error.WriteLine("Fail " + PrintSingle(x));
+                                        System.Console.Error.WriteLine(
+                                            new String(' ', indent * 2)
+                                            + "Fail "
+                                            + PrintSingle(x));
                                         Debug.Assert(false);
                                     }
                                 }
@@ -403,15 +466,25 @@ namespace pl1
             }
             if (result.Count == 0)
             {
+                if (_log_parse)
+                {
+                    System.Console.Error.WriteLine(
+                        new String(' ', indent * 2)
+                        + "result empty.");
+                }
                 return null;
             }
 
             if (_log_parse)
             {
-                System.Console.Error.Write("Entry " + here
-                                              + " return ");
+                System.Console.Error.Write(
+                    new String(' ', indent * 2)
+                    + "Entry "
+                    + here
+                    + " return ");
                 string str = PrintResult(result);
-                System.Console.Error.WriteLine(str);
+                System.Console.Error.WriteLine(
+                    str);
             }
             return result;
         }

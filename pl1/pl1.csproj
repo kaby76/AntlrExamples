@@ -9,7 +9,9 @@
   </ItemGroup>
   
   <ItemGroup>
-    <Antlr4 Include="pl1_parser.g4" />
+    <Antlr4 Include="pl1_parser.g4">
+      <GAtn>true</GAtn>
+    </Antlr4>
   </ItemGroup>
 
   <ItemGroup>
