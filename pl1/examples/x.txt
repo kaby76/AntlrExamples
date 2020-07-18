@@ -1,0 +1,1559 @@
+line 61:5 no viable alternative at input 'asdfPUT'
+Count 1
+Entry 1 State 0 pl1pgm tokenIndex 0 PSAM1
+  Entry 2 State 380 tokenIndex 0 PSAM1
+    Entry 3 State 376 tokenIndex 0 PSAM1
+      Entry 4 State 2 pl1stmtlist tokenIndex 0 PSAM1
+        Entry 5 State 382 tokenIndex 0 PSAM1
+          Entry 6 State 383 tokenIndex 0 PSAM1
+            Entry 7 State 8 pl1stmt tokenIndex 0 PSAM1
+              Entry 8 State 443 tokenIndex 0 PSAM1
+                Entry 9 State 428 tokenIndex 0 PSAM1
+                  Entry 10 State 14 stmt tokenIndex 0 PSAM1
+                    Entry 11 State 498 tokenIndex 0 PSAM1
+                      Entry 12 State 455 tokenIndex 0 PSAM1
+                        Entry 13 State 499 tokenIndex 0 PSAM1
+                          Entry 14 State 15 tokenIndex 0 PSAM1
+                          Entry 14 State 15 tokenIndex 0 PSAM1 return |||  / 499 => 15 on eps
+                        Entry 13 State 499 tokenIndex 0 PSAM1 return |||  / 455 => 499 on eps / 499 => 15 on eps
+                      Entry 12 State 455 tokenIndex 0 PSAM1 return |||  / 498 => 455 on eps / 455 => 499 on eps / 499 => 15 on eps
+                      Entry 15 State 456 tokenIndex 0 PSAM1
+                        Entry 16 State 16 allocatestmt tokenIndex 0 PSAM1
+                          Entry 17 State 500 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 18 State 457 tokenIndex 0 PSAM1
+                        Entry 19 State 266 assignstmt tokenIndex 0 PSAM1
+                          Entry 20 State 2184 tokenIndex 0 PSAM1
+                            Entry 21 State 2152 tokenIndex 0 PSAM1
+                              Entry 22 State 2124 tokenIndex 0 PSAM1
+                                Entry 23 State 280 varnamerefcommalist tokenIndex 0 PSAM1
+                                  Entry 24 State 2356 tokenIndex 0 PSAM1
+                                    Entry 25 State 2357 tokenIndex 0 PSAM1
+                                      Entry 26 State 282 varnameref tokenIndex 0 PSAM1
+                                        Entry 27 State 2367 tokenIndex 0 PSAM1
+                                          Entry 28 State 2368 tokenIndex 0 PSAM1
+                                            Entry 29 State 284 varnamequal tokenIndex 0 PSAM1
+                                              Entry 30 State 2594 tokenIndex 0 PSAM1
+                                                Entry 31 State 2409 tokenIndex 0 PSAM1
+                                                  Entry 32 State 2384 tokenIndex 0 PSAM1
+                                                    Entry 33 State 292 varname tokenIndex 0 PSAM1
+                                                      Entry 34 State 2631 tokenIndex 0 PSAM1
+                                                        Entry 35 State 2627 tokenIndex 0 PSAM1
+                                                          Entry 36 State 2632 tokenIndex 1 :
+                                                            Entry 37 State 293 tokenIndex 1 :
+                                                            Entry 37 State 293 tokenIndex 1 : return |||  / 2632 => 293 on eps
+                                                          Entry 36 State 2632 tokenIndex 1 : return |||  / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps
+                                                        Entry 35 State 2627 tokenIndex 0 PSAM1 return |||  / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps
+                                                        Entry 38 State 2628 tokenIndex 0 PSAM1
+                                                          Entry 39 State 294 varname_kw tokenIndex 0 PSAM1
+                                                            Entry 40 State 2633 tokenIndex 0 PSAM1
+                                                            result empty.
+                                                          result empty.
+                                                        result empty.
+                                                        Entry 41 State 2629 tokenIndex 0 PSAM1
+                                                          Entry 42 State 296 varname_kwpp tokenIndex 0 PSAM1
+                                                            Entry 43 State 2635 tokenIndex 0 PSAM1
+                                                            result empty.
+                                                          result empty.
+                                                        result empty.
+                                                        Entry 44 State 2630 tokenIndex 0 PSAM1
+                                                          Entry 45 State 298 varname_conditions tokenIndex 0 PSAM1
+                                                            Entry 46 State 2637 tokenIndex 0 PSAM1
+                                                            result empty.
+                                                          result empty.
+                                                        result empty.
+                                                      Entry 34 State 2631 tokenIndex 0 PSAM1 return |||  / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps
+                                                    Entry 33 State 292 varname tokenIndex 0 PSAM1 return |||  / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps
+                                                    Entry 47 State 2410 tokenIndex 1 :
+                                                      Entry 48 State 2595 tokenIndex 1 :
+                                                        Entry 49 State 285 tokenIndex 1 :
+                                                        Entry 49 State 285 tokenIndex 1 : return |||  / 2595 => 285 on eps
+                                                      Entry 48 State 2595 tokenIndex 1 : return |||  / 2410 => 2595 on eps / 2595 => 285 on eps
+                                                    Entry 47 State 2410 tokenIndex 1 : return |||  / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps
+                                                  Entry 32 State 2384 tokenIndex 0 PSAM1 return |||  / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps
+                                                  Entry 50 State 2385 tokenIndex 0 PSAM1
+                                                    Entry 51 State 292 varname tokenIndex 0 PSAM1
+                                                    already visited.
+                                                  result empty.
+                                                  Entry 52 State 2390 tokenIndex 0 PSAM1
+                                                    Entry 53 State 292 varname tokenIndex 0 PSAM1
+                                                    already visited.
+                                                  result empty.
+                                                  Entry 54 State 2398 tokenIndex 0 PSAM1
+                                                    Entry 55 State 292 varname tokenIndex 0 PSAM1
+                                                    already visited.
+                                                  result empty.
+                                                  Entry 56 State 2402 tokenIndex 0 PSAM1
+                                                    Entry 57 State 292 varname tokenIndex 0 PSAM1
+                                                    already visited.
+                                                  result empty.
+                                                Entry 31 State 2409 tokenIndex 0 PSAM1 return |||  / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps
+                                                Entry 58 State 2592 tokenIndex 0 PSAM1
+                                                  Entry 59 State 2411 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 60 State 2418 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 61 State 2422 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 62 State 2429 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 63 State 2434 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 64 State 2441 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 65 State 2445 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 66 State 2452 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 67 State 2457 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 68 State 2462 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 69 State 2469 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 70 State 2473 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 71 State 2480 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 72 State 2485 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 73 State 2490 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 74 State 2497 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 75 State 2501 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 76 State 2508 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 77 State 2513 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 78 State 2520 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 79 State 2524 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 80 State 2531 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 81 State 2536 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 82 State 2540 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 83 State 2547 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 84 State 2554 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 85 State 2559 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 86 State 2564 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 87 State 2569 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 88 State 2573 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 89 State 2580 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                  Entry 90 State 2587 tokenIndex 0 PSAM1
+                                                  result empty.
+                                                result empty.
+                                              Entry 30 State 2594 tokenIndex 0 PSAM1 return |||  / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps
+                                            Entry 29 State 284 varnamequal tokenIndex 0 PSAM1 return |||  / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps
+                                            Entry 91 State 2369 tokenIndex 1 :
+                                              Entry 92 State 2381 tokenIndex 1 :
+                                                Entry 93 State 2379 tokenIndex 1 :
+                                                  Entry 94 State 2370 tokenIndex 1 :
+                                                    Entry 95 State 2371 tokenIndex 1 :
+                                                    result empty.
+                                                  result empty.
+                                                  Entry 96 State 2373 tokenIndex 1 :
+                                                    Entry 97 State 2374 tokenIndex 1 :
+                                                    result empty.
+                                                  result empty.
+                                                  Entry 98 State 2376 tokenIndex 1 :
+                                                    Entry 99 State 2377 tokenIndex 1 :
+                                                    result empty.
+                                                  result empty.
+                                                result empty.
+                                                Entry 100 State 2382 tokenIndex 1 :
+                                                  Entry 101 State 283 tokenIndex 1 :
+                                                  Entry 101 State 283 tokenIndex 1 : return |||  / 2382 => 283 on eps
+                                                Entry 100 State 2382 tokenIndex 1 : return |||  / 2381 => 2382 on eps / 2382 => 283 on eps
+                                              Entry 92 State 2381 tokenIndex 1 : return |||  / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps
+                                            Entry 91 State 2369 tokenIndex 1 : return |||  / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps
+                                          Entry 28 State 2368 tokenIndex 0 PSAM1 return |||  / 2367 => 2368 on action (eps) / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps
+                                        Entry 27 State 2367 tokenIndex 0 PSAM1 return |||  / 282 => 2367 on eps / 2367 => 2368 on action (eps) / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps
+                                      Entry 26 State 282 varnameref tokenIndex 0 PSAM1 return |||  / 2357 => 282 on varnameref (eps) / 282 => 2367 on eps / 2367 => 2368 on action (eps) / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps
+                                      Entry 102 State 2358 tokenIndex 1 :
+                                        Entry 103 State 2364 tokenIndex 1 :
+                                          Entry 104 State 2362 tokenIndex 1 :
+                                            Entry 105 State 2359 tokenIndex 1 :
+                                              Entry 106 State 2360 tokenIndex 1 :
+                                              result empty.
+                                            result empty.
+                                          result empty.
+                                          Entry 107 State 2365 tokenIndex 1 :
+                                            Entry 108 State 281 tokenIndex 1 :
+                                            Entry 108 State 281 tokenIndex 1 : return |||  / 2365 => 281 on eps
+                                          Entry 107 State 2365 tokenIndex 1 : return |||  / 2364 => 2365 on eps / 2365 => 281 on eps
+                                        Entry 103 State 2364 tokenIndex 1 : return |||  / 2358 => 2364 on eps / 2364 => 2365 on eps / 2365 => 281 on eps
+                                      Entry 102 State 2358 tokenIndex 1 : return |||  / 283 => 2358 on eps / 2358 => 2364 on eps / 2364 => 2365 on eps / 2365 => 281 on eps
+                                    Entry 25 State 2357 tokenIndex 0 PSAM1 return |||  / 2356 => 2357 on action (eps) / 2357 => 282 on varnameref (eps) / 282 => 2367 on eps / 2367 => 2368 on action (eps) / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps / 283 => 2358 on eps / 2358 => 2364 on eps / 2364 => 2365 on eps / 2365 => 281 on eps
+                                  Entry 24 State 2356 tokenIndex 0 PSAM1 return |||  / 280 => 2356 on eps / 2356 => 2357 on action (eps) / 2357 => 282 on varnameref (eps) / 282 => 2367 on eps / 2367 => 2368 on action (eps) / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps / 283 => 2358 on eps / 2358 => 2364 on eps / 2364 => 2365 on eps / 2365 => 281 on eps
+                                Entry 23 State 280 varnamerefcommalist tokenIndex 0 PSAM1 return |||  / 2124 => 280 on varnamerefcommalist (eps) / 280 => 2356 on eps / 2356 => 2357 on action (eps) / 2357 => 282 on varnameref (eps) / 282 => 2367 on eps / 2367 => 2368 on action (eps) / 2368 => 284 on varnamequal (eps) / 284 => 2594 on eps / 2594 => 2409 on eps / 2409 => 2384 on eps / 2384 => 292 on varname (eps) / 292 => 2631 on eps / 2631 => 2627 on eps / 2627 => 2632 on 353 ('PSAM1') / 2632 => 293 on eps / 293 => 2410 on eps / 2410 => 2595 on eps / 2595 => 285 on eps / 285 => 2369 on eps / 2369 => 2381 on eps / 2381 => 2382 on eps / 2382 => 283 on eps / 283 => 2358 on eps / 2358 => 2364 on eps / 2364 => 2365 on eps / 2365 => 281 on eps
+                                Entry 109 State 2125 tokenIndex 1 :
+                                result empty.
+                              result empty.
+                              Entry 110 State 2128 tokenIndex 0 PSAM1
+                                Entry 111 State 280 varnamerefcommalist tokenIndex 0 PSAM1
+                                already visited.
+                              result empty.
+                              Entry 112 State 2135 tokenIndex 0 PSAM1
+                              result empty.
+                              Entry 113 State 2142 tokenIndex 0 PSAM1
+                              result empty.
+                            result empty.
+                            Entry 114 State 2182 tokenIndex 0 PSAM1
+                              Entry 115 State 2154 tokenIndex 0 PSAM1
+                                Entry 116 State 280 varnamerefcommalist tokenIndex 0 PSAM1
+                                already visited.
+                              result empty.
+                              Entry 117 State 2158 tokenIndex 0 PSAM1
+                                Entry 118 State 280 varnamerefcommalist tokenIndex 0 PSAM1
+                                already visited.
+                              result empty.
+                              Entry 119 State 2165 tokenIndex 0 PSAM1
+                              result empty.
+                              Entry 120 State 2172 tokenIndex 0 PSAM1
+                              result empty.
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 121 State 458 tokenIndex 0 PSAM1
+                        Entry 122 State 22 attachstmt tokenIndex 0 PSAM1
+                          Entry 123 State 631 tokenIndex 0 PSAM1
+                            Entry 124 State 558 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 125 State 560 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 126 State 567 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 127 State 577 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 128 State 591 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 129 State 597 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 130 State 607 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 131 State 617 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 132 State 459 tokenIndex 0 PSAM1
+                        Entry 133 State 36 callstmt tokenIndex 0 PSAM1
+                          Entry 134 State 691 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 135 State 460 tokenIndex 0 PSAM1
+                        Entry 136 State 38 closestmt tokenIndex 0 PSAM1
+                          Entry 137 State 694 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 138 State 461 tokenIndex 0 PSAM1
+                        Entry 139 State 306 dclstmt tokenIndex 0 PSAM1
+                          Entry 140 State 2753 tokenIndex 0 PSAM1
+                            Entry 141 State 2750 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 142 State 2752 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 143 State 462 tokenIndex 0 PSAM1
+                        Entry 144 State 40 defaultstmt tokenIndex 0 PSAM1
+                          Entry 145 State 701 tokenIndex 0 PSAM1
+                            Entry 146 State 697 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 147 State 699 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 148 State 463 tokenIndex 0 PSAM1
+                        Entry 149 State 42 definealiasstmt tokenIndex 0 PSAM1
+                          Entry 150 State 703 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 151 State 464 tokenIndex 0 PSAM1
+                        Entry 152 State 44 defineordinalstmt tokenIndex 0 PSAM1
+                          Entry 153 State 723 tokenIndex 0 PSAM1
+                            Entry 154 State 708 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 155 State 715 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 156 State 465 tokenIndex 0 PSAM1
+                        Entry 157 State 46 definestructurestmt tokenIndex 0 PSAM1
+                          Entry 158 State 725 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 159 State 466 tokenIndex 0 PSAM1
+                        Entry 160 State 34 delaystmt tokenIndex 0 PSAM1
+                          Entry 161 State 686 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 162 State 467 tokenIndex 0 PSAM1
+                        Entry 163 State 62 deletestmt tokenIndex 0 PSAM1
+                          Entry 164 State 847 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 165 State 468 tokenIndex 0 PSAM1
+                        Entry 166 State 64 detachstmt tokenIndex 0 PSAM1
+                          Entry 167 State 850 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 168 State 469 tokenIndex 0 PSAM1
+                        Entry 169 State 60 displaystmt tokenIndex 0 PSAM1
+                          Entry 170 State 845 tokenIndex 0 PSAM1
+                            Entry 171 State 805 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 172 State 810 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 173 State 819 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 174 State 832 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 175 State 470 tokenIndex 0 PSAM1
+                        Entry 176 State 66 elsestmt tokenIndex 0 PSAM1
+                          Entry 177 State 856 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 178 State 471 tokenIndex 0 PSAM1
+                        Entry 179 State 72 exitstmt tokenIndex 0 PSAM1
+                          Entry 180 State 869 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 181 State 472 tokenIndex 0 PSAM1
+                        Entry 182 State 74 fetchstmt tokenIndex 0 PSAM1
+                          Entry 183 State 871 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 184 State 473 tokenIndex 0 PSAM1
+                        Entry 185 State 80 flushstmt tokenIndex 0 PSAM1
+                          Entry 186 State 931 tokenIndex 0 PSAM1
+                            Entry 187 State 920 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 188 State 926 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 189 State 474 tokenIndex 0 PSAM1
+                        Entry 190 State 82 formatstmt tokenIndex 0 PSAM1
+                          Entry 191 State 933 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 192 State 475 tokenIndex 0 PSAM1
+                        Entry 193 State 84 freestmt tokenIndex 0 PSAM1
+                          Entry 194 State 936 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 195 State 476 tokenIndex 0 PSAM1
+                        Entry 196 State 88 getstmt tokenIndex 0 PSAM1
+                          Entry 197 State 978 tokenIndex 0 PSAM1
+                            Entry 198 State 965 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 199 State 967 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 200 State 972 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 201 State 477 tokenIndex 0 PSAM1
+                        Entry 202 State 90 gotostmt tokenIndex 0 PSAM1
+                          Entry 203 State 985 tokenIndex 0 PSAM1
+                            Entry 204 State 980 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 205 State 983 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 206 State 478 tokenIndex 0 PSAM1
+                        Entry 207 State 262 ifstmt tokenIndex 0 PSAM1
+                          Entry 208 State 2109 tokenIndex 0 PSAM1
+                            Entry 209 State 264 ifprestmt tokenIndex 0 PSAM1
+                              Entry 210 State 2122 tokenIndex 0 PSAM1
+                                Entry 211 State 2113 tokenIndex 0 PSAM1
+                                result empty.
+                                Entry 212 State 2115 tokenIndex 0 PSAM1
+                                result empty.
+                              result empty.
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 213 State 479 tokenIndex 0 PSAM1
+                        Entry 214 State 92 iteratestmt tokenIndex 0 PSAM1
+                          Entry 215 State 990 tokenIndex 0 PSAM1
+                            Entry 216 State 987 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 217 State 988 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 218 State 480 tokenIndex 0 PSAM1
+                        Entry 219 State 94 leavestmt tokenIndex 0 PSAM1
+                          Entry 220 State 995 tokenIndex 0 PSAM1
+                            Entry 221 State 992 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 222 State 993 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 223 State 481 tokenIndex 0 PSAM1
+                        Entry 224 State 96 locatestmt tokenIndex 0 PSAM1
+                          Entry 225 State 997 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 226 State 482 tokenIndex 0 PSAM1
+                        Entry 227 State 98 onstmt tokenIndex 0 PSAM1
+                          Entry 228 State 1019 tokenIndex 0 PSAM1
+                            Entry 229 State 1001 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 230 State 1005 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 231 State 1010 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 232 State 1015 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 233 State 483 tokenIndex 0 PSAM1
+                        Entry 234 State 100 openstmt tokenIndex 0 PSAM1
+                          Entry 235 State 1021 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 236 State 484 tokenIndex 0 PSAM1
+                        Entry 237 State 150 otherwisestmt tokenIndex 0 PSAM1
+                          Entry 238 State 1213 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 239 State 485 tokenIndex 0 PSAM1
+                        Entry 240 State 116 putstmt tokenIndex 0 PSAM1
+                          Entry 241 State 1115 tokenIndex 0 PSAM1
+                            Entry 242 State 1102 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 243 State 1104 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 244 State 1109 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 245 State 486 tokenIndex 0 PSAM1
+                        Entry 246 State 120 readstmt tokenIndex 0 PSAM1
+                          Entry 247 State 1122 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 248 State 487 tokenIndex 0 PSAM1
+                        Entry 249 State 122 releasestmt tokenIndex 0 PSAM1
+                          Entry 250 State 1129 tokenIndex 0 PSAM1
+                            Entry 251 State 1125 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 252 State 1127 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 253 State 488 tokenIndex 0 PSAM1
+                        Entry 254 State 124 resignalstmt tokenIndex 0 PSAM1
+                          Entry 255 State 1131 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 256 State 489 tokenIndex 0 PSAM1
+                        Entry 257 State 126 returnstmt tokenIndex 0 PSAM1
+                          Entry 258 State 1139 tokenIndex 0 PSAM1
+                            Entry 259 State 1133 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 260 State 1134 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 261 State 490 tokenIndex 0 PSAM1
+                        Entry 262 State 130 revertstmt tokenIndex 0 PSAM1
+                          Entry 263 State 1144 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 264 State 491 tokenIndex 0 PSAM1
+                        Entry 265 State 128 rewritestmt tokenIndex 0 PSAM1
+                          Entry 266 State 1141 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 267 State 492 tokenIndex 0 PSAM1
+                        Entry 268 State 132 signalstmt tokenIndex 0 PSAM1
+                          Entry 269 State 1147 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 270 State 493 tokenIndex 0 PSAM1
+                        Entry 271 State 134 stopstmt tokenIndex 0 PSAM1
+                          Entry 272 State 1150 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 273 State 494 tokenIndex 0 PSAM1
+                        Entry 274 State 138 waitstmt tokenIndex 0 PSAM1
+                          Entry 275 State 1174 tokenIndex 0 PSAM1
+                            Entry 276 State 1155 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 277 State 1160 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 278 State 1168 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 279 State 495 tokenIndex 0 PSAM1
+                        Entry 280 State 148 whenstmt tokenIndex 0 PSAM1
+                          Entry 281 State 1207 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 282 State 496 tokenIndex 0 PSAM1
+                        Entry 283 State 140 writestmt tokenIndex 0 PSAM1
+                          Entry 284 State 1176 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 285 State 497 tokenIndex 0 PSAM1
+                        Entry 286 State 136 unlockstmt tokenIndex 0 PSAM1
+                          Entry 287 State 1152 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                    Entry 11 State 498 tokenIndex 0 PSAM1 return |||  / 14 => 498 on eps / 498 => 455 on eps / 455 => 499 on eps / 499 => 15 on eps
+                  Entry 10 State 14 stmt tokenIndex 0 PSAM1 return |||  / 428 => 14 on stmt (eps) / 14 => 498 on eps / 498 => 455 on eps / 455 => 499 on eps / 499 => 15 on eps
+                  Entry 288 State 444 tokenIndex 0 PSAM1
+                    Entry 289 State 9 tokenIndex 0 PSAM1
+                    Entry 289 State 9 tokenIndex 0 PSAM1 return |||  / 444 => 9 on eps
+                  Entry 288 State 444 tokenIndex 0 PSAM1 return |||  / 15 => 444 on eps / 444 => 9 on eps
+                Entry 9 State 428 tokenIndex 0 PSAM1 return |||  / 443 => 428 on eps / 428 => 14 on stmt (eps) / 14 => 498 on eps / 498 => 455 on eps / 455 => 499 on eps / 499 => 15 on eps / 15 => 444 on eps / 444 => 9 on eps
+                Entry 290 State 429 tokenIndex 0 PSAM1
+                  Entry 291 State 6 prestmtlist tokenIndex 0 PSAM1
+                    Entry 292 State 412 tokenIndex 0 PSAM1
+                      Entry 293 State 406 tokenIndex 0 PSAM1
+                        Entry 294 State 407 tokenIndex 0 PSAM1
+                          Entry 295 State 284 varnamequal tokenIndex 0 PSAM1
+                          already visited.
+                        result empty.
+                      result empty.
+                      Entry 296 State 408 tokenIndex 0 PSAM1
+                      result empty.
+                    result empty.
+                  result empty.
+                result empty.
+                Entry 297 State 433 tokenIndex 0 PSAM1
+                  Entry 298 State 12 stmtscope tokenIndex 0 PSAM1
+                    Entry 299 State 453 tokenIndex 0 PSAM1
+                      Entry 300 State 447 tokenIndex 0 PSAM1
+                        Entry 301 State 28 beginstmt tokenIndex 0 PSAM1
+                          Entry 302 State 669 tokenIndex 0 PSAM1
+                            Entry 303 State 662 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 304 State 663 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 305 State 448 tokenIndex 0 PSAM1
+                        Entry 306 State 244 dostmt tokenIndex 0 PSAM1
+                          Entry 307 State 2017 tokenIndex 0 PSAM1
+                            Entry 308 State 2014 tokenIndex 0 PSAM1
+                              Entry 309 State 246 do_type_1 tokenIndex 0 PSAM1
+                                Entry 310 State 2019 tokenIndex 0 PSAM1
+                                result empty.
+                              result empty.
+                            result empty.
+                            Entry 311 State 2015 tokenIndex 0 PSAM1
+                              Entry 312 State 248 do_type_2 tokenIndex 0 PSAM1
+                                Entry 313 State 2021 tokenIndex 0 PSAM1
+                                result empty.
+                              result empty.
+                            result empty.
+                            Entry 314 State 2016 tokenIndex 0 PSAM1
+                              Entry 315 State 252 do_type_3 tokenIndex 0 PSAM1
+                                Entry 316 State 2056 tokenIndex 0 PSAM1
+                                result empty.
+                              result empty.
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 317 State 449 tokenIndex 0 PSAM1
+                        Entry 318 State 70 entrystmt tokenIndex 0 PSAM1
+                          Entry 319 State 867 tokenIndex 0 PSAM1
+                            Entry 320 State 864 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 321 State 866 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 322 State 450 tokenIndex 0 PSAM1
+                        Entry 323 State 102 packagestmt tokenIndex 0 PSAM1
+                          Entry 324 State 1027 tokenIndex 0 PSAM1
+                            Entry 325 State 1024 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 326 State 1025 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 327 State 451 tokenIndex 0 PSAM1
+                        Entry 328 State 118 procedurestmt tokenIndex 0 PSAM1
+                          Entry 329 State 1120 tokenIndex 0 PSAM1
+                            Entry 330 State 1117 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 331 State 1119 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                      Entry 332 State 452 tokenIndex 0 PSAM1
+                        Entry 333 State 146 selectstmt tokenIndex 0 PSAM1
+                          Entry 334 State 1205 tokenIndex 0 PSAM1
+                            Entry 335 State 1199 tokenIndex 0 PSAM1
+                            result empty.
+                            Entry 336 State 1200 tokenIndex 0 PSAM1
+                            result empty.
+                          result empty.
+                        result empty.
+                      result empty.
+                    result empty.
+                  result empty.
+                result empty.
+                Entry 337 State 434 tokenIndex 0 PSAM1
+                  Entry 338 State 6 prestmtlist tokenIndex 0 PSAM1
+                  already visited.
+                result empty.
+                Entry 339 State 438 tokenIndex 0 PSAM1
+                  Entry 340 State 10 stmtscopeend tokenIndex 0 PSAM1
+                    Entry 341 State 445 tokenIndex 0 PSAM1
+                      Entry 342 State 68 endstmt tokenIndex 0 PSAM1
+                        Entry 343 State 862 tokenIndex 0 PSAM1
+                          Entry 344 State 859 tokenIndex 0 PSAM1
+                          result empty.
+                          Entry 345 State 860 tokenIndex 0 PSAM1
+                          result empty.
+                        result empty.
+                      result empty.
+                    result empty.
+                  result empty.
+                result empty.
+                Entry 346 State 439 tokenIndex 0 PSAM1
+                  Entry 347 State 6 prestmtlist tokenIndex 0 PSAM1
+                  already visited.
+                result empty.
+              Entry 8 State 443 tokenIndex 0 PSAM1 return |||  / 8 => 443 on eps / 443 => 428 on eps / 428 => 14 on stmt (eps) / 14 => 498 on eps / 498 => 455 on eps / 455 => 499 on eps / 499 => 15 on eps / 15 => 444 on eps / 444 => 9 on eps
+            Entry 7 State 8 pl1stmt tokenIndex 0 PSAM1 return |||  / 383 => 8 on pl1stmt (eps) / 8 => 443 on eps / 443 => 428 on eps / 428 => 14 on stmt (eps) / 14 => 498 on eps / 498 => 455 on eps / 455 => 499 on eps / 499 => 15 on eps / 15 => 444 on eps / 444 => 9 on eps
+            Entry 348 State 384 tokenIndex 0 PSAM1
+            result empty.
+          result empty.
+        result empty.
+      result empty.
+    result empty.
+    Entry 349 State 379 tokenIndex 0 PSAM1
+    result empty.
+  result empty.
+result empty.
+line 61:5 no viable alternative at input 'asdfPUT'
+error in parse.
+Token 0 line 1 col 1 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL PSAM1
+Token 1 line 1 col 6 ':'(5) channel DEFAULT_TOKEN_CHANNEL :
+Token 2 line 1 col 8 PROCEDURE(236) channel DEFAULT_TOKEN_CHANNEL PROC
+Token 3 line 1 col 13 OPTIONS(213) channel DEFAULT_TOKEN_CHANNEL OPTIONS
+Token 4 line 1 col 20 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 5 line 1 col 21 MAIN(178) channel DEFAULT_TOKEN_CHANNEL MAIN
+Token 6 line 1 col 25 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 7 line 1 col 27 RETURNS(261) channel DEFAULT_TOKEN_CHANNEL RETURNS
+Token 8 line 1 col 34 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 9 line 1 col 35 DECIMAL(79) channel DEFAULT_TOKEN_CHANNEL DEC
+Token 10 line 1 col 38 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 11 line 1 col 39 NUM(339) channel DEFAULT_TOKEN_CHANNEL 12
+Token 12 line 1 col 41 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 13 line 1 col 42 NUM(339) channel DEFAULT_TOKEN_CHANNEL 2
+Token 14 line 1 col 43 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 15 line 1 col 44 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 16 line 1 col 45 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 17 line 29 col 3 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 18 line 29 col 7 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL DUMP_FINDER
+Token 19 line 29 col 19 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 20 line 29 col 23 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 21 line 29 col 24 NUM(339) channel DEFAULT_TOKEN_CHANNEL 30
+Token 22 line 29 col 26 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 23 line 29 col 28 INITIAL_(147) channel DEFAULT_TOKEN_CHANNEL INIT
+Token 24 line 29 col 32 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 25 line 29 col 33 STR_CONSTANT(340) channel DEFAULT_TOKEN_CHANNEL '*STORAGE FOR PROGRAM PSAM1***'
+Token 26 line 29 col 64 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 27 line 29 col 65 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 28 line 35 col 3 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 29 line 35 col 7 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CUSTFILE
+Token 30 line 35 col 16 FILE_(114) channel DEFAULT_TOKEN_CHANNEL FILE
+Token 31 line 35 col 21 INPUT(151) channel DEFAULT_TOKEN_CHANNEL INPUT
+Token 32 line 35 col 27 RECORD(242) channel DEFAULT_TOKEN_CHANNEL RECORD
+Token 33 line 35 col 34 SEQUENTIAL(269) channel DEFAULT_TOKEN_CHANNEL SEQUENTIAL
+Token 34 line 36 col 14 ENVIRONMENT(101) channel DEFAULT_TOKEN_CHANNEL ENV
+Token 35 line 36 col 17 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 36 line 36 col 18 FB(109) channel DEFAULT_TOKEN_CHANNEL FB
+Token 37 line 36 col 21 RECSIZE(243) channel DEFAULT_TOKEN_CHANNEL RECSIZE
+Token 38 line 36 col 28 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 39 line 36 col 29 NUM(339) channel DEFAULT_TOKEN_CHANNEL 80
+Token 40 line 36 col 31 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 41 line 36 col 33 BLKSIZE(41) channel DEFAULT_TOKEN_CHANNEL BLKSIZE
+Token 42 line 36 col 40 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 43 line 36 col 41 NUM(339) channel DEFAULT_TOKEN_CHANNEL 0
+Token 44 line 36 col 42 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 45 line 36 col 43 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 46 line 36 col 44 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 47 line 37 col 3 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 48 line 37 col 7 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRANFILE
+Token 49 line 37 col 16 FILE_(114) channel DEFAULT_TOKEN_CHANNEL FILE
+Token 50 line 37 col 21 INPUT(151) channel DEFAULT_TOKEN_CHANNEL INPUT
+Token 51 line 37 col 27 RECORD(242) channel DEFAULT_TOKEN_CHANNEL RECORD
+Token 52 line 37 col 34 SEQUENTIAL(269) channel DEFAULT_TOKEN_CHANNEL SEQUENTIAL
+Token 53 line 37 col 45 BUFFERED(42) channel DEFAULT_TOKEN_CHANNEL BUFFERED
+Token 54 line 37 col 53 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 55 line 38 col 3 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 56 line 38 col 7 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CUSTRPT
+Token 57 line 38 col 15 FILE_(114) channel DEFAULT_TOKEN_CHANNEL FILE
+Token 58 line 38 col 20 STREAM(280) channel DEFAULT_TOKEN_CHANNEL STREAM
+Token 59 line 38 col 27 PRINT(234) channel DEFAULT_TOKEN_CHANNEL PRINT
+Token 60 line 38 col 32 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 61 line 43 col 4 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 62 line 43 col 8 NUM(339) channel DEFAULT_TOKEN_CHANNEL 1
+Token 63 line 43 col 10 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_RECORD
+Token 64 line 43 col 21 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 65 line 44 col 10 NUM(339) channel DEFAULT_TOKEN_CHANNEL 2
+Token 66 line 44 col 12 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_CODE
+Token 67 line 44 col 31 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 68 line 44 col 35 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 69 line 44 col 36 NUM(339) channel DEFAULT_TOKEN_CHANNEL 6
+Token 70 line 44 col 37 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 71 line 44 col 38 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 72 line 45 col 10 NUM(339) channel DEFAULT_TOKEN_CHANNEL 2
+Token 73 line 45 col 12 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_FILL3
+Token 74 line 45 col 31 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 75 line 45 col 35 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 76 line 45 col 36 NUM(339) channel DEFAULT_TOKEN_CHANNEL 1
+Token 77 line 45 col 37 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 78 line 45 col 38 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 79 line 46 col 10 NUM(339) channel DEFAULT_TOKEN_CHANNEL 2
+Token 80 line 46 col 12 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CRUNCH_PARMS
+Token 81 line 46 col 24 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 82 line 47 col 12 NUM(339) channel DEFAULT_TOKEN_CHANNEL 3
+Token 83 line 47 col 14 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CRUNCH_IO_LOOPS
+Token 84 line 47 col 33 PICTURE(230) channel DEFAULT_TOKEN_CHANNEL PIC
+Token 85 line 47 col 37 STR_CONSTANT(340) channel DEFAULT_TOKEN_CHANNEL '99999'
+Token 86 line 47 col 44 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 87 line 48 col 12 NUM(339) channel DEFAULT_TOKEN_CHANNEL 3
+Token 88 line 48 col 14 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CRUNCH_FILL1
+Token 89 line 48 col 33 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 90 line 48 col 37 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 91 line 48 col 38 NUM(339) channel DEFAULT_TOKEN_CHANNEL 1
+Token 92 line 48 col 39 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 93 line 48 col 40 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 94 line 49 col 12 NUM(339) channel DEFAULT_TOKEN_CHANNEL 3
+Token 95 line 49 col 14 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CRUNCH_CPU_LOOPS
+Token 96 line 49 col 33 PICTURE(230) channel DEFAULT_TOKEN_CHANNEL PIC
+Token 97 line 49 col 37 STR_CONSTANT(340) channel DEFAULT_TOKEN_CHANNEL '999999999'
+Token 98 line 49 col 48 ','(2) channel DEFAULT_TOKEN_CHANNEL ,
+Token 99 line 50 col 10 NUM(339) channel DEFAULT_TOKEN_CHANNEL 2
+Token 100 line 50 col 12 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CRUNCH_FILL2
+Token 101 line 50 col 31 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 102 line 50 col 35 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 103 line 50 col 36 NUM(339) channel DEFAULT_TOKEN_CHANNEL 58
+Token 104 line 50 col 38 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 105 line 50 col 39 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 106 line 52 col 4 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 107 line 52 col 8 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_COMMENT
+Token 108 line 52 col 31 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 109 line 52 col 35 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 110 line 52 col 36 NUM(339) channel DEFAULT_TOKEN_CHANNEL 1
+Token 111 line 52 col 37 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 112 line 52 col 42 DEFINED(84) channel DEFAULT_TOKEN_CHANNEL DEFINED
+Token 113 line 52 col 50 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_RECORD
+Token 114 line 52 col 61 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 115 line 53 col 4 DECLARE(77) channel DEFAULT_TOKEN_CHANNEL DCL
+Token 116 line 53 col 8 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_RECORD_ALL
+Token 117 line 53 col 31 CHARACTER(57) channel DEFAULT_TOKEN_CHANNEL CHAR
+Token 118 line 53 col 35 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 119 line 53 col 36 NUM(339) channel DEFAULT_TOKEN_CHANNEL 80
+Token 120 line 53 col 38 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 121 line 53 col 42 DEFINED(84) channel DEFAULT_TOKEN_CHANNEL DEFINED
+Token 122 line 53 col 50 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL TRAN_RECORD
+Token 123 line 53 col 61 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 124 line 59 col 3 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL PRTHDG1
+Token 125 line 59 col 10 ':'(5) channel DEFAULT_TOKEN_CHANNEL :
+Token 126 line 59 col 12 PROCEDURE(236) channel DEFAULT_TOKEN_CHANNEL PROCEDURE
+Token 127 line 59 col 21 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 128 line 60 col 4 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL asdf
+Token 129 line 61 col 5 PUT(237) channel DEFAULT_TOKEN_CHANNEL PUT
+Token 130 line 61 col 9 FILE_(114) channel DEFAULT_TOKEN_CHANNEL FILE
+Token 131 line 61 col 14 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 132 line 61 col 15 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CUSTRPT
+Token 133 line 61 col 22 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 134 line 61 col 24 SKIP_(274) channel DEFAULT_TOKEN_CHANNEL SKIP
+Token 135 line 61 col 29 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 136 line 61 col 30 NUM(339) channel DEFAULT_TOKEN_CHANNEL 1
+Token 137 line 61 col 31 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 138 line 61 col 33 LIST(172) channel DEFAULT_TOKEN_CHANNEL LIST
+Token 139 line 61 col 38 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 140 line 61 col 39 STRING(281) channel DEFAULT_TOKEN_CHANNEL STRING
+Token 141 line 61 col 45 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 142 line 61 col 46 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL HDR2
+Token 143 line 61 col 50 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 144 line 61 col 51 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 145 line 61 col 52 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 146 line 62 col 5 PUT(237) channel DEFAULT_TOKEN_CHANNEL PUT
+Token 147 line 62 col 9 FILE_(114) channel DEFAULT_TOKEN_CHANNEL FILE
+Token 148 line 62 col 14 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 149 line 62 col 15 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL CUSTRPT
+Token 150 line 62 col 22 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 151 line 62 col 24 SKIP_(274) channel DEFAULT_TOKEN_CHANNEL SKIP
+Token 152 line 62 col 29 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 153 line 62 col 30 NUM(339) channel DEFAULT_TOKEN_CHANNEL 1
+Token 154 line 62 col 31 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 155 line 62 col 33 LIST(172) channel DEFAULT_TOKEN_CHANNEL LIST
+Token 156 line 62 col 38 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 157 line 62 col 39 STRING(281) channel DEFAULT_TOKEN_CHANNEL STRING
+Token 158 line 62 col 45 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 159 line 62 col 46 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL HDR3
+Token 160 line 62 col 50 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 161 line 62 col 51 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 162 line 62 col 52 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 163 line 63 col 3 END(97) channel DEFAULT_TOKEN_CHANNEL END
+Token 164 line 63 col 7 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL PRTHDG1
+Token 165 line 63 col 14 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 166 line 65 col 3 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL PROGRAM_STATUS
+Token 167 line 65 col 18 '='(7) channel DEFAULT_TOKEN_CHANNEL =
+Token 168 line 65 col 20 STR_CONSTANT(340) channel DEFAULT_TOKEN_CHANNEL 'PROGRAM ENDING'
+Token 169 line 65 col 36 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 170 line 67 col 1 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL PROGRAM_END
+Token 171 line 67 col 12 ':'(5) channel DEFAULT_TOKEN_CHANNEL :
+Token 172 line 68 col 1 RETURN(260) channel DEFAULT_TOKEN_CHANNEL RETURN
+Token 173 line 68 col 7 '('(3) channel DEFAULT_TOKEN_CHANNEL (
+Token 174 line 68 col 8 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL BALANCE_AVG
+Token 175 line 68 col 19 ')'(4) channel DEFAULT_TOKEN_CHANNEL )
+Token 176 line 68 col 20 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 177 line 69 col 1 END(97) channel DEFAULT_TOKEN_CHANNEL END
+Token 178 line 69 col 5 VARNAME(353) channel DEFAULT_TOKEN_CHANNEL PSAM1
+Token 179 line 69 col 10 ';'(1) channel DEFAULT_TOKEN_CHANNEL ;
+Token 180 line 70 col 0 EOF(-1) channel DEFAULT_TOKEN_CHANNEL <EOF>
+
+( pl1pgm
+  ( pl1stmtlist
+    ( pl1stmtlist
+      ( pl1stmtlist
+        ( pl1stmtlist
+          ( pl1stmtlist
+            ( pl1stmtlist
+              ( pl1stmtlist
+                ( pl1stmtlist
+                  ( pl1stmtlist
+                    ( pl1stmtlist
+                      ( pl1stmtlist
+                        ( pl1stmtlist
+                          ( pl1stmtlist
+                            ( pl1stmtlist
+                              ( pl1stmtlist
+                                ( pl1stmt
+                                  ( prestmtlist
+                                    ( varnamequal
+                                      ( varname
+                                        ( DEFAULT_TOKEN_CHANNEL i=0 txt=PSAM1 tt=353
+                                  ) ) ) )
+                                  ( DEFAULT_TOKEN_CHANNEL i=1 txt=: tt=5
+                                  )
+                                  ( stmtscope
+                                    ( procedurestmt
+                                      ( DEFAULT_TOKEN_CHANNEL i=2 txt=PROC tt=236
+                                      )
+                                      ( procgrouplist
+                                        ( procgrouplist
+                                          ( procgroup
+                                            ( DEFAULT_TOKEN_CHANNEL i=3 txt=OPTIONS tt=213
+                                            )
+                                            ( DEFAULT_TOKEN_CHANNEL i=4 txt=( tt=3
+                                            )
+                                            ( procoptionlist
+                                              ( procoption
+                                                ( DEFAULT_TOKEN_CHANNEL i=5 txt=MAIN tt=178
+                                            ) ) )
+                                            ( DEFAULT_TOKEN_CHANNEL i=6 txt=) tt=4
+                                        ) ) )
+                                        ( procgroup
+                                          ( DEFAULT_TOKEN_CHANNEL i=7 txt=RETURNS tt=261
+                                          )
+                                          ( DEFAULT_TOKEN_CHANNEL i=8 txt=( tt=3
+                                          )
+                                          ( entryparmcommalist
+                                            ( entryparm
+                                              ( dcloptionlist
+                                                ( dcloption
+                                                  ( dclnumeric
+                                                    ( DEFAULT_TOKEN_CHANNEL i=9 txt=DEC tt=79
+                                                    )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=10 txt=( tt=3
+                                                    )
+                                                    ( dclnumericNUM
+                                                      ( DEFAULT_TOKEN_CHANNEL i=11 txt=12 tt=339
+                                                    ) )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=12 txt=, tt=2
+                                                    )
+                                                    ( dclnumericNUM
+                                                      ( DEFAULT_TOKEN_CHANNEL i=13 txt=2 tt=339
+                                                    ) )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=14 txt=) tt=4
+                                          ) ) ) ) ) )
+                                          ( DEFAULT_TOKEN_CHANNEL i=15 txt=) tt=4
+                                ) ) ) ) ) )
+                                ( DEFAULT_TOKEN_CHANNEL i=16 txt=; tt=1
+                              ) )
+                              ( pl1stmt
+                                ( stmt
+                                  ( dclstmt
+                                    ( DEFAULT_TOKEN_CHANNEL i=17 txt=DCL tt=77
+                                    )
+                                    ( dcltermcommalist
+                                      ( dclnamebase
+                                        ( varname
+                                          ( DEFAULT_TOKEN_CHANNEL i=18 txt=DUMP_FINDER tt=353
+                                        ) )
+                                        ( dclfactor
+                                          ( dcloptionlist
+                                            ( dcloptionlist
+                                              ( dcloption
+                                                ( dclchar
+                                                  ( DEFAULT_TOKEN_CHANNEL i=19 txt=CHAR tt=57
+                                                  )
+                                                  ( charspec
+                                                    ( DEFAULT_TOKEN_CHANNEL i=20 txt=( tt=3
+                                                    )
+                                                    ( expr
+                                                      ( exprbase
+                                                        ( exprconst
+                                                          ( exprnumconst
+                                                            ( DEFAULT_TOKEN_CHANNEL i=21 txt=30 tt=339
+                                                    ) ) ) ) )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=22 txt=) tt=4
+                                            ) ) ) ) )
+                                            ( dcloption
+                                              ( dclinit
+                                                ( DEFAULT_TOKEN_CHANNEL i=23 txt=INIT tt=147
+                                                )
+                                                ( DEFAULT_TOKEN_CHANNEL i=24 txt=( tt=3
+                                                )
+                                                ( inititemcommalist
+                                                  ( inititem
+                                                    ( exprbase
+                                                      ( exprconst
+                                                        ( exprstrconst
+                                                          ( DEFAULT_TOKEN_CHANNEL i=25 txt='*STORAGE FOR PROGRAM PSAM1***' tt=340
+                                                ) ) ) ) ) )
+                                                ( DEFAULT_TOKEN_CHANNEL i=26 txt=) tt=4
+                              ) ) ) ) ) ) ) ) ) )
+                              ( DEFAULT_TOKEN_CHANNEL i=27 txt=; tt=1
+                            ) )
+                            ( pl1stmt
+                              ( stmt
+                                ( dclstmt
+                                  ( DEFAULT_TOKEN_CHANNEL i=28 txt=DCL tt=77
+                                  )
+                                  ( dcltermcommalist
+                                    ( dclnamebase
+                                      ( varname
+                                        ( DEFAULT_TOKEN_CHANNEL i=29 txt=CUSTFILE tt=353
+                                      ) )
+                                      ( dclfactor
+                                        ( dcloptionlist
+                                          ( dcloptionlist
+                                            ( dcloptionlist
+                                              ( dcloptionlist
+                                                ( dcloptionlist
+                                                  ( dcloption
+                                                    ( dclio
+                                                      ( DEFAULT_TOKEN_CHANNEL i=30 txt=FILE tt=114
+                                                ) ) ) )
+                                                ( dcloption
+                                                  ( dclio
+                                                    ( DEFAULT_TOKEN_CHANNEL i=31 txt=INPUT tt=151
+                                              ) ) ) )
+                                              ( dcloption
+                                                ( dclio
+                                                  ( DEFAULT_TOKEN_CHANNEL i=32 txt=RECORD tt=242
+                                            ) ) ) )
+                                            ( dcloption
+                                              ( dclio
+                                                ( DEFAULT_TOKEN_CHANNEL i=33 txt=SEQUENTIAL tt=269
+                                          ) ) ) )
+                                          ( dcloption
+                                            ( dclio
+                                              ( DEFAULT_TOKEN_CHANNEL i=34 txt=ENV tt=101
+                                              )
+                                              ( DEFAULT_TOKEN_CHANNEL i=35 txt=( tt=3
+                                              )
+                                              ( environmentspeclist
+                                                ( environmentspeclist
+                                                  ( environmentspeclist
+                                                    ( environmentspec
+                                                      ( DEFAULT_TOKEN_CHANNEL i=36 txt=FB tt=109
+                                                  ) ) )
+                                                  ( environmentspec
+                                                    ( DEFAULT_TOKEN_CHANNEL i=37 txt=RECSIZE tt=243
+                                                    )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=38 txt=( tt=3
+                                                    )
+                                                    ( environmentspecparm
+                                                      ( DEFAULT_TOKEN_CHANNEL i=39 txt=80 tt=339
+                                                    ) )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=40 txt=) tt=4
+                                                ) ) )
+                                                ( environmentspec
+                                                  ( DEFAULT_TOKEN_CHANNEL i=41 txt=BLKSIZE tt=41
+                                                  )
+                                                  ( DEFAULT_TOKEN_CHANNEL i=42 txt=( tt=3
+                                                  )
+                                                  ( environmentspecparm
+                                                    ( DEFAULT_TOKEN_CHANNEL i=43 txt=0 tt=339
+                                                  ) )
+                                                  ( DEFAULT_TOKEN_CHANNEL i=44 txt=) tt=4
+                                              ) ) )
+                                              ( DEFAULT_TOKEN_CHANNEL i=45 txt=) tt=4
+                            ) ) ) ) ) ) ) ) ) )
+                            ( DEFAULT_TOKEN_CHANNEL i=46 txt=; tt=1
+                          ) )
+                          ( pl1stmt
+                            ( stmt
+                              ( dclstmt
+                                ( DEFAULT_TOKEN_CHANNEL i=47 txt=DCL tt=77
+                                )
+                                ( dcltermcommalist
+                                  ( dclnamebase
+                                    ( varname
+                                      ( DEFAULT_TOKEN_CHANNEL i=48 txt=TRANFILE tt=353
+                                    ) )
+                                    ( dclfactor
+                                      ( dcloptionlist
+                                        ( dcloptionlist
+                                          ( dcloptionlist
+                                            ( dcloptionlist
+                                              ( dcloptionlist
+                                                ( dcloption
+                                                  ( dclio
+                                                    ( DEFAULT_TOKEN_CHANNEL i=49 txt=FILE tt=114
+                                              ) ) ) )
+                                              ( dcloption
+                                                ( dclio
+                                                  ( DEFAULT_TOKEN_CHANNEL i=50 txt=INPUT tt=151
+                                            ) ) ) )
+                                            ( dcloption
+                                              ( dclio
+                                                ( DEFAULT_TOKEN_CHANNEL i=51 txt=RECORD tt=242
+                                          ) ) ) )
+                                          ( dcloption
+                                            ( dclio
+                                              ( DEFAULT_TOKEN_CHANNEL i=52 txt=SEQUENTIAL tt=269
+                                        ) ) ) )
+                                        ( dcloption
+                                          ( dclio
+                                            ( DEFAULT_TOKEN_CHANNEL i=53 txt=BUFFERED tt=42
+                          ) ) ) ) ) ) ) ) ) )
+                          ( DEFAULT_TOKEN_CHANNEL i=54 txt=; tt=1
+                        ) )
+                        ( pl1stmt
+                          ( stmt
+                            ( dclstmt
+                              ( DEFAULT_TOKEN_CHANNEL i=55 txt=DCL tt=77
+                              )
+                              ( dcltermcommalist
+                                ( dclnamebase
+                                  ( varname
+                                    ( DEFAULT_TOKEN_CHANNEL i=56 txt=CUSTRPT tt=353
+                                  ) )
+                                  ( dclfactor
+                                    ( dcloptionlist
+                                      ( dcloptionlist
+                                        ( dcloptionlist
+                                          ( dcloption
+                                            ( dclio
+                                              ( DEFAULT_TOKEN_CHANNEL i=57 txt=FILE tt=114
+                                        ) ) ) )
+                                        ( dcloption
+                                          ( dclio
+                                            ( DEFAULT_TOKEN_CHANNEL i=58 txt=STREAM tt=280
+                                      ) ) ) )
+                                      ( dcloption
+                                        ( dclio
+                                          ( DEFAULT_TOKEN_CHANNEL i=59 txt=PRINT tt=234
+                        ) ) ) ) ) ) ) ) ) )
+                        ( DEFAULT_TOKEN_CHANNEL i=60 txt=; tt=1
+                      ) )
+                      ( pl1stmt
+                        ( stmt
+                          ( dclstmt
+                            ( DEFAULT_TOKEN_CHANNEL i=61 txt=DCL tt=77
+                            )
+                            ( dcltermcommalist
+                              ( dcltermcommalist
+                                ( dcltermcommalist
+                                  ( dcltermcommalist
+                                    ( dcltermcommalist
+                                      ( dcltermcommalist
+                                        ( dcltermcommalist
+                                          ( dcltermcommalist
+                                            ( dclnamebase
+                                              ( DEFAULT_TOKEN_CHANNEL i=62 txt=1 tt=339
+                                              )
+                                              ( varname
+                                                ( DEFAULT_TOKEN_CHANNEL i=63 txt=TRAN_RECORD tt=353
+                                          ) ) ) )
+                                          ( DEFAULT_TOKEN_CHANNEL i=64 txt=, tt=2
+                                          )
+                                          ( dclnamebase
+                                            ( DEFAULT_TOKEN_CHANNEL i=65 txt=2 tt=339
+                                            )
+                                            ( varname
+                                              ( DEFAULT_TOKEN_CHANNEL i=66 txt=TRAN_CODE tt=353
+                                            ) )
+                                            ( dclfactor
+                                              ( dcloptionlist
+                                                ( dcloption
+                                                  ( dclchar
+                                                    ( DEFAULT_TOKEN_CHANNEL i=67 txt=CHAR tt=57
+                                                    )
+                                                    ( charspec
+                                                      ( DEFAULT_TOKEN_CHANNEL i=68 txt=( tt=3
+                                                      )
+                                                      ( expr
+                                                        ( exprbase
+                                                          ( exprconst
+                                                            ( exprnumconst
+                                                              ( DEFAULT_TOKEN_CHANNEL i=69 txt=6 tt=339
+                                                      ) ) ) ) )
+                                                      ( DEFAULT_TOKEN_CHANNEL i=70 txt=) tt=4
+                                        ) ) ) ) ) ) ) )
+                                        ( DEFAULT_TOKEN_CHANNEL i=71 txt=, tt=2
+                                        )
+                                        ( dclnamebase
+                                          ( DEFAULT_TOKEN_CHANNEL i=72 txt=2 tt=339
+                                          )
+                                          ( varname
+                                            ( DEFAULT_TOKEN_CHANNEL i=73 txt=TRAN_FILL3 tt=353
+                                          ) )
+                                          ( dclfactor
+                                            ( dcloptionlist
+                                              ( dcloption
+                                                ( dclchar
+                                                  ( DEFAULT_TOKEN_CHANNEL i=74 txt=CHAR tt=57
+                                                  )
+                                                  ( charspec
+                                                    ( DEFAULT_TOKEN_CHANNEL i=75 txt=( tt=3
+                                                    )
+                                                    ( expr
+                                                      ( exprbase
+                                                        ( exprconst
+                                                          ( exprnumconst
+                                                            ( DEFAULT_TOKEN_CHANNEL i=76 txt=1 tt=339
+                                                    ) ) ) ) )
+                                                    ( DEFAULT_TOKEN_CHANNEL i=77 txt=) tt=4
+                                      ) ) ) ) ) ) ) )
+                                      ( DEFAULT_TOKEN_CHANNEL i=78 txt=, tt=2
+                                      )
+                                      ( dclnamebase
+                                        ( DEFAULT_TOKEN_CHANNEL i=79 txt=2 tt=339
+                                        )
+                                        ( varname
+                                          ( DEFAULT_TOKEN_CHANNEL i=80 txt=CRUNCH_PARMS tt=353
+                                    ) ) ) )
+                                    ( DEFAULT_TOKEN_CHANNEL i=81 txt=, tt=2
+                                    )
+                                    ( dclnamebase
+                                      ( DEFAULT_TOKEN_CHANNEL i=82 txt=3 tt=339
+                                      )
+                                      ( varname
+                                        ( DEFAULT_TOKEN_CHANNEL i=83 txt=CRUNCH_IO_LOOPS tt=353
+                                      ) )
+                                      ( dclfactor
+                                        ( dcloptionlist
+                                          ( dcloption
+                                            ( dclchar
+                                              ( DEFAULT_TOKEN_CHANNEL i=84 txt=PIC tt=230
+                                              )
+                                              ( DEFAULT_TOKEN_CHANNEL i=85 txt='99999' tt=340
+                                  ) ) ) ) ) ) )
+                                  ( DEFAULT_TOKEN_CHANNEL i=86 txt=, tt=2
+                                  )
+                                  ( dclnamebase
+                                    ( DEFAULT_TOKEN_CHANNEL i=87 txt=3 tt=339
+                                    )
+                                    ( varname
+                                      ( DEFAULT_TOKEN_CHANNEL i=88 txt=CRUNCH_FILL1 tt=353
+                                    ) )
+                                    ( dclfactor
+                                      ( dcloptionlist
+                                        ( dcloption
+                                          ( dclchar
+                                            ( DEFAULT_TOKEN_CHANNEL i=89 txt=CHAR tt=57
+                                            )
+                                            ( charspec
+                                              ( DEFAULT_TOKEN_CHANNEL i=90 txt=( tt=3
+                                              )
+                                              ( expr
+                                                ( exprbase
+                                                  ( exprconst
+                                                    ( exprnumconst
+                                                      ( DEFAULT_TOKEN_CHANNEL i=91 txt=1 tt=339
+                                              ) ) ) ) )
+                                              ( DEFAULT_TOKEN_CHANNEL i=92 txt=) tt=4
+                                ) ) ) ) ) ) ) )
+                                ( DEFAULT_TOKEN_CHANNEL i=93 txt=, tt=2
+                                )
+                                ( dclnamebase
+                                  ( DEFAULT_TOKEN_CHANNEL i=94 txt=3 tt=339
+                                  )
+                                  ( varname
+                                    ( DEFAULT_TOKEN_CHANNEL i=95 txt=CRUNCH_CPU_LOOPS tt=353
+                                  ) )
+                                  ( dclfactor
+                                    ( dcloptionlist
+                                      ( dcloption
+                                        ( dclchar
+                                          ( DEFAULT_TOKEN_CHANNEL i=96 txt=PIC tt=230
+                                          )
+                                          ( DEFAULT_TOKEN_CHANNEL i=97 txt='999999999' tt=340
+                              ) ) ) ) ) ) )
+                              ( DEFAULT_TOKEN_CHANNEL i=98 txt=, tt=2
+                              )
+                              ( dclnamebase
+                                ( DEFAULT_TOKEN_CHANNEL i=99 txt=2 tt=339
+                                )
+                                ( varname
+                                  ( DEFAULT_TOKEN_CHANNEL i=100 txt=CRUNCH_FILL2 tt=353
+                                ) )
+                                ( dclfactor
+                                  ( dcloptionlist
+                                    ( dcloption
+                                      ( dclchar
+                                        ( DEFAULT_TOKEN_CHANNEL i=101 txt=CHAR tt=57
+                                        )
+                                        ( charspec
+                                          ( DEFAULT_TOKEN_CHANNEL i=102 txt=( tt=3
+                                          )
+                                          ( expr
+                                            ( exprbase
+                                              ( exprconst
+                                                ( exprnumconst
+                                                  ( DEFAULT_TOKEN_CHANNEL i=103 txt=58 tt=339
+                                          ) ) ) ) )
+                                          ( DEFAULT_TOKEN_CHANNEL i=104 txt=) tt=4
+                      ) ) ) ) ) ) ) ) ) ) )
+                      ( DEFAULT_TOKEN_CHANNEL i=105 txt=; tt=1
+                    ) )
+                    ( pl1stmt
+                      ( stmt
+                        ( dclstmt
+                          ( DEFAULT_TOKEN_CHANNEL i=106 txt=DCL tt=77
+                          )
+                          ( dcltermcommalist
+                            ( dclnamebase
+                              ( varname
+                                ( DEFAULT_TOKEN_CHANNEL i=107 txt=TRAN_COMMENT tt=353
+                              ) )
+                              ( dclfactor
+                                ( dcloptionlist
+                                  ( dcloptionlist
+                                    ( dcloption
+                                      ( dclchar
+                                        ( DEFAULT_TOKEN_CHANNEL i=108 txt=CHAR tt=57
+                                        )
+                                        ( charspec
+                                          ( DEFAULT_TOKEN_CHANNEL i=109 txt=( tt=3
+                                          )
+                                          ( expr
+                                            ( exprbase
+                                              ( exprconst
+                                                ( exprnumconst
+                                                  ( DEFAULT_TOKEN_CHANNEL i=110 txt=1 tt=339
+                                          ) ) ) ) )
+                                          ( DEFAULT_TOKEN_CHANNEL i=111 txt=) tt=4
+                                  ) ) ) ) )
+                                  ( dcloption
+                                    ( dclstg
+                                      ( DEFAULT_TOKEN_CHANNEL i=112 txt=DEFINED tt=84
+                                      )
+                                      ( varnameref
+                                        ( varnamequal
+                                          ( varname
+                                            ( DEFAULT_TOKEN_CHANNEL i=113 txt=TRAN_RECORD tt=353
+                    ) ) ) ) ) ) ) ) ) ) ) ) )
+                    ( DEFAULT_TOKEN_CHANNEL i=114 txt=; tt=1
+                  ) )
+                  ( pl1stmt
+                    ( stmt
+                      ( dclstmt
+                        ( DEFAULT_TOKEN_CHANNEL i=115 txt=DCL tt=77
+                        )
+                        ( dcltermcommalist
+                          ( dclnamebase
+                            ( varname
+                              ( DEFAULT_TOKEN_CHANNEL i=116 txt=TRAN_RECORD_ALL tt=353
+                            ) )
+                            ( dclfactor
+                              ( dcloptionlist
+                                ( dcloptionlist
+                                  ( dcloption
+                                    ( dclchar
+                                      ( DEFAULT_TOKEN_CHANNEL i=117 txt=CHAR tt=57
+                                      )
+                                      ( charspec
+                                        ( DEFAULT_TOKEN_CHANNEL i=118 txt=( tt=3
+                                        )
+                                        ( expr
+                                          ( exprbase
+                                            ( exprconst
+                                              ( exprnumconst
+                                                ( DEFAULT_TOKEN_CHANNEL i=119 txt=80 tt=339
+                                        ) ) ) ) )
+                                        ( DEFAULT_TOKEN_CHANNEL i=120 txt=) tt=4
+                                ) ) ) ) )
+                                ( dcloption
+                                  ( dclstg
+                                    ( DEFAULT_TOKEN_CHANNEL i=121 txt=DEFINED tt=84
+                                    )
+                                    ( varnameref
+                                      ( varnamequal
+                                        ( varname
+                                          ( DEFAULT_TOKEN_CHANNEL i=122 txt=TRAN_RECORD tt=353
+                  ) ) ) ) ) ) ) ) ) ) ) ) )
+                  ( DEFAULT_TOKEN_CHANNEL i=123 txt=; tt=1
+                ) )
+                ( pl1stmt
+                  ( prestmtlist
+                    ( varnamequal
+                      ( varname
+                        ( DEFAULT_TOKEN_CHANNEL i=124 txt=PRTHDG1 tt=353
+                  ) ) ) )
+                  ( DEFAULT_TOKEN_CHANNEL i=125 txt=: tt=5
+                  )
+                  ( stmtscope
+                    ( procedurestmt
+                      ( DEFAULT_TOKEN_CHANNEL i=126 txt=PROCEDURE tt=236
+                ) ) ) )
+                ( DEFAULT_TOKEN_CHANNEL i=127 txt=; tt=1
+              ) )
+              ( pl1stmt
+                ( DEFAULT_TOKEN_CHANNEL i=128 txt=asdf tt=353
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=129 txt=PUT tt=237
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=130 txt=FILE tt=114
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=131 txt=( tt=3
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=132 txt=CUSTRPT tt=353
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=133 txt=) tt=4
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=134 txt=SKIP tt=274
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=135 txt=( tt=3
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=136 txt=1 tt=339
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=137 txt=) tt=4
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=138 txt=LIST tt=172
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=139 txt=( tt=3
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=140 txt=STRING tt=281
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=141 txt=( tt=3
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=142 txt=HDR2 tt=353
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=143 txt=) tt=4
+                )
+                ( DEFAULT_TOKEN_CHANNEL i=144 txt=) tt=4
+              ) )
+              ( DEFAULT_TOKEN_CHANNEL i=145 txt=; tt=1
+            ) )
+            ( pl1stmt
+              ( stmt
+                ( putstmt
+                  ( DEFAULT_TOKEN_CHANNEL i=146 txt=PUT tt=237
+                  )
+                  ( putoptionlist
+                    ( putoptionlist
+                      ( putoptionlist
+                        ( putoption
+                          ( DEFAULT_TOKEN_CHANNEL i=147 txt=FILE tt=114
+                          )
+                          ( DEFAULT_TOKEN_CHANNEL i=148 txt=( tt=3
+                          )
+                          ( varnameref
+                            ( varnamequal
+                              ( varname
+                                ( DEFAULT_TOKEN_CHANNEL i=149 txt=CUSTRPT tt=353
+                          ) ) ) )
+                          ( DEFAULT_TOKEN_CHANNEL i=150 txt=) tt=4
+                      ) ) )
+                      ( putoption
+                        ( DEFAULT_TOKEN_CHANNEL i=151 txt=SKIP tt=274
+                        )
+                        ( DEFAULT_TOKEN_CHANNEL i=152 txt=( tt=3
+                        )
+                        ( expr
+                          ( exprbase
+                            ( exprconst
+                              ( exprnumconst
+                                ( DEFAULT_TOKEN_CHANNEL i=153 txt=1 tt=339
+                        ) ) ) ) )
+                        ( DEFAULT_TOKEN_CHANNEL i=154 txt=) tt=4
+                    ) ) )
+                    ( putoption
+                      ( dataspecification
+                        ( DEFAULT_TOKEN_CHANNEL i=155 txt=LIST tt=172
+                        )
+                        ( listdataspec
+                          ( DEFAULT_TOKEN_CHANNEL i=156 txt=( tt=3
+                          )
+                          ( datalist
+                            ( expr
+                              ( exprbase
+                                ( varnameref
+                                  ( varnamequal
+                                    ( varname
+                                      ( varname_kw
+                                        ( DEFAULT_TOKEN_CHANNEL i=157 txt=STRING tt=281
+                                    ) ) )
+                                    ( DEFAULT_TOKEN_CHANNEL i=158 txt=( tt=3
+                                    )
+                                    ( varnamedimensioncommalist
+                                      ( varnamedimension
+                                        ( expr
+                                          ( exprbase
+                                            ( varnameref
+                                              ( varnamequal
+                                                ( varname
+                                                  ( DEFAULT_TOKEN_CHANNEL i=159 txt=HDR3 tt=353
+                                    ) ) ) ) ) ) ) )
+                                    ( DEFAULT_TOKEN_CHANNEL i=160 txt=) tt=4
+                          ) ) ) ) ) )
+                          ( DEFAULT_TOKEN_CHANNEL i=161 txt=) tt=4
+            ) ) ) ) ) ) ) )
+            ( DEFAULT_TOKEN_CHANNEL i=162 txt=; tt=1
+          ) )
+          ( pl1stmt
+            ( stmtscopeend
+              ( endstmt
+                ( DEFAULT_TOKEN_CHANNEL i=163 txt=END tt=97
+                )
+                ( varname
+                  ( DEFAULT_TOKEN_CHANNEL i=164 txt=PRTHDG1 tt=353
+          ) ) ) ) )
+          ( DEFAULT_TOKEN_CHANNEL i=165 txt=; tt=1
+        ) )
+        ( pl1stmt
+          ( stmt
+            ( assignstmt
+              ( varnamerefcommalist
+                ( varnameref
+                  ( varnamequal
+                    ( varname
+                      ( DEFAULT_TOKEN_CHANNEL i=166 txt=PROGRAM_STATUS tt=353
+              ) ) ) ) )
+              ( DEFAULT_TOKEN_CHANNEL i=167 txt== tt=7
+              )
+              ( expr
+                ( exprbase
+                  ( exprconst
+                    ( exprstrconst
+                      ( DEFAULT_TOKEN_CHANNEL i=168 txt='PROGRAM ENDING' tt=340
+        ) ) ) ) ) ) ) )
+        ( DEFAULT_TOKEN_CHANNEL i=169 txt=; tt=1
+      ) )
+      ( pl1stmt
+        ( prestmtlist
+          ( varnamequal
+            ( varname
+              ( DEFAULT_TOKEN_CHANNEL i=170 txt=PROGRAM_END tt=353
+        ) ) ) )
+        ( DEFAULT_TOKEN_CHANNEL i=171 txt=: tt=5
+        )
+        ( stmt
+          ( returnstmt
+            ( DEFAULT_TOKEN_CHANNEL i=172 txt=RETURN tt=260
+            )
+            ( DEFAULT_TOKEN_CHANNEL i=173 txt=( tt=3
+            )
+            ( expr
+              ( exprbase
+                ( varnameref
+                  ( varnamequal
+                    ( varname
+                      ( DEFAULT_TOKEN_CHANNEL i=174 txt=BALANCE_AVG tt=353
+            ) ) ) ) ) )
+            ( DEFAULT_TOKEN_CHANNEL i=175 txt=) tt=4
+      ) ) ) )
+      ( DEFAULT_TOKEN_CHANNEL i=176 txt=; tt=1
+    ) )
+    ( pl1stmt
+      ( stmtscopeend
+        ( endstmt
+          ( DEFAULT_TOKEN_CHANNEL i=177 txt=END tt=97
+          )
+          ( varname
+            ( DEFAULT_TOKEN_CHANNEL i=178 txt=PSAM1 tt=353
+    ) ) ) ) )
+    ( DEFAULT_TOKEN_CHANNEL i=179 txt=; tt=1
+  ) )
+  ( DEFAULT_TOKEN_CHANNEL i=180 txt=<EOF> tt=-1
+) )
+
+
+C:\Users\kenne\Documents\AntlrExamples\pl1\bin\Debug\netcoreapp3.1\pl1.exe (process 10848) exited with code 0.
+To automatically close the console when debugging stops, enable Tools->Options->Debugging->Automatically close the console when debugging stops.
+Press any key to close this window . . .

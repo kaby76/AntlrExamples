@@ -1,0 +1,69 @@
+ PSAM1: PROC OPTIONS(MAIN) RETURNS(DEC(12,2));
+ /****************************************************************
+  * LICENSED MATERIALS - PROPERTY OF IBM
+  * "RESTRICTED MATERIALS OF IBM"
+  * (C) COPYRIGHT IBM CORPORATION 2019. ALL RIGHTS RESERVED
+  * US GOVERNMENT USERS RESTRICTED RIGHTS - USE, DUPLICATION,
+  * OR DISCLOSURE RESTRICTED BY GSA ADP SCHEDULE
+  * CONTRACT WITH IBM CORPORATION
+  ****************************************************************
+  * PROGRAM:  PSAM1    (PLI FOR MVS AND VM)
+  *
+  * AUTHOR :  DOUG STOUT
+  *           IBM PD TOOLS
+  *
+  * READS A FILE AND WRITES A REPORT
+  * PROCESSING IS CONTROLLED BY A TRANSACTION FILE
+  *
+  ****************************************************************
+  *
+  * TRANSACTION FILE RECORD DESCRIPTIONS:
+  *     0    1    1    2    2    3    3    4    4    5    5    6    6
+  * ....5....0....5....0....5....0....5....0....5....0....5....0....5
+  * *        <== AN ASTERISK IN FIRST COLUMN IS A COMMENT
+  * PRINT    <== PRODUCES A DETAIL REPORT
+  * TOTALS   <== PRODUCES A SUMMARY REPORT
+  *
+  ****************************************************************/
+
+   DCL DUMP_FINDER CHAR(30) INIT('*STORAGE FOR PROGRAM PSAM1***');
+
+   /**********************/
+   /* INPUT/OUTPUT FILES */
+   /**********************/
+
+   DCL CUSTFILE FILE INPUT RECORD SEQUENTIAL
+              ENV(FB RECSIZE(80) BLKSIZE(0));
+   DCL TRANFILE FILE INPUT RECORD SEQUENTIAL BUFFERED;
+   DCL CUSTRPT FILE STREAM PRINT;
+
+   /*************************************
+    * TRANFILE RECORD                   *
+    *************************************/
+    DCL 1 TRAN_RECORD,
+          2 TRAN_CODE          CHAR(6),
+          2 TRAN_FILL3         CHAR(1),
+          2 CRUNCH_PARMS,
+            3 CRUNCH_IO_LOOPS    PIC '99999',
+            3 CRUNCH_FILL1       CHAR(1),
+            3 CRUNCH_CPU_LOOPS   PIC '999999999',
+          2 CRUNCH_FILL2       CHAR(58);
+
+    DCL TRAN_COMMENT           CHAR(1)    DEFINED TRAN_RECORD;
+    DCL TRAN_RECORD_ALL        CHAR(80)   DEFINED TRAN_RECORD;
+
+   /***************************************
+    * CUSTFILE RECORDS                    *
+    ***************************************/
+
+   PRTHDG1: PROCEDURE;
+    asdf
+     PUT FILE (CUSTRPT) SKIP (1) LIST (STRING(HDR2));
+     PUT FILE (CUSTRPT) SKIP (1) LIST (STRING(HDR3));
+   END PRTHDG1;
+
+   PROGRAM_STATUS = 'PROGRAM ENDING';
+
+ PROGRAM_END:
+ RETURN(BALANCE_AVG);
+ END PSAM1;

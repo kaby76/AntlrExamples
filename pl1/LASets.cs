@@ -171,12 +171,20 @@ namespace pl1
 
             if (_log_parse)
             {
+                var n = _parser.Atn.ruleToStartState.Where(t => t.stateNumber == state.stateNumber);
+                var r = n.Any() ? n.FirstOrDefault().ruleIndex : -1;
+                var name = (r >= 0) ? (" " + _parser.RuleNames[r]) : "";
                 System.Console.Error.WriteLine(
                     new String(' ', indent * 2)
-                    + "Entry " + here
-                    + " State " + state
-                    + " tokenIndex " + token_index
-                    + " " + input_token.Text
+                    + "Entry "
+                    + here
+                    + " State "
+                    + state
+                    + name
+                    + " tokenIndex "
+                    + token_index
+                    + " "
+                    + input_token.Text
                 );
             }
 
@@ -222,10 +230,20 @@ namespace pl1
             {
                 if (_log_parse)
                 {
+                    var n = _parser.Atn.ruleToStartState.Where(t => t.stateNumber == state.stateNumber);
+                    var r = n.Any() ? n.FirstOrDefault().ruleIndex : -1;
+                    var name = (r >= 0) ? (" " + _parser.RuleNames[r]) : "";
                     System.Console.Error.Write(
                         new String(' ', indent * 2)
                         + "Entry "
                         + here
+                        + " State "
+                        + state
+                        + name
+                        + " tokenIndex "
+                        + token_index
+                        + " "
+                        + input_token.Text
                         + " return ");
                 }
 
@@ -477,10 +495,20 @@ namespace pl1
 
             if (_log_parse)
             {
+                var n = _parser.Atn.ruleToStartState.Where(t => t.stateNumber == state.stateNumber);
+                var r = n.Any() ? n.FirstOrDefault().ruleIndex : -1;
+                var name = (r >= 0) ? (" " + _parser.RuleNames[r]) : "";
                 System.Console.Error.Write(
                     new String(' ', indent * 2)
                     + "Entry "
                     + here
+                    + " State "
+                    + state
+                    + name
+                    + " tokenIndex "
+                    + token_index
+                    + " "
+                    + input_token.Text
                     + " return ");
                 string str = PrintResult(result);
                 System.Console.Error.WriteLine(
