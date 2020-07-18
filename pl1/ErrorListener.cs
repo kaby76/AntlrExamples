@@ -28,11 +28,10 @@ namespace pl1
             int col, string msg, RecognitionException e)
         {
             had_error = true;
-            if (false && _first_time)
+            if (_first_time)
             {
                 try
                 {
-                    _first_time = false;
                     LASets la_sets = new LASets();
                     IntervalSet set = la_sets.Compute(_parser, _token_stream, line, col);
                     List<string> result = new List<string>();
@@ -41,6 +40,7 @@ namespace pl1
                         string rule_name = _parser.Vocabulary.GetSymbolicName(r);
                         result.Add(rule_name);
                     }
+
                     if (result.Any())
                     {
                         System.Console.Error.WriteLine("Parse error line/col " + line + "/" + col
@@ -55,7 +55,9 @@ namespace pl1
                     return;
                 }
                 catch (Exception)
-                { }
+                {
+                    System.Console.Error.WriteLine("crash!");
+                }
             }
             base.SyntaxError(output, recognizer, offendingSymbol, line, col, msg, e);
         }
