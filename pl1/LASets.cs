@@ -16,7 +16,11 @@ namespace pl1
         private CommonTokenStream _token_stream;
         private List<IToken> _input;
         private int _cursor;
-        private readonly Dictionary<Pair<ATNState, int>, bool> _visited = new Dictionary<Pair<ATNState, int>, bool>();
+
+        private readonly Dictionary<Tuple<ATNState, int, int>, bool> _visited =
+            new Dictionary<Tuple<ATNState, int, int>, bool>();
+        private readonly Dictionary<Tuple<ATNState, int, int, List<int>>, bool> _visited_extra =
+            new Dictionary<Tuple<ATNState, int, int, List<int>>, bool>();
         private HashSet<ATNState> _stop_states;
         private HashSet<ATNState> _start_states;
         private bool _log_parse = false;
@@ -42,8 +46,8 @@ namespace pl1
         public IntervalSet Compute(Parser parser, CommonTokenStream token_stream, int line, int col)
         {
             IntervalSet result = new IntervalSet();
-            _log_closure = true;
-            _log_parse = true;
+            //_log_closure = true;
+            //_log_parse = true;
             _input = new List<IToken>();
             _parser = parser;
             _token_stream = token_stream;
@@ -83,7 +87,7 @@ namespace pl1
             _token_stream.Seek(currentIndex);
             _reentry = false;
             // Start parse from a fake initial state.
-            List<List<Edge>> all_parses = EnterState(new Edge()
+            List<List<Edge>> all_parses = EnterState(new List<int>() {}, new Edge()
             {
                 _index = 0,
                 _index_at_transition = 0,
@@ -161,35 +165,19 @@ namespace pl1
 
         // Step to state and continue parsing input.
         // Returns a list of transitions leading to a state that accepts input.
-        private List<List<Edge>> EnterState(Edge t, int indent)
+        private List<List<Edge>> EnterState(List<int> p, Edge t, int indent)
         {
             int here = ++entry_value;
             int index_on_transition = t._index_at_transition;
             int token_index = t._index;
             ATNState state = t._to;
-            IToken input_token = _input[token_index];
-
-            if (_log_parse)
-            {
-                var n = _parser.Atn.ruleToStartState.Where(t => t.stateNumber == state.stateNumber);
-                var r = n.Any() ? n.FirstOrDefault().ruleIndex : -1;
-                var name = (r >= 0) ? (" " + _parser.RuleNames[r]) : "";
-                System.Console.Error.WriteLine(
-                    new String(' ', indent * 2)
-                    + "Entry "
-                    + here
-                    + " State "
-                    + state
-                    + name
-                    + " tokenIndex "
-                    + token_index
-                    + " "
-                    + input_token.Text
-                );
-            }
+            var rule_match = _parser.Atn.ruleToStartState.Where(t => t.stateNumber == state.stateNumber);
+            var start_rule = rule_match.Any() ? rule_match.FirstOrDefault().ruleIndex : -1;
+            var q = p.ToList();
+            if (start_rule >= 0) q.Add(start_rule);
 
             // Upon reaching the cursor, return match.
-            bool at_match = input_token.TokenIndex >= _cursor;
+            bool at_match = token_index == _cursor;
             if (at_match)
             {
                 if (_log_parse)
@@ -211,18 +199,64 @@ namespace pl1
                 return res;
             }
 
-            if (_visited.ContainsKey(new Pair<ATNState, int>(state, token_index)))
+            IToken input_token = _input[token_index];
+
+            if (_log_parse)
+            {
+                var name = (start_rule >= 0) ? (" " + _parser.RuleNames[start_rule]) : "";
+                System.Console.Error.WriteLine(
+                    new String(' ', indent * 2)
+                    + "Entry "
+                    + here
+                    + " State "
+                    + state
+                    + name
+                    + " tokenIndex "
+                    + token_index
+                    + " "
+                    + input_token.Text
+                );
+            }
+
+            bool at_match2 = input_token.TokenIndex >= _cursor;
+            if (at_match2)
             {
                 if (_log_parse)
                 {
-                    System.Console.Error.WriteLine(
+                    System.Console.Error.Write(
                         new String(' ', indent * 2)
-                        + "already visited.");
+                        + "Entry "
+                        + here
+                        + " return ");
                 }
-                return null;
+
+                List<List<Edge>> res = new List<List<Edge>>() { new List<Edge>() { t } };
+                if (_log_parse)
+                {
+                    string str = PrintResult(res);
+                    System.Console.Error.WriteLine(
+                        str);
+                }
+                return res;
             }
 
-            _visited[new Pair<ATNState, int>(state, token_index)] = true;
+            if (_visited.ContainsKey(new Tuple<ATNState, int, int>(state, token_index, indent)))
+            {
+                if (_visited_extra.ContainsKey(new Tuple<ATNState, int, int, List<int>>(
+                    state, token_index, indent, p)))
+                {
+                    if (_log_parse)
+                    {
+                        System.Console.Error.WriteLine(
+                            new String(' ', indent * 2)
+                            + "already visited.");
+                    }
+                    return null;
+                }
+            }
+
+            _visited_extra[new Tuple<ATNState, int, int, List<int>>(state, token_index, indent, q)] = true;
+            _visited[new Tuple<ATNState, int, int>(state, token_index, indent)] = true;
 
             List<List<Edge>> result = new List<List<Edge>>();
 
@@ -267,7 +301,7 @@ namespace pl1
                         {
                             RuleTransition rule = (RuleTransition)transition;
                             ATNState sub_state = rule.target;
-                            matches = EnterState(new Edge()
+                            matches = EnterState(q, new Edge()
                             {
                                 _from = state,
                                 _to = rule.target,
@@ -303,7 +337,7 @@ namespace pl1
                                     }
                                     else
                                     {
-                                        List<List<Edge>> xxx = EnterState(new Edge()
+                                        List<List<Edge>> xxx = EnterState(q, new Edge()
                                         {
                                             _from = f._to,
                                             _to = rule.followState,
@@ -328,9 +362,9 @@ namespace pl1
                                             foreach (List<Edge> y in xxx)
                                             {
                                                 List<Edge> copy = y.ToList();
-                                                foreach (Edge q in match)
+                                                foreach (Edge g in match)
                                                 {
-                                                    copy.Add(q);
+                                                    copy.Add(g);
                                                 }
                                                 new_matches.Add(copy);
                                             }
@@ -346,7 +380,7 @@ namespace pl1
                     case TransitionType.PREDICATE:
                         if (CheckPredicate((PredicateTransition)transition))
                         {
-                            matches = EnterState(new Edge()
+                            matches = EnterState(q, new Edge()
                             {
                                 _from = state,
                                 _to = transition.target,
@@ -369,7 +403,7 @@ namespace pl1
                         break;
 
                     case TransitionType.WILDCARD:
-                        matches = EnterState(new Edge()
+                        matches = EnterState(q, new Edge()
                         {
                             _from = state,
                             _to = transition.target,
@@ -394,7 +428,7 @@ namespace pl1
                     default:
                         if (transition.IsEpsilon)
                         {
-                            matches = EnterState(new Edge()
+                            matches = EnterState(q, new Edge()
                             {
                                 _from = state,
                                 _to = transition.target,
@@ -426,7 +460,7 @@ namespace pl1
 
                                 if (set.Contains(input_token.Type))
                                 {
-                                    matches = EnterState(new Edge()
+                                    matches = EnterState(q, new Edge()
                                     {
                                         _from = state,
                                         _to = transition.target,

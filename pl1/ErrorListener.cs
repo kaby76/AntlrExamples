@@ -40,7 +40,8 @@ namespace pl1
                     foreach (int r in set.ToList())
                     {
                         string rule_name = _parser.Vocabulary.GetSymbolicName(r);
-                        result.Add(rule_name);
+                        if (rule_name != null)
+                            result.Add(rule_name);
                     }
 
                     if (result.Any())
@@ -56,7 +57,7 @@ namespace pl1
 
                     return;
                 }
-                catch (Exception)
+                catch (Exception exc)
                 {
                     System.Console.Error.WriteLine("crash!");
                 }
