@@ -1,9 +1,7 @@
-﻿using System.IO;
-using System.Text;
-
-namespace pl1
+﻿namespace pl1
 {
     using Antlr4.Runtime;
+    using System.Text;
 
     public class Program
     {

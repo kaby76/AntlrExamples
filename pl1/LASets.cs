@@ -1,4 +1,4 @@
-﻿// Template generated code from Antlr4BuildTasks.Template v 7.3
+﻿// Template generated code from Antlr4BuildTasks.Template v 8.1
 namespace pl1
 {
     using Antlr4.Runtime;
@@ -37,7 +37,6 @@ namespace pl1
             public int _index_at_transition;
             public int _index; // Where we are in parse at _to state.
         }
-
 
         public LASets()
         {

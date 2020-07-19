@@ -1,4 +1,4 @@
-﻿// Template generated code from Antlr4BuildTasks.Template v 7.3
+﻿// Template generated code from Antlr4BuildTasks.Template v 8.1
 namespace pl1
 {
     using Antlr4.Runtime;
@@ -42,6 +42,8 @@ namespace pl1
         public static StringBuilder OutputTree(this IParseTree tree, CommonTokenStream stream)
         {
             StringBuilder sb = new StringBuilder();
+            changed = 0;
+            first_time = true;
             tree.ParenthesizedAST(sb, stream);
             return sb;
         }

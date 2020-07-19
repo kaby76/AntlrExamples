@@ -1,4 +1,4 @@
-﻿// Template generated code from Antlr4BuildTasks.Template v 7.3
+﻿// Template generated code from Antlr4BuildTasks.Template v 8.1
 namespace pl1
 {
     using Antlr4.Runtime;
@@ -16,12 +16,19 @@ namespace pl1
         private readonly CommonTokenStream _token_stream;
         private bool _first_time;
 
+        public bool UseNfaInterpForErrors
+        {
+            get;
+            set;
+        }
+
         public ErrorListener(Parser parser, Lexer lexer, CommonTokenStream token_stream)
         {
             _parser = parser;
             _lexer = lexer;
             _token_stream = token_stream;
             _first_time = true;
+            UseNfaInterpForErrors = true;
         }
 
         private static int count = 0;
@@ -29,8 +36,9 @@ namespace pl1
             int col, string msg, RecognitionException e)
         {
             had_error = true;
-            if (_first_time)
+            if (_first_time && UseNfaInterpForErrors)
             {
+                _first_time = false;
                 try
                 {
                     System.Console.WriteLine("Count " + ++count);
@@ -54,12 +62,10 @@ namespace pl1
                     {
                         base.SyntaxError(output, recognizer, offendingSymbol, line, col, msg, e);
                     }
-
                     return;
                 }
                 catch (Exception exc)
                 {
-                    System.Console.Error.WriteLine("crash!");
                 }
             }
             base.SyntaxError(output, recognizer, offendingSymbol, line, col, msg, e);
