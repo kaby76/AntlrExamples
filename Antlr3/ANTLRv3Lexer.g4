@@ -27,7 +27,7 @@
 */
 lexer grammar ANTLRv3Lexer;
 
-options { superClass = LexerAdaptor; }
+options { superClass = Antlr3LexerAdaptor; }
 
 channels { OFF_CHANNEL }
 

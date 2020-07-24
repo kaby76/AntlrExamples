@@ -7,21 +7,21 @@ namespace te
     using Antlr4.Runtime.Misc;
 
 #pragma warning disable CA1012 // Abstract types should not have constructors
-    public abstract class LexerAdaptor : Lexer
+    public abstract class Antlr3LexerAdaptor : Lexer
 #pragma warning restore CA1012 // But Lexer demands it - old 
     {
-    // I copy a reference to the stream, so It can be used as a Char Stream, not as a IISStream
+        // I copy a reference to the stream, so It can be used as a Char Stream, not as a IISStream
         readonly ICharStream stream;
-    // Tokens are read only so I hack my way
+        // Tokens are read only so I hack my way
         readonly FieldInfo tokenInput = typeof(CommonToken).GetField("_type", BindingFlags.NonPublic | BindingFlags.Instance);
-        protected LexerAdaptor(ICharStream input)
-                : base(input, Console.Out, Console.Error)
+        protected Antlr3LexerAdaptor(ICharStream input)
+            : base(input, Console.Out, Console.Error)
         {
             stream = input;
         }
 
-        protected LexerAdaptor(ICharStream input, TextWriter output, TextWriter errorOutput)
-                : base(input, output, errorOutput)
+	    protected Antlr3LexerAdaptor(ICharStream input, TextWriter output, TextWriter errorOutput)
+            : base(input, output, errorOutput)
         {
             stream = input;
         }
