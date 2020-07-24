@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "te": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\kenne\\te\\ex\\simplecalc.g"
+    }
+  }
+}
