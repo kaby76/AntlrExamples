@@ -57,11 +57,11 @@ actionScopeName
    ;
 
 optionsSpec
-   : OPTIONS LBRACE (option SEMI)* RBRACE
+   : OPTIONS LBRACE option* RBRACE
    ;
 
 option
-   : id EQUAL optionValue
+   : id EQUAL optionValue SEMI
    ;
 
 optionValue

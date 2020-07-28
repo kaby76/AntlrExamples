@@ -1,10 +1,10 @@
-using System;
-using System.Reflection;
 namespace te
 {
-    using System.IO;
     using Antlr4.Runtime;
     using Antlr4.Runtime.Misc;
+    using System;
+    using System.IO;
+    using System.Reflection;
 
 #pragma warning disable CA1012 // Abstract types should not have constructors
     public abstract class Antlr3LexerAdaptor : Lexer
