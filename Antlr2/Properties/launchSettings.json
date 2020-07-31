@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "te": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\kenne\\Documents\\Antlrexamples\\Antlr2\\ex\\antlrv2.g"
+    }
+  }
+}

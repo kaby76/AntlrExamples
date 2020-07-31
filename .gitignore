@@ -205,3 +205,5 @@ Antlr3/bin/
 *.c
 *.h
 Antlr3/obj/
+Antlr2/bin/
+Antlr2/obj/
