@@ -1,7 +1,8 @@
 grammar fluent;
 
+
 /* An FTL file defines a Resource consisting of Entries. */
-resource            : (entry | Blank_block | junk)*;
+resource            : (entry | blank_block)* EOF;
 
 /* Entries are the main building blocks of Fluent. They define translations and
  * contextual and semantic information about the translations. During the AST
@@ -9,16 +10,17 @@ resource            : (entry | Blank_block | junk)*;
  * the number of #) are joined together. Single-# comments directly preceding
  * Messages and Terms are attached to the Message or Term and are not
  * standalone Entries. */
-entry               : (message Line_end)
-                      | (term Line_end)
-                      | commentLine;
-message             : identifier Blank_inline? '=' Blank_inline? ((pattern attribute*) | (attribute+));
-term                : '-' identifier Blank_inline? '=' Blank_inline? pattern attribute*;
+entry               : (message line_end)
+                      | (term line_end)
+                      | commentLine
+					  ;
+message             : identifier blank_inline? '=' blank_inline? ((pattern attribute*) | (attribute+));
+term                : '-' identifier blank_inline? '=' blank_inline? pattern attribute*;
 
 /* Adjacent comment lines of the same comment type are joined together during
  * the AST construction. */
-commentLine         : ('###' | '##' | '#') ('\u0020' Comment_char*)? Line_end;
-Comment_char        : Any_char /*TODO - Line_end */;
+commentLine         : ('#' '#' '#' | '#' '#' | '#') (' ' comment_char*)? line_end;
+comment_char        : any_char_minus_line_end;
 
 /* Junk represents unparsed content.
  *
@@ -26,11 +28,11 @@ Comment_char        : Any_char /*TODO - Line_end */;
  * be a beginning of a new message, term, or a comment. Any whitespace
  * following a broken Entry is also considered part of Junk.
  */
-junk                : Junk_line (Junk_line /*TODO - '#' - '-' - [a-zA-Z] */ )*;
-Junk_line           : /[^\n]*/ ('\u000A' | EOF);
+junk                : junk_line (junk_line /*TODO - '#' - '-' - [a-zA-Z] */ )*;
+junk_line           : .*? (lf | EOF);
 
 /* Attributes of Messages and Terms. */
-attribute           : Line_end Blank? '.' identifier Blank_inline? '=' Blank_inline? pattern;
+attribute           : line_end blank? '.' identifier blank_inline? '=' blank_inline? pattern;
 
 /* Patterns are values of Messages, Terms, Attributes and Variants. */
 pattern             : patternElement+;
@@ -39,20 +41,20 @@ pattern             : patternElement+;
  * Text needs to be indented and start with a non-special character.
  * Placeables can start at the beginning of the line or be indented.
  * Adjacent TextElements are joined in AST creation. */
-patternElement      : Inline_text
-                      | Block_text
+patternElement      : inline_text
+                      | block_text
                       | inline_placeable
                       | block_placeable;
-Inline_text         : Text_char+;
-Block_text          : Blank_block Blank_inline Indented_char Inline_text?;
-inline_placeable    : '{' Blank? (selectExpression | inlineExpression) Blank? '}';
-block_placeable     : Blank_block Blank_inline? inline_placeable;
+inline_text         : text_char+;
+block_text          : blank_block blank_inline indented_char inline_text?;
+inline_placeable    : '{' blank? (selectExpression | inlineExpression) blank? '}';
+block_placeable     : blank_block blank_inline? inline_placeable;
 
 /* Rules for validating expressions in Placeables and as selectors of
  * SelectExpressions are documented in spec/valid.md and enforced in
  * syntax/abstract.js. */
-inlineExpression    : StringLiteral
-                      | NumberLiteral
+inlineExpression    : stringLiteral
+                      | numberLiteral
                       | functionReference
                       | messageReference
                       | termReference
@@ -60,8 +62,8 @@ inlineExpression    : StringLiteral
                       | inline_placeable;
 
 /* Literals */
-StringLiteral       : '"' Quoted_char* '"';
-NumberLiteral       : '-'? Digits ('.' Digits)?;
+stringLiteral       : '"' quoted_char* '"';
+numberLiteral       : '-'? digits ('.' digits)?;
 
 /* Inline Expressions */
 functionReference   : identifier callArguments;
@@ -69,27 +71,22 @@ messageReference    : identifier attributeAccessor?;
 termReference       : '-' identifier attributeAccessor? callArguments?;
 variableReference   : '$' identifier;
 attributeAccessor   : '.' identifier;
-callArguments       : Blank? '(' Blank? argument_list Blank? ')';
-argument_list       : (argument Blank? ',' Blank?)* argument?;
+callArguments       : blank? '(' blank? argument_list blank? ')';
+argument_list       : (argument blank? ',' blank?)* argument?;
 argument            : namedArgument
                       | inlineExpression;
-namedArgument       : identifier Blank? ':' Blank? (StringLiteral | NumberLiteral);
+namedArgument       : identifier blank? ':' blank? (stringLiteral | numberLiteral);
 
 /* Block Expressions */
-selectExpression    : inlineExpression Blank? '->' Blank_inline? variant_list;
-variant_list        : variant* defaultVariant variant* Line_end;
-variant             : Line_end Blank? variantKey Blank_inline? pattern;
-defaultVariant      : Line_end Blank? '*' variantKey Blank_inline? pattern;
-variantKey          : '[' Blank? (NumberLiteral | identifier) Blank? ']';
+selectExpression    : inlineExpression blank? '-' '>' blank_inline? variant_list;
+variant_list        : variant* defaultVariant variant* line_end;
+variant             : line_end blank? variantKey blank_inline? pattern;
+defaultVariant      : line_end blank? '*' variantKey blank_inline? pattern;
+variantKey          : '[' blank? (numberLiteral | identifier) blank? ']';
 
 /* Identifier */
-identifier : Identifier;
+identifier : (lowercase | uppercase) (lowercase | uppercase | digit | underscore | dash)+ ;
 
-
-
-// LEXER
-
-Identifier          : [a-zA-Z] [a-zA-Z0-9_-]*;
 
 /* Content Characters
  *
@@ -100,7 +97,8 @@ Identifier          : [a-zA-Z] [a-zA-Z0-9_-]*;
  * Some Unicode characters, even if allowed, should be avoided in Fluent
  * resources. See spec/recommendations.md.
  */
-Any_char            : [\u0000-\u{10FFFF}];
+any_char : lowercase | uppercase | digit | underscore | dash | space | line_end | others;
+any_char_minus_line_end : lowercase | uppercase | digit | underscore | dash | space | others;
 
 /* Text elements
  *
@@ -111,10 +109,9 @@ Any_char            : [\u0000-\u{10FFFF}];
  * requirement some text characters may not appear as the first character on a
  * new line.
  */
-Special_text_char   : '{'
-                      | '}';
-Text_char           : Any_char /*TODO - Special_text_char - Line_end */;
-Indented_char       : Text_char /*TODO - '[' - '*' - '.' */;
+special_text_char   : '{' | '}';
+text_char           : any_char_minus_line_end /*TODO - Special_text_char - Line_end */;
+indented_char       : text_char /*TODO - '[' - '*' - '.' */;
 
 /* String literals
  *
@@ -126,22 +123,53 @@ Indented_char       : Text_char /*TODO - '[' - '*' - '.' */;
  * literal opening brace ({) is allowed in string literals because they may not
  * comprise placeables.
  */
-Special_quoted_char : '"'
-                      | '\\';
-Special_escape      : '\\' Special_quoted_char;
-Unicode_escape      : ('\\u' /[0-9a-fA-F]{4}/)
-                      | ('\\U' /[0-9a-fA-F]{6}/);
-Quoted_char         : (Any_char /*TODO - Special_quoted_char - Line_end */)
-                      | Special_escape
-                      | Unicode_escape;
+special_quoted_char : '"' | '\\';
+special_escape      : '\\' special_quoted_char;
+unicode_escape      : 
+	(
+		'\\' 'u'
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit))
+	| (
+		'\\' 'U'
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit)
+		(a_through_f_lc | a_through_f_uc | digit))
+	;
+quoted_char         : (any_char_minus_line_end /*TODO - Special_quoted_char - Line_end */)
+                      | special_escape
+                      | unicode_escape;
 
 /* Numbers */
-Digits              : [0-9]+;
+digits              : digit+;
 
 /* Whitespace */
-Blank_inline        : '\u0020'+;
-Line_end            : '\u000D\u000A'
-                      | '\u000A'
-		      ;
-Blank_block         : (Blank_inline? Line_end)+;
-Blank               : (Blank_inline | Line_end)+;
+blank_inline        : space+;
+cr : '\r';
+lf : '\n';
+line_end            : cr lf | lf  ;
+blank_block         : (blank_inline? line_end)+;
+blank               : (blank_inline | line_end)+;
+
+lowercase :
+'a' | 'b' | 'c' | 'd' | 'e' | 'f'
+ | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p'
+ | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+;
+a_through_f_lc : 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
+uppercase :
+ 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
+ | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P'
+ | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+ ;
+a_through_f_uc :  | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' ;
+digit : '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' ;
+underscore : '_';
+dash : '-';
+space : ' ' | '\t';
+others : '!' | ',' ;
