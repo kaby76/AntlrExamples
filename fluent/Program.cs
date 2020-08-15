@@ -45,8 +45,13 @@ namespace fluent
             }
             else
             {
-                Try(@"hello = Hello
+                Try(@"hello = Hello, world!
 ");
+                Try(@"hello = Hello, world!
+
+
+");
+                Try(@"hello = Hello, world!");
             }
         }
 
