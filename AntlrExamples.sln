@@ -34,6 +34,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AntlrTargetCSharp", "AntlrT
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "pl1", "pl1\pl1.csproj", "{36AA8B7E-926D-478D-B0F4-4E8B8CB151E8}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Antlr2", "Antlr2\Antlr2.csproj", "{3BEDDCFF-BBE3-4CF4-944F-BFE8736001DC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Antlr3", "Antlr3\Antlr3.csproj", "{23DD919C-4D20-4818-9F17-FE29B551B3C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -92,6 +96,14 @@ Global
 		{36AA8B7E-926D-478D-B0F4-4E8B8CB151E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36AA8B7E-926D-478D-B0F4-4E8B8CB151E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36AA8B7E-926D-478D-B0F4-4E8B8CB151E8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3BEDDCFF-BBE3-4CF4-944F-BFE8736001DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BEDDCFF-BBE3-4CF4-944F-BFE8736001DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BEDDCFF-BBE3-4CF4-944F-BFE8736001DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BEDDCFF-BBE3-4CF4-944F-BFE8736001DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23DD919C-4D20-4818-9F17-FE29B551B3C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23DD919C-4D20-4818-9F17-FE29B551B3C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23DD919C-4D20-4818-9F17-FE29B551B3C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23DD919C-4D20-4818-9F17-FE29B551B3C5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
