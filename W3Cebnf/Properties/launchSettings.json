@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "W3Cebnf": {
+      "commandName": "Project",
+      "commandLineArgs": "-tree -tokens $(ProjectDir)xpath.ebnf"
+    }
+  }
+}
