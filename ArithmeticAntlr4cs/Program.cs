@@ -11,7 +11,7 @@
             var lexer = new arithmeticLexer(str);
             var tokens = new CommonTokenStream(lexer);
             var parser = new arithmeticParser(tokens);
-            var tree = parser.file();
+            var tree = parser.expression();
             System.Console.WriteLine(tree.ToStringTree(parser.RuleNames));
         }
     }
