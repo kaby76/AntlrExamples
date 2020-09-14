@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "a": {
+      "commandName": "Project",
+      "commandLineArgs": "C:/Users/kenne/a/input"
+    }
+  }
+}
