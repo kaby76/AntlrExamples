@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CSharp": {
+      "commandName": "Project",
+      "commandLineArgs": "d:\\roslyn\\src\\Compilers\\CSharp\\Portable\\Parser\\LanguageParser.cs"
+    }
+  }
+}

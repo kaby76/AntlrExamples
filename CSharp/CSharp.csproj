@@ -6,14 +6,6 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <Antlr4 Include="ANTLRv4Parser.g4">
-      <Package>Antlr</Package>
-      <AntOutDir>$(OutputPath)</AntOutDir>
-    </Antlr4>
-    <Antlr4 Include="ANTLRv4Lexer.g4">
-      <Package>Antlr</Package>
-      <AntOutDir>$(OutputPath)</AntOutDir>
-    </Antlr4>
     <Antlr4 Include="CSharpParser.g4">
       <Package>Antlr</Package>
       <AntOutDir>$(OutputPath)</AntOutDir>

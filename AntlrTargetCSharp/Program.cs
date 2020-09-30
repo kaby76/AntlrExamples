@@ -1,5 +1,4 @@
-﻿// Template generated code from Antlr4BuildTasks.Template v 2.1
-namespace Antlr
+﻿namespace Antlr
 {
     using Antlr4.Runtime;
 
