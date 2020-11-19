@@ -1,3 +1,8 @@
+
+// Based on the Dart Programming Language Specification, 5th edition draft,
+// Version 2.2, July 29, 2019;
+// https://dart.dev/guides/language/specifications/DartLangSpec-v2.2.pdf
+
 /*
  [The "BSD licence"]
  Copyright (c) 2019 Wener
