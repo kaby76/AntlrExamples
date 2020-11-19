@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "consoleapp": {
+      "commandName": "Project",
+      "commandLineArgs": "examples/d10.dart",
+      "workingDirectory": "C:\\Users\\kenne\\Dart"
+    }
+  }
+}
