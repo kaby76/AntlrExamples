@@ -1,11 +1,9 @@
 ﻿namespace Filter
 {
     using Antlr4.Runtime;
-    using System.Text;
 
     public class Program
     {
-        static bool have_files = false;
         static void Main(string[] args)
         {
             Try("A and B");
@@ -23,7 +21,7 @@
             var listener_parser = new ErrorListener<IToken>();
             lexer.AddErrorListener(listener_lexer);
             parser.AddErrorListener(listener_parser);
-            var tree = parser.filter();
+            var tree = parser.booleanAndExpression();
             if (listener_lexer.had_error || listener_parser.had_error)
                 System.Console.WriteLine("error in parse.");
             else
