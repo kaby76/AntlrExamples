@@ -1,0 +1,26 @@
+<!-- Template generated code from Antlr4BuildTasks.dotnet-antlr v 1.5 -->
+<Project Sdk="Microsoft.NET.Sdk" >
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  
+<ItemGroup>
+<Antlr4 Include="JavaScriptLexer.g4" />
+<Antlr4 Include="JavaScriptParser.g4" />
+<Antlr4 Include="JavaScriptLexer.g4" />
+<Antlr4 Include="JavaScriptParser.g4" />
+</ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version ="4.9.1" />
+    <PackageReference Include="Antlr4BuildTasks" Version = "8.13" PrivateAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" >
+    <NoWarn>1701;1702;3021</NoWarn>
+  </PropertyGroup>
+</Project>
