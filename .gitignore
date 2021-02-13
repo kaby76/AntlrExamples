@@ -225,3 +225,15 @@ abcs/bin/
 abcs/obj/
 CSharp/bin/
 CSharp/obj/
+Filter/obj/
+Java/Generated/
+Filter/bin/
+Filter/bad/bin/
+Filter/bad/obj/
+Filter/better/bin/
+Filter/better/obj/
+Filter/mod/obj/
+Javascript/C#/obj/
+Javascript/JS/node_modules/
+Javascript/C#/bin/
+Javascript/JS/package-lock.json

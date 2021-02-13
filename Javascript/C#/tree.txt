@@ -1,0 +1,1 @@
+(program (sourceElements (sourceElement (statement (expressionStatement (expressionSequence (singleExpression (singleExpression (identifier i)) = (singleExpression (literal (numericLiteral 1))))) (eos ;))))) <EOF>)
