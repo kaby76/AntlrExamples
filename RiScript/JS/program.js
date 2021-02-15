@@ -3,8 +3,8 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const antlr4 = require('antlr4');
-import JavaScriptLexer from './JavaScriptLexer.js';
-import JavaScriptParser from './JavaScriptParser.js';
+import RiScriptLexer from './RiScriptLexer.js';
+import RiScriptParser from './RiScriptParser.js';
 const strops = require('typescript-string-operations');
 let fs = require('fs-extra')
 
@@ -23,12 +23,8 @@ class MyErrorListener extends antlr4.error.ErrorListener {
 		console.error(`${offendingSymbol} line ${line}, col ${column}: ${msg}`);
 	}
 }
-let a1 = [];
-a1.push(null);
-a1.push(null);
-a1.push(null);
-	let x = antlr4.Utils.arrayToString(a1);
 
+var show_tokens = false;
 var show_tree = false;
 var input = null;
 var file_name = null;
@@ -62,18 +58,17 @@ if (input == null && file_name == null)
     }
     var input = sb.ToString();
     str = antlr4.CharStreams.fromString(input);
-} else if (input != null)
-{
-    str = antlr4.CharStreams.fromString(input);
-} else if (file_name != null)
-{
-    str = antlr4.CharStreams.fromPathSync(file_name, 'utf8');
 }
+
+for (var kk = 0; kk < 99; ++kk)
+{
+	
+str = antlr4.CharStreams.fromPathSync(file_name, 'utf8');
 var num_errors = 0;
-const lexer = new JavaScriptLexer(str);
+const lexer = new RiScriptLexer(str);
 lexer.strictMode = false;
 const tokens = new antlr4.CommonTokenStream(lexer);
-const parser = new JavaScriptParser(tokens);
+const parser = new RiScriptParser(tokens);
 lexer.removeErrorListeners();
 parser.removeErrorListeners();
 parser.addErrorListener(new MyErrorListener());
@@ -91,18 +86,9 @@ if (show_tokens)
     }
 }
 lexer.reset();
-const tree = parser.program();
+const tree = parser.script();
 if (show_tree)
 {
     console.log(tree.toStringTree(parser.ruleNames));
 }
-if (num_errors > 0)
-{
-    console.log('error in parse.');
-    process.exitCode = 1;
-}
-else
-{
-    console.log('parse completed.');
-    process.exitCode = 0;
 }

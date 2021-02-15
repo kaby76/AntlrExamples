@@ -13,11 +13,19 @@ export default class JavaScriptLexerBase extends antlr4.Parser {
     }
 
     prev(str) {
-        const source = this._input.LT(-1).source[1].strdata;
-        const start = this._input.LT(-1).start;
-        const stop = this._input.LT(-1).stop;
-        const prev = source.slice(start, stop + 1);
-        return prev === str;
+        return  this._input.LT(-1).text === str;
+    }
+
+    // Short form for next(String str)
+    n(str)
+    {
+        return next(str);
+    }
+
+    // Whether the next token value equals to @param str
+    next(str)
+    {
+        return  this._input.LT(1).text === str;
     }
 
     notLineTerminator() {
@@ -52,10 +60,10 @@ export default class JavaScriptLexerBase extends antlr4.Parser {
             return true;
         }
         if (ahead.type === JavaScriptParser.WhiteSpaces) {
-            possibleIndexEosToken = this.getCurrentToken().getTokenIndex() - 2;
+            possibleIndexEosToken = this.getCurrentToken().tokenIndex - 2;
             ahead = this._input.get(possibleIndexEosToken);
         }
-        const text = ahead.type;
+        const text = ahead.text;
         const type = ahead.type;
         return (
                 (type === JavaScriptParser.MultiLineComment &&
