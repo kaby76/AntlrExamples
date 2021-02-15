@@ -199,11 +199,6 @@ AntlrTargetCSharp/bin/
 pl1/bin/
 pl1/obj/
 Antlr3/bin/
-*.java
-*.tokens
-*.as
-*.c
-*.h
 Antlr3/obj/
 Antlr2/bin/
 Antlr2/obj/
