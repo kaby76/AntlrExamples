@@ -6,7 +6,6 @@ const antlr4 = require('antlr4');
 import JavaScriptLexer from './JavaScriptLexer.js';
 import JavaScriptParser from './JavaScriptParser.js';
 
-import CaseChangingStream from './CaseChangingStream.js';
 const strops = require('typescript-string-operations');
 let fs = require('fs-extra')
 

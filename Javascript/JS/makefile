@@ -1,5 +1,5 @@
 # Template generated code from trgen 0.10.0
-JAR = C:/Users/Kenne/Downloads/antlr-4.9.2-complete.jar
+JAR = /tmp/antlr-4.9.3-complete.jar
 CLASSPATH = $(JAR)\;.
 .SUFFIXES: .g4 .js
 ANTLRGRAMMARS ?= $(wildcard *.g4)
@@ -15,7 +15,7 @@ clean:
 	rm -f *.tokens
 	rm -f $(GENERATED)
 run:
-	trwdog node index.js $(RUNARGS)
+	node index.js $(RUNARGS)
 JavaScriptLexer.js : JavaScriptLexer.g4
 	java -jar $(JAR) -encoding utf-8 -Dlanguage=JavaScript  $<
 JavaScriptParser.js : JavaScriptParser.g4
