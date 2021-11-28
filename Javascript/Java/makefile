@@ -1,11 +1,11 @@
 # Template generated code from trgen 0.10.0
-JAR = C:/Users/Kenne/Downloads/antlr-4.9.2-complete.jar
-CLASSPATH = $(JAR)\;.
+JAR = /tmp/antlr-4.9.3-complete.jar
+CLASSPATH = $(JAR):.
 .SUFFIXES: .g4 .java .class
 .java.class:
 	javac -cp $(CLASSPATH) $*.java
 ANTLRGRAMMARS ?= $(wildcard *.g4)
-GENERATED = JavaScriptLexer.java JavaScriptParser.java 
+GENERATED = JavaScriptLexer.java JavaScriptParser.java JavaScriptParserBaseListener.java  JavaScriptParserListener.java
 SOURCES = $(GENERATED) \
     Program.java \
     ErrorListener.java
