@@ -1,28 +1,25 @@
+# Template generated code from trgen 0.10.0
+JAR = C:/Users/Kenne/Downloads/antlr-4.9.2-complete.jar
+CLASSPATH = $(JAR)\;.
 .SUFFIXES: .g4 .js
-
 ANTLRGRAMMARS ?= $(wildcard *.g4)
-
-%Lexer.js %Parser.js : %.g4
-	java -jar `cygpath -w ~/Downloads/antlr-4.9.1-complete.jar` -Dlanguage=JavaScript $<
-
-%.js : %.g4
-	java -jar `cygpath -w ~/Downloads/antlr-4.9.1-complete.jar` -Dlanguage=JavaScript $<
-
-GENERATED = JavaScriptLexer.js JavaScriptParser.js
-
-SOURCES = $(GENERATED) \
-    program.js
-
-default: $(GENERATED)
-	npm i antlr4@4.9.1
-	npm i typescript-string-operations@1.4.1
-	npm i fs-extra
-
+GENERATED = JavaScriptLexer.js JavaScriptParser.js 
+SOURCES = $(GENERATED) index.js
+default: classes
+classes: $(SOURCES)
+	npm install
 clean:
 	rm -rf node_modules
 	rm -f package-lock.json
+	rm -f *.interp
+	rm -f *.tokens
 	rm -f $(GENERATED)
-	rm -f *.tokens *.interp
-
 run:
-	node program.js
+	trwdog node index.js $(RUNARGS)
+JavaScriptLexer.js : JavaScriptLexer.g4
+	java -jar $(JAR) -encoding utf-8 -Dlanguage=JavaScript  $<
+JavaScriptParser.js : JavaScriptParser.g4
+	java -jar $(JAR) -encoding utf-8 -Dlanguage=JavaScript  $<
+
+test:
+	bash test.sh

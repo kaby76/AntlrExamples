@@ -1,34 +1,32 @@
-// Template generated code from Antlr4BuildTasks.dotnet-antlr v 1.5
+// Template generated code from trgen 0.10.0
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const antlr4 = require('antlr4');
 import JavaScriptLexer from './JavaScriptLexer.js';
 import JavaScriptParser from './JavaScriptParser.js';
+
+import CaseChangingStream from './CaseChangingStream.js';
 const strops = require('typescript-string-operations');
 let fs = require('fs-extra')
 
 function getChar() {
-	let buffer = Buffer.alloc(1);
-	var xx = fs.readSync(0, buffer, 0, 1);
-	if (buffer[0] == 0x0a) {
-		return '';
-	}
+    let buffer = Buffer.alloc(1);
+    var xx = fs.readSync(0, buffer, 0, 1);
+    if (xx === 0) {
+        return '';
+    }
     return buffer.toString('utf8');
 }
 
 class MyErrorListener extends antlr4.error.ErrorListener {
-	syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
-		num_errors++;
-		console.error(`${offendingSymbol} line ${line}, col ${column}: ${msg}`);
-	}
+    syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
+        num_errors++;
+        console.error(`${offendingSymbol} line ${line}, col ${column}: ${msg}`);
+    }
 }
-let a1 = [];
-a1.push(null);
-a1.push(null);
-a1.push(null);
-	let x = antlr4.Utils.arrayToString(a1);
 
+var show_tokens = false;
 var show_tree = false;
 var input = null;
 var file_name = null;
@@ -89,8 +87,8 @@ if (show_tokens)
         if (token.type === antlr4.Token.EOF)
             break;
     }
+    lexer.reset();
 }
-lexer.reset();
 const tree = parser.program();
 if (show_tree)
 {
@@ -98,11 +96,11 @@ if (show_tree)
 }
 if (num_errors > 0)
 {
-    console.log('error in parse.');
+    console.error('Parse failed.');
     process.exitCode = 1;
 }
 else
 {
-    console.log('parse completed.');
+    console.error('Parse succeeded.');
     process.exitCode = 0;
 }
