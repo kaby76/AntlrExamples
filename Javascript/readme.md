@@ -4,6 +4,7 @@ This directory contains a copy of the [JavaScript](https://github.com/antlr/gram
 in [grammars-v4](https://github.com/antlr/grammars-v4) that has been set up with
 [trgen](https://github.com/kaby76/Domemtech.Trash/tree/main/trgen) drivers. Trgen is
 part of the [Trash toolkit](https://github.com/kaby76/Domemtech.Trash) for grammars.
+The driver code here is generated for the Linux OS or MSYS2 in the Windows OS.
 
 The code contained here can be built using "make" or "dotnet build".
 You will need to set yourself up with the appropriate environment for the build,

@@ -1,9 +1,9 @@
 # Template generated code from trgen 0.10.0
 JAR = /tmp/antlr-4.9.3-complete.jar
-CLASSPATH = $(JAR)\;.
+CLASSPATH = $(JAR):.
 .SUFFIXES: .g4 .js
 ANTLRGRAMMARS ?= $(wildcard *.g4)
-GENERATED = JavaScriptLexer.js JavaScriptParser.js 
+GENERATED = JavaScriptLexer.js JavaScriptParser.js JavaScriptParserListener.js
 SOURCES = $(GENERATED) index.js
 default: classes
 classes: $(SOURCES)
