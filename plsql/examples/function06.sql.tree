@@ -1,0 +1,1 @@
+(sql_script (unit_statement (procedure_call (routine_name (identifier (id_expression (regular_id (non_reserved_keywords_pre12c call))))))) (unit_statement (procedure_call (routine_name (identifier (id_expression (regular_id dbms_scheduler))) . (id_expression (regular_id auto_purge))) (function_argument ( )))) <EOF>)

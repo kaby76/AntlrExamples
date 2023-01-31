@@ -1,0 +1,1 @@
+(sql_script (unit_statement (drop_user DROP USER (user_object_name (id_expression (regular_id sidney))))) ; (unit_statement (drop_user DROP USER (user_object_name (id_expression (regular_id sidney))) CASCADE)) ; <EOF>)
